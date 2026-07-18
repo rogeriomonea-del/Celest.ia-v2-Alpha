@@ -1,0 +1,6 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "installCommand": "npm install --prefix celestia_dashboard",
+  "buildCommand": "npm run build --prefix celestia_dashboard",
+  "outputDirectory": "celestia_dashboard/dist"
+}
