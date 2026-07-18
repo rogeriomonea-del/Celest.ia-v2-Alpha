@@ -21,15 +21,17 @@ USER_AGENT = (
 )
 
 
-async def get_json(
+async def _request_json(
+    method: str,
     url: str,
     *,
     params: dict | None = None,
+    json_body: dict | None = None,
     headers: dict | None = None,
     timeout_s: float = 20.0,
     retries: int = 3,
 ) -> dict:
-    """GET a JSON document with exponential-backoff retries."""
+    """HTTP request returning JSON, with exponential-backoff retries."""
     last_error: Exception | None = None
     merged_headers = {"User-Agent": USER_AGENT, "Accept": "application/json"}
     if headers:
@@ -37,7 +39,9 @@ async def get_json(
     for attempt in range(retries):
         try:
             async with httpx.AsyncClient(timeout=timeout_s) as client:
-                response = await client.get(url, params=params, headers=merged_headers)
+                response = await client.request(
+                    method, url, params=params, json=json_body, headers=merged_headers
+                )
                 if response.status_code == 429 and attempt < retries - 1:
                     await asyncio.sleep(2**attempt)
                     continue
@@ -47,4 +51,30 @@ async def get_json(
             last_error = error
             if attempt < retries - 1:
                 await asyncio.sleep(2**attempt)
-    raise ProviderError(f"GET {url} failed after {retries} attempts: {last_error}")
+    raise ProviderError(f"{method} {url} failed after {retries} attempts: {last_error}")
+
+
+async def get_json(
+    url: str,
+    *,
+    params: dict | None = None,
+    headers: dict | None = None,
+    timeout_s: float = 20.0,
+    retries: int = 3,
+) -> dict:
+    return await _request_json(
+        "GET", url, params=params, headers=headers, timeout_s=timeout_s, retries=retries
+    )
+
+
+async def post_json(
+    url: str,
+    *,
+    json_body: dict,
+    headers: dict | None = None,
+    timeout_s: float = 20.0,
+    retries: int = 3,
+) -> dict:
+    return await _request_json(
+        "POST", url, json_body=json_body, headers=headers, timeout_s=timeout_s, retries=retries
+    )

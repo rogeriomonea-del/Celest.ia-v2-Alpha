@@ -70,6 +70,10 @@ class Settings:
     skyscanner_api_key: str = ""   # SKYSCANNER_API_KEY — Skyscanner Partners v3
     rapidapi_key: str = ""         # RAPIDAPI_KEY — fallback Skyscanner via RapidAPI
 
+    # --- Managed scraping (Firecrawl) ---
+    firecrawl_api_key: str = ""    # FIRECRAWL_API_KEY — scraping gerenciado
+    firecrawl_api_url: str = "https://api.firecrawl.dev/v1/scrape"
+
     # --- Airline scraping (Playwright; no key, URL templates overridable) ---
     copa_booking_url: str = (
         "https://shopping.copaair.com/flights/{origin}-{destination}"
@@ -100,6 +104,9 @@ class Settings:
     def has_skyscanner(self) -> bool:
         return bool(self.skyscanner_api_key or self.rapidapi_key)
 
+    def has_firecrawl(self) -> bool:
+        return bool(self.firecrawl_api_key)
+
 
 def load_settings() -> Settings:
     load_dotenv()
@@ -107,6 +114,8 @@ def load_settings() -> Settings:
         serpapi_key=_env("SERPAPI_KEY"),
         skyscanner_api_key=_env("SKYSCANNER_API_KEY"),
         rapidapi_key=_env("RAPIDAPI_KEY"),
+        firecrawl_api_key=_env("FIRECRAWL_API_KEY"),
+        firecrawl_api_url=_env("FIRECRAWL_API_URL", Settings.firecrawl_api_url),
         copa_booking_url=_env("COPA_BOOKING_URL", Settings.copa_booking_url),
         latam_offers_url=_env("LATAM_OFFERS_URL", Settings.latam_offers_url),
         scraper_headless=_env("SCRAPER_HEADLESS", "1") not in {"0", "false", "no"},

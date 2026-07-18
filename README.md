@@ -19,8 +19,8 @@ Duas peças principais:
         ▼                   ▼                      ▼
 ┌───────────────┐   ┌──────────────────┐   ┌───────────────────┐
 │ PriceScout    │   │ CopaScraper      │   │ LatamScraper      │
-│ Google Flights│   │ Playwright em    │   │ Playwright em     │
-│ + Skyscanner  │   │ shopping.copaair │   │ latamairlines.com │
+│ Google Flights│   │ Firecrawl →      │   │ Firecrawl →       │
+│ + Skyscanner  │   │ Playwright local │   │ Playwright local  │
 │ (PRÉ-FILTRO)  │   │ (ConnectMiles)   │   │ (LATAM Pass)      │
 └───────┬───────┘   └────────┬─────────┘   └─────────┬─────────┘
         │ top-K mais baratos │ ofertas cash + award  │
@@ -77,6 +77,7 @@ Todas as chaves vão no arquivo **`.env` na raiz** (copie de `.env.example`).
 | `SERPAPI_KEY` | SerpApi (Google Flights) | https://serpapi.com | Pré-filtro de preços |
 | `SKYSCANNER_API_KEY` | Skyscanner Partners v3 | https://developers.skyscanner.net | Pré-filtro + descoberta de rotas |
 | `RAPIDAPI_KEY` | RapidAPI (fallback Skyscanner) | https://rapidapi.com | Alternativa sem aprovação de parceiro |
+| `FIRECRAWL_API_KEY` | Firecrawl (scraping gerenciado) | https://firecrawl.dev | Copa/LATAM com anti-bot gerenciado; Playwright local vira fallback |
 | `COPA_BOOKING_URL` / `LATAM_OFFERS_URL` | — | — | Ajustar templates se os sites mudarem |
 | `MILHEIRO_*` | — | — | Valor que você paga por 1.000 milhas |
 | `PREFILTER_TOP_K` / `MAX_SUBAGENTS` | — | — | Custo × velocidade da pesquisa |
