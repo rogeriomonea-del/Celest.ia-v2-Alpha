@@ -1,0 +1,314 @@
+import { findAirport } from './airports'
+import type { Airline, Flight, FlightStop, FlightTag } from '../types'
+
+export const AIRLINES: Record<string, Airline> = {
+  LA: { code: 'LA', name: 'LATAM Airlines', logoGradient: 'from-rose-600 to-red-800' },
+  AD: { code: 'AD', name: 'Azul Linhas Aéreas', logoGradient: 'from-sky-500 to-blue-700' },
+  G3: { code: 'G3', name: 'GOL Linhas Aéreas', logoGradient: 'from-orange-500 to-amber-600' },
+  TP: { code: 'TP', name: 'TAP Air Portugal', logoGradient: 'from-emerald-500 to-green-700' },
+  IB: { code: 'IB', name: 'Iberia', logoGradient: 'from-red-500 to-yellow-500' },
+  AF: { code: 'AF', name: 'Air France', logoGradient: 'from-indigo-600 to-blue-900' },
+  LH: { code: 'LH', name: 'Lufthansa', logoGradient: 'from-amber-400 to-yellow-600' },
+  KL: { code: 'KL', name: 'KLM', logoGradient: 'from-cyan-500 to-sky-700' },
+  CM: { code: 'CM', name: 'Copa Airlines', logoGradient: 'from-blue-600 to-indigo-800' },
+}
+
+interface FlightTemplate {
+  airline: string
+  flightNumber: string
+  departureTime: string
+  arrivalTime: string
+  arrivalDayOffset: number
+  durationMin: number
+  stops: FlightStop[]
+  price: number
+  seatsLeft: number | null
+  tags: FlightTag[]
+  baggage: { carryOn: boolean; checkedBags: number }
+  emissions: 'low' | 'average' | 'high'
+}
+
+const TEMPLATES: FlightTemplate[] = [
+  {
+    airline: 'TP',
+    flightNumber: 'TP 88',
+    departureTime: '22:05',
+    arrivalTime: '11:50',
+    arrivalDayOffset: 1,
+    durationMin: 585,
+    stops: [],
+    price: 3412,
+    seatsLeft: null,
+    tags: ['wifi'],
+    baggage: { carryOn: true, checkedBags: 1 },
+    emissions: 'average',
+  },
+  {
+    airline: 'LA',
+    flightNumber: 'LA 8084',
+    departureTime: '23:35',
+    arrivalTime: '13:35',
+    arrivalDayOffset: 1,
+    durationMin: 600,
+    stops: [],
+    price: 3689,
+    seatsLeft: 3,
+    tags: ['wifi', 'best-rated'],
+    baggage: { carryOn: true, checkedBags: 1 },
+    emissions: 'average',
+  },
+  {
+    airline: 'TP',
+    flightNumber: 'TP 82',
+    departureTime: '11:35',
+    arrivalTime: '01:25',
+    arrivalDayOffset: 1,
+    durationMin: 590,
+    stops: [],
+    price: 4120,
+    seatsLeft: null,
+    tags: ['wifi', 'flexible'],
+    baggage: { carryOn: true, checkedBags: 2 },
+    emissions: 'average',
+  },
+  {
+    airline: 'IB',
+    flightNumber: 'IB 6824',
+    departureTime: '20:15',
+    arrivalTime: '14:10',
+    arrivalDayOffset: 1,
+    durationMin: 715,
+    stops: [{ airportCode: 'MAD', city: 'Madri', layoverMin: 95 }],
+    price: 2847,
+    seatsLeft: null,
+    tags: ['eco'],
+    baggage: { carryOn: true, checkedBags: 1 },
+    emissions: 'low',
+  },
+  {
+    airline: 'AF',
+    flightNumber: 'AF 457',
+    departureTime: '19:10',
+    arrivalTime: '14:45',
+    arrivalDayOffset: 1,
+    durationMin: 775,
+    stops: [{ airportCode: 'CDG', city: 'Paris', layoverMin: 130 }],
+    price: 3095,
+    seatsLeft: null,
+    tags: ['wifi'],
+    baggage: { carryOn: true, checkedBags: 1 },
+    emissions: 'average',
+  },
+  {
+    airline: 'LH',
+    flightNumber: 'LH 507',
+    departureTime: '18:05',
+    arrivalTime: '15:20',
+    arrivalDayOffset: 1,
+    durationMin: 855,
+    stops: [{ airportCode: 'FRA', city: 'Frankfurt', layoverMin: 160 }],
+    price: 2932,
+    seatsLeft: 5,
+    tags: ['eco'],
+    baggage: { carryOn: true, checkedBags: 1 },
+    emissions: 'low',
+  },
+  {
+    airline: 'AD',
+    flightNumber: 'AD 7500',
+    departureTime: '16:40',
+    arrivalTime: '10:05',
+    arrivalDayOffset: 1,
+    durationMin: 745,
+    stops: [{ airportCode: 'VCP', city: 'Campinas', layoverMin: 85 }],
+    price: 3218,
+    seatsLeft: null,
+    tags: ['wifi', 'best-rated'],
+    baggage: { carryOn: true, checkedBags: 1 },
+    emissions: 'average',
+  },
+  {
+    airline: 'KL',
+    flightNumber: 'KL 792',
+    departureTime: '17:55',
+    arrivalTime: '16:30',
+    arrivalDayOffset: 1,
+    durationMin: 995,
+    stops: [{ airportCode: 'AMS', city: 'Amsterdã', layoverMin: 210 }],
+    price: 2789,
+    seatsLeft: null,
+    tags: ['eco'],
+    baggage: { carryOn: true, checkedBags: 1 },
+    emissions: 'low',
+  },
+  {
+    airline: 'CM',
+    flightNumber: 'CM 702',
+    departureTime: '09:20',
+    arrivalTime: '07:45',
+    arrivalDayOffset: 1,
+    durationMin: 1105,
+    stops: [
+      { airportCode: 'PTY', city: 'Cidade do Panamá', layoverMin: 150 },
+      { airportCode: 'MAD', city: 'Madri', layoverMin: 120 },
+    ],
+    price: 2549,
+    seatsLeft: null,
+    tags: [],
+    baggage: { carryOn: true, checkedBags: 2 },
+    emissions: 'high',
+  },
+  {
+    airline: 'G3',
+    flightNumber: 'G3 7602',
+    departureTime: '21:30',
+    arrivalTime: '17:50',
+    arrivalDayOffset: 1,
+    durationMin: 940,
+    stops: [
+      { airportCode: 'GIG', city: 'Rio de Janeiro', layoverMin: 75 },
+      { airportCode: 'MAD', city: 'Madri', layoverMin: 105 },
+    ],
+    price: 2612,
+    seatsLeft: 2,
+    tags: [],
+    baggage: { carryOn: true, checkedBags: 0 },
+    emissions: 'high',
+  },
+  {
+    airline: 'LA',
+    flightNumber: 'LA 8112',
+    departureTime: '13:25',
+    arrivalTime: '05:55',
+    arrivalDayOffset: 1,
+    durationMin: 750,
+    stops: [{ airportCode: 'GIG', city: 'Rio de Janeiro', layoverMin: 90 }],
+    price: 3374,
+    seatsLeft: null,
+    tags: ['wifi'],
+    baggage: { carryOn: true, checkedBags: 1 },
+    emissions: 'average',
+  },
+  {
+    airline: 'IB',
+    flightNumber: 'IB 6826',
+    departureTime: '12:50',
+    arrivalTime: '08:15',
+    arrivalDayOffset: 1,
+    durationMin: 925,
+    stops: [{ airportCode: 'MAD', city: 'Madri', layoverMin: 300 }],
+    price: 2698,
+    seatsLeft: null,
+    tags: ['eco'],
+    baggage: { carryOn: true, checkedBags: 1 },
+    emissions: 'low',
+  },
+  {
+    airline: 'AF',
+    flightNumber: 'AF 459',
+    departureTime: '15:30',
+    arrivalTime: '12:40',
+    arrivalDayOffset: 1,
+    durationMin: 910,
+    stops: [{ airportCode: 'CDG', city: 'Paris', layoverMin: 245 }],
+    price: 2874,
+    seatsLeft: null,
+    tags: ['wifi', 'eco'],
+    baggage: { carryOn: true, checkedBags: 1 },
+    emissions: 'low',
+  },
+  {
+    airline: 'TP',
+    flightNumber: 'TP 84',
+    departureTime: '08:15',
+    arrivalTime: '22:05',
+    arrivalDayOffset: 0,
+    durationMin: 590,
+    stops: [],
+    price: 4890,
+    seatsLeft: 4,
+    tags: ['wifi', 'flexible', 'best-rated'],
+    baggage: { carryOn: true, checkedBags: 2 },
+    emissions: 'average',
+  },
+  {
+    airline: 'AD',
+    flightNumber: 'AD 7512',
+    departureTime: '05:50',
+    arrivalTime: '01:35',
+    arrivalDayOffset: 1,
+    durationMin: 885,
+    stops: [{ airportCode: 'REC', city: 'Recife', layoverMin: 110 }],
+    price: 3056,
+    seatsLeft: null,
+    tags: ['eco', 'wifi'],
+    baggage: { carryOn: true, checkedBags: 1 },
+    emissions: 'low',
+  },
+  {
+    airline: 'LH',
+    flightNumber: 'LH 509',
+    departureTime: '10:10',
+    arrivalTime: '09:30',
+    arrivalDayOffset: 1,
+    durationMin: 1160,
+    stops: [
+      { airportCode: 'FRA', city: 'Frankfurt', layoverMin: 320 },
+      { airportCode: 'MAD', city: 'Madri', layoverMin: 95 },
+    ],
+    price: 2495,
+    seatsLeft: null,
+    tags: [],
+    baggage: { carryOn: true, checkedBags: 1 },
+    emissions: 'high',
+  },
+]
+
+const FALLBACK_HUBS = ['MAD', 'CDG', 'FRA', 'AMS', 'PTY', 'GIG', 'BSB', 'SCL']
+
+/**
+ * A template's hardcoded stopover can collide with the searched endpoints
+ * (e.g. searching GRU → MAD would show a "connection in MAD"). Swap any
+ * colliding stop for a hub not already used by this itinerary.
+ */
+function resolveStops(
+  stops: FlightStop[],
+  originCode: string,
+  destinationCode: string,
+): FlightStop[] {
+  const taken = new Set([originCode, destinationCode, ...stops.map((s) => s.airportCode)])
+  return stops.map((stop) => {
+    if (stop.airportCode !== originCode && stop.airportCode !== destinationCode) return stop
+    const replacement = FALLBACK_HUBS.find((code) => !taken.has(code))
+    if (!replacement) return stop
+    taken.add(replacement)
+    return { ...stop, airportCode: replacement, city: findAirport(replacement).city }
+  })
+}
+
+/**
+ * Builds the mock result set for a route. Simulates what a real GDS/meta
+ * search API would return: the same inventory templates re-keyed to the
+ * searched origin/destination pair.
+ */
+export function buildFlights(originCode: string, destinationCode: string): Flight[] {
+  return TEMPLATES.map((template, index) => ({
+    id: `${template.airline}-${template.flightNumber.replace(/\s/g, '')}-${index}`,
+    airline: AIRLINES[template.airline],
+    flightNumber: template.flightNumber,
+    departure: { time: template.departureTime, airportCode: originCode },
+    arrival: {
+      time: template.arrivalTime,
+      airportCode: destinationCode,
+      dayOffset: template.arrivalDayOffset,
+    },
+    durationMin: template.durationMin,
+    stops: resolveStops(template.stops, originCode, destinationCode),
+    price: template.price,
+    currency: 'BRL',
+    seatsLeft: template.seatsLeft,
+    tags: template.tags,
+    baggage: template.baggage,
+    emissions: template.emissions,
+  }))
+}
