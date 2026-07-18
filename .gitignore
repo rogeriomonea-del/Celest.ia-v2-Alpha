@@ -1,0 +1,22 @@
+# Secrets / local config
+.env
+.env.local
+
+# Firecrawl local cache
+.firecrawl/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.venv/
+venv/
+
+# Node (dashboard tooling)
+node_modules/
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/

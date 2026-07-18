@@ -36,3 +36,11 @@ pytest
 O módulo `scrapers.py` inclui funções que demonstram como coletar preços de voo
 na Copa Airlines e Skyscanner, além de consultar o saldo do programa ConnectMiles.
 Antes de realizar scraping, verifique os termos de uso de cada serviço.
+
+## Dados da web via Firecrawl
+
+O projeto usa o [Firecrawl](https://docs.firecrawl.dev) como camada de dados
+da web (busca, scraping renderizado, interação com páginas com login e
+monitoramento de mudanças). Instalação, credenciais (`.env.example`) e o
+roteamento de cada scraper para o endpoint correto estão em
+[FIRECRAWL.md](FIRECRAWL.md).
