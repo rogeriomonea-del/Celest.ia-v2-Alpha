@@ -39,6 +39,7 @@ export function Header() {
         <div className="flex items-center gap-1 sm:gap-2">
           <button
             type="button"
+            aria-label="Idioma e moeda: BRL, português (Brasil)"
             className="inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100"
           >
             <Globe className="h-4 w-4" aria-hidden="true" />

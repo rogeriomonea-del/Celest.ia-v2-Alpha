@@ -57,8 +57,8 @@ function StopsLine({ flight }: { flight: Flight }) {
         {stopCount === 0
           ? 'Direto'
           : stopCount === 1
-            ? `1 parada · ${flight.stops[0].airportCode}`
-            : `${stopCount} paradas · ${flight.stops.map((stop) => stop.airportCode).join(', ')}`}
+            ? `1 escala · ${flight.stops[0].airportCode}`
+            : `${stopCount} escalas · ${flight.stops.map((stop) => stop.airportCode).join(', ')}`}
       </span>
     </div>
   )
@@ -68,7 +68,7 @@ function ExpandedDetails({ flight }: { flight: Flight }) {
   return (
     <div className="mt-4 space-y-4 rounded-xl bg-slate-50 p-4 text-sm">
       <div>
-        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
           Itinerário
         </p>
         <ol className="space-y-2">
@@ -83,7 +83,7 @@ function ExpandedDetails({ flight }: { flight: Flight }) {
             <li key={stop.airportCode} className="flex items-center gap-3">
               <span className="h-2 w-2 shrink-0 rounded-full bg-amber-500" aria-hidden="true" />
               <span className="text-slate-700">
-                Conexão em <strong className="font-semibold">{stop.city}</strong> (
+                Escala em <strong className="font-semibold">{stop.city}</strong> (
                 {stop.airportCode}) · espera de {formatDuration(stop.layoverMin)}
               </span>
             </li>
@@ -109,7 +109,9 @@ function ExpandedDetails({ flight }: { flight: Flight }) {
           <Luggage className="h-4 w-4 text-slate-400" aria-hidden="true" />
           {flight.baggage.checkedBags === 0
             ? 'Bagagem despachada não incluída'
-            : `${flight.baggage.checkedBags} bagagem${flight.baggage.checkedBags > 1 ? 'ns' : ''} de 23 kg`}
+            : `${flight.baggage.checkedBags} ${
+                flight.baggage.checkedBags > 1 ? 'bagagens' : 'bagagem'
+              } de 23 kg`}
         </span>
         <span className="inline-flex items-center gap-1.5">
           <Leaf className="h-4 w-4 text-slate-400" aria-hidden="true" />
@@ -202,7 +204,7 @@ export function FlightCard({ flight, isCheapest, isFastest }: FlightCardProps) {
           )}
           {flight.tags.includes('eco') && (
             <span className="inline-flex items-center gap-1 text-emerald-600">
-              <Leaf className="h-3.5 w-3.5" aria-hidden="true" /> Eco friendly
+              <Leaf className="h-3.5 w-3.5" aria-hidden="true" /> Sustentável
             </span>
           )}
           {flight.tags.includes('best-rated') && (

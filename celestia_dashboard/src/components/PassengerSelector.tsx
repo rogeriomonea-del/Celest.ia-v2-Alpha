@@ -67,8 +67,21 @@ export function PassengerSelector({
 }: PassengerSelectorProps) {
   const [open, setOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
+  const triggerRef = useRef<HTMLButtonElement>(null)
 
   useClickOutside(containerRef, () => setOpen(false), open)
+
+  const close = () => {
+    setOpen(false)
+    triggerRef.current?.focus()
+  }
+
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'Escape' && open) {
+      event.stopPropagation()
+      close()
+    }
+  }
 
   const totalSeated = passengers.adults + passengers.children
   const totalPassengers = totalSeated + passengers.infants
@@ -82,8 +95,9 @@ export function PassengerSelector({
   }
 
   return (
-    <div ref={containerRef} className="relative h-full">
+    <div ref={containerRef} className="relative h-full" onKeyDown={handleKeyDown}>
       <button
+        ref={triggerRef}
         type="button"
         aria-expanded={open}
         onClick={() => setOpen((current) => !current)}
@@ -96,7 +110,7 @@ export function PassengerSelector({
           aria-hidden="true"
         />
         <span className="min-w-0 flex-1">
-          <span className="block text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+          <span className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">
             Passageiros
           </span>
           <span className="block truncate text-sm font-semibold text-slate-900">
@@ -106,7 +120,7 @@ export function PassengerSelector({
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full z-30 mt-2 w-80 animate-pop rounded-2xl border border-slate-200 bg-white p-4 shadow-xl shadow-slate-900/10">
+        <div className="absolute right-0 top-full z-30 mt-2 w-[min(20rem,calc(100vw-3rem))] animate-pop rounded-2xl border border-slate-200 bg-white p-4 shadow-xl shadow-slate-900/10">
           <div className="divide-y divide-slate-100">
             <StepperRow
               label="Adultos"
@@ -135,7 +149,7 @@ export function PassengerSelector({
           </div>
 
           <div className="mt-2 border-t border-slate-100 pt-3">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
               Classe da cabine
             </p>
             <div className="space-y-1">
@@ -159,7 +173,7 @@ export function PassengerSelector({
 
           <button
             type="button"
-            onClick={() => setOpen(false)}
+            onClick={close}
             className="mt-3 w-full rounded-lg bg-indigo-600 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-700"
           >
             Confirmar

@@ -43,7 +43,7 @@ function toggleValue<T>(list: T[], value: T): T[] {
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
-    <h3 className="mb-3 text-xs font-bold uppercase tracking-wide text-slate-400">{children}</h3>
+    <h3 className="mb-3 text-xs font-bold uppercase tracking-wide text-slate-500">{children}</h3>
   )
 }
 
@@ -170,7 +170,7 @@ export function FilterSidebar({ flights, filters, priceBounds, onChange }: Filte
               >
                 <Icon className="h-4 w-4" aria-hidden="true" />
                 {label}
-                <span className="font-normal text-slate-400">{range}</span>
+                <span className="font-normal text-slate-500">{range}</span>
               </button>
             )
           })}

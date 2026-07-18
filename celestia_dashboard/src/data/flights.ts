@@ -1,3 +1,4 @@
+import { findAirport } from './airports'
 import type { Airline, Flight, FlightStop, FlightTag } from '../types'
 
 export const AIRLINES: Record<string, Airline> = {
@@ -263,6 +264,28 @@ const TEMPLATES: FlightTemplate[] = [
   },
 ]
 
+const FALLBACK_HUBS = ['MAD', 'CDG', 'FRA', 'AMS', 'PTY', 'GIG', 'BSB', 'SCL']
+
+/**
+ * A template's hardcoded stopover can collide with the searched endpoints
+ * (e.g. searching GRU → MAD would show a "connection in MAD"). Swap any
+ * colliding stop for a hub not already used by this itinerary.
+ */
+function resolveStops(
+  stops: FlightStop[],
+  originCode: string,
+  destinationCode: string,
+): FlightStop[] {
+  const taken = new Set([originCode, destinationCode, ...stops.map((s) => s.airportCode)])
+  return stops.map((stop) => {
+    if (stop.airportCode !== originCode && stop.airportCode !== destinationCode) return stop
+    const replacement = FALLBACK_HUBS.find((code) => !taken.has(code))
+    if (!replacement) return stop
+    taken.add(replacement)
+    return { ...stop, airportCode: replacement, city: findAirport(replacement).city }
+  })
+}
+
 /**
  * Builds the mock result set for a route. Simulates what a real GDS/meta
  * search API would return: the same inventory templates re-keyed to the
@@ -280,7 +303,7 @@ export function buildFlights(originCode: string, destinationCode: string): Fligh
       dayOffset: template.arrivalDayOffset,
     },
     durationMin: template.durationMin,
-    stops: template.stops,
+    stops: resolveStops(template.stops, originCode, destinationCode),
     price: template.price,
     currency: 'BRL',
     seatsLeft: template.seatsLeft,

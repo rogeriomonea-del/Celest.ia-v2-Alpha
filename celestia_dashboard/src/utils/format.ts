@@ -27,6 +27,13 @@ export function formatShortDate(date: Date | null): string {
   return `${capitalizedWeekday}, ${date.getDate()} ${month}.`
 }
 
+const fullDateFormatter = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'full' })
+
+/** Full date for accessible names: "sábado, 15 de agosto de 2026". */
+export function formatFullDate(date: Date): string {
+  return fullDateFormatter.format(date)
+}
+
 const monthYearFormatter = new Intl.DateTimeFormat('pt-BR', {
   month: 'long',
   year: 'numeric',

@@ -10,7 +10,7 @@ interface AirportInputProps {
   icon: LucideIcon
   value: Airport
   onChange: (airport: Airport) => void
-  /** Airport shown greyed-out in the list (e.g. the other endpoint of the route). */
+  /** Airport shown greyed-out and unselectable (the other endpoint of the route). */
   excludeCode?: string
 }
 
@@ -45,6 +45,16 @@ export function AirportInput({ label, icon: Icon, value, onChange, excludeCode }
       .slice(0, MAX_SUGGESTIONS)
   }, [query])
 
+  const isSelectable = (index: number) =>
+    index >= 0 && index < suggestions.length && suggestions[index].code !== excludeCode
+
+  // The excluded airport is never a valid target: if the raw highlight lands
+  // on it (e.g. it ranks first for the typed query), derive to the first
+  // selectable option instead.
+  const activeIndex = isSelectable(highlighted)
+    ? highlighted
+    : suggestions.findIndex((airport) => airport.code !== excludeCode)
+
   const selectAirport = (airport: Airport) => {
     onChange(airport)
     setOpen(false)
@@ -52,18 +62,24 @@ export function AirportInput({ label, icon: Icon, value, onChange, excludeCode }
     inputRef.current?.blur()
   }
 
+  const moveHighlight = (delta: number) => {
+    let next = activeIndex + delta
+    while (next >= 0 && next < suggestions.length && !isSelectable(next)) next += delta
+    if (isSelectable(next)) setHighlighted(next)
+  }
+
   const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
     if (!open) return
     if (event.key === 'ArrowDown') {
       event.preventDefault()
-      setHighlighted((index) => Math.min(index + 1, suggestions.length - 1))
+      moveHighlight(1)
     } else if (event.key === 'ArrowUp') {
       event.preventDefault()
-      setHighlighted((index) => Math.max(index - 1, 0))
+      moveHighlight(-1)
     } else if (event.key === 'Enter') {
       event.preventDefault()
-      const airport = suggestions[highlighted]
-      if (airport) selectAirport(airport)
+      const airport = suggestions[activeIndex]
+      if (airport && airport.code !== excludeCode) selectAirport(airport)
     } else if (event.key === 'Escape') {
       setOpen(false)
       inputRef.current?.blur()
@@ -71,6 +87,7 @@ export function AirportInput({ label, icon: Icon, value, onChange, excludeCode }
   }
 
   const listboxId = `airport-listbox-${label}`
+  const optionId = (index: number) => `${listboxId}-opt-${index}`
 
   return (
     <div ref={containerRef} className="relative">
@@ -80,7 +97,7 @@ export function AirportInput({ label, icon: Icon, value, onChange, excludeCode }
       >
         <Icon className="h-5 w-5 shrink-0 text-slate-400 transition-colors group-focus-within:text-indigo-600" aria-hidden="true" />
         <div className="min-w-0 flex-1">
-          <span className="block text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+          <span className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">
             {label}
           </span>
           <input
@@ -90,6 +107,9 @@ export function AirportInput({ label, icon: Icon, value, onChange, excludeCode }
             aria-expanded={open}
             aria-controls={listboxId}
             aria-autocomplete="list"
+            aria-activedescendant={
+              open && activeIndex >= 0 ? optionId(activeIndex) : undefined
+            }
             aria-label={label}
             className="w-full truncate border-none bg-transparent p-0 text-sm font-semibold text-slate-900 placeholder:font-normal placeholder:text-slate-400 focus:outline-none focus:ring-0"
             placeholder="Cidade ou aeroporto"
@@ -112,6 +132,7 @@ export function AirportInput({ label, icon: Icon, value, onChange, excludeCode }
         <ul
           id={listboxId}
           role="listbox"
+          aria-label={`Sugestões de ${label.toLowerCase()}`}
           className="thin-scrollbar absolute left-0 top-full z-30 mt-2 max-h-80 w-full min-w-[18rem] animate-pop overflow-y-auto rounded-2xl border border-slate-200 bg-white py-2 shadow-xl shadow-slate-900/10"
         >
           {suggestions.length === 0 && (
@@ -120,34 +141,40 @@ export function AirportInput({ label, icon: Icon, value, onChange, excludeCode }
           {suggestions.map((airport, index) => {
             const isExcluded = airport.code === excludeCode
             return (
-              <li key={airport.code} role="option" aria-selected={airport.code === value.code}>
-                <button
-                  type="button"
-                  disabled={isExcluded}
-                  onClick={() => selectAirport(airport)}
-                  onMouseEnter={() => setHighlighted(index)}
-                  className={`flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors ${
-                    isExcluded
-                      ? 'cursor-not-allowed opacity-40'
-                      : index === highlighted
-                        ? 'bg-indigo-50'
-                        : 'hover:bg-slate-50'
-                  }`}
-                >
-                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500">
-                    <Plane className="h-4 w-4" aria-hidden="true" />
+              <li
+                key={airport.code}
+                id={optionId(index)}
+                role="option"
+                aria-selected={index === activeIndex}
+                aria-disabled={isExcluded || undefined}
+                onMouseDown={(event) => {
+                  event.preventDefault()
+                  if (!isExcluded) selectAirport(airport)
+                }}
+                onMouseEnter={() => {
+                  if (!isExcluded) setHighlighted(index)
+                }}
+                className={`flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors ${
+                  isExcluded
+                    ? 'cursor-not-allowed opacity-40'
+                    : index === activeIndex
+                      ? 'cursor-pointer bg-indigo-50'
+                      : 'cursor-pointer hover:bg-slate-50'
+                }`}
+              >
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500">
+                  <Plane className="h-4 w-4" aria-hidden="true" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-semibold text-slate-900">
+                    {airport.city}
+                    <span className="ml-1.5 font-normal text-slate-400">· {airport.country}</span>
                   </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-semibold text-slate-900">
-                      {airport.city}
-                      <span className="ml-1.5 font-normal text-slate-400">· {airport.country}</span>
-                    </span>
-                    <span className="block truncate text-xs text-slate-500">{airport.name}</span>
-                  </span>
-                  <span className="shrink-0 rounded-md bg-slate-100 px-2 py-1 text-xs font-bold tracking-wide text-slate-600">
-                    {airport.code}
-                  </span>
-                </button>
+                  <span className="block truncate text-xs text-slate-500">{airport.name}</span>
+                </span>
+                <span className="shrink-0 rounded-md bg-slate-100 px-2 py-1 text-xs font-bold tracking-wide text-slate-600">
+                  {airport.code}
+                </span>
               </li>
             )
           })}

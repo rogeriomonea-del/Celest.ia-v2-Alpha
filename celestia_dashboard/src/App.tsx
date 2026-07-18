@@ -20,6 +20,8 @@ import type { Filters, Flight, SearchParams, SortKey } from './types'
 
 const SEARCH_LATENCY_MS = 1400
 const SKELETON_COUNT = 5
+/** Slider bounds snap to this step so the true max/min stay reachable. */
+const PRICE_STEP = 50
 
 function buildDefaultSearch(): SearchParams {
   const today = startOfDay(new Date())
@@ -38,7 +40,7 @@ function buildDefaultFilters(flights: Flight[]): Filters {
   return {
     stops: [0, 1, 2],
     airlines: [...new Set(flights.map((flight) => flight.airline.code))],
-    maxPrice: Math.max(...flights.map((flight) => flight.price)),
+    maxPrice: Math.ceil(Math.max(...flights.map((flight) => flight.price)) / PRICE_STEP) * PRICE_STEP,
     departureWindows: [],
   }
 }
@@ -72,7 +74,10 @@ export default function App() {
   const priceBounds = useMemo(() => {
     if (results.length === 0) return { min: 0, max: 0 }
     const prices = results.map((flight) => flight.price)
-    return { min: Math.min(...prices), max: Math.max(...prices) }
+    return {
+      min: Math.floor(Math.min(...prices) / PRICE_STEP) * PRICE_STEP,
+      max: Math.ceil(Math.max(...prices) / PRICE_STEP) * PRICE_STEP,
+    }
   }, [results])
 
   const filteredFlights = useMemo(
@@ -134,7 +139,7 @@ export default function App() {
                 <ArrowRight className="h-4 w-4 text-slate-400" aria-hidden="true" />
                 {params.destination.city}
               </h2>
-              <p className="text-sm text-slate-500">
+              <p role="status" aria-live="polite" className="text-sm text-slate-500">
                 {dateSummary} ·{' '}
                 {loading
                   ? 'buscando…'
