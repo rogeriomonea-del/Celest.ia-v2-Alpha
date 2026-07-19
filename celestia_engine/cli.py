@@ -124,6 +124,9 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     sub.add_parser("status", help="quais integrações estão ativas nesta máquina")
+    sub.add_parser(
+        "doctor", help="testa cada integração com 1 chamada real e mostra o resultado"
+    )
     sub.add_parser("routes", help="resumo da malha de rotas")
     sub.add_parser("milheiro", help="tabela de milheiro configurada")
 
@@ -164,6 +167,91 @@ def main(argv: list[str] | None = None) -> int:
             "  (plano free) em CADA API no site do RapidAPI."
         )
         return 0
+
+    if args.command == "doctor":
+        from datetime import timedelta
+
+        from .models import Route
+        from .providers import google_flights, google_flights2, lyov, skyscanner
+        from .providers.base import ProviderNotConfigured, post_json
+
+        settings = load_settings()
+        route = Route("GRU", "MIA", "*")
+        depart = date.today() + timedelta(days=30)
+
+        async def _doctor():
+            results: list[tuple[str, str, str]] = []
+
+            async def check(name, fn):
+                try:
+                    detail = await fn()
+                    results.append((name, "✓", detail))
+                except ProviderNotConfigured as error:
+                    results.append((name, "—", f"não configurado ({error})"))
+                except Exception as error:  # noqa: BLE001 - doctor reporta tudo
+                    results.append((name, "✗", str(error)[:220]))
+
+            def fmt_quotes(quotes):
+                if not quotes:
+                    return "OK — respondeu, sem preços para a rota de teste"
+                cheapest = min(q.price_brl for q in quotes)
+                return f"OK — {len(quotes)} preços (menor: R$ {cheapest:,.0f})".replace(",", ".")
+
+            async def check_serpapi():
+                return fmt_quotes(
+                    await google_flights.quote(settings, route, depart, Cabin.ECONOMY)
+                )
+
+            async def check_gf2():
+                return fmt_quotes(
+                    await google_flights2.quote(settings, route, depart, Cabin.ECONOMY)
+                )
+
+            async def check_sky():
+                return fmt_quotes(
+                    await skyscanner.quote(settings, route, depart, Cabin.ECONOMY)
+                )
+
+            async def check_lyov():
+                plans = await lyov.fetch_plans(settings, company="TAM", cycle=date.today())
+                return f"OK — {len(plans)} planos RPL da TAM"
+
+            async def check_firecrawl():
+                if not settings.has_firecrawl():
+                    raise ProviderNotConfigured("FIRECRAWL_API_KEY ausente")
+                payload = await post_json(
+                    settings.firecrawl_api_url,
+                    json_body={"url": "https://example.com", "formats": ["markdown"]},
+                    headers={"Authorization": f"Bearer {settings.firecrawl_api_key}"},
+                    timeout_s=30,
+                    retries=1,
+                )
+                if payload.get("success"):
+                    return "OK — scrape de teste respondeu"
+                return f"respondeu com erro: {payload.get('error', 'desconhecido')}"
+
+            import asyncio as aio
+
+            await aio.gather(
+                check("SerpApi (google_flights)", check_serpapi),
+                check("google-flights2 (RapidAPI)", check_gf2),
+                check(f"Skyscanner ({settings.rapidapi_sky_host})", check_sky),
+                check("Lyov malha RPL (RapidAPI)", check_lyov),
+                check("Firecrawl (consome ~1 crédito)", check_firecrawl),
+            )
+            return results
+
+        print("Testando cada integração com 1 chamada REAL (rota de teste GRU→MIA)…\n")
+        ok = True
+        for name, mark, detail in asyncio.run(_doctor()):
+            print(f"  [{mark}] {name}\n      {detail}")
+            if mark == "✗":
+                ok = False
+        print(
+            "\nLegenda: ✓ funcionando · — sem chave (fonte desativada) · ✗ erro"
+            "\nDica: 403 no RapidAPI = falta clicar Subscribe naquela API específica."
+        )
+        return 0 if ok else 1
 
     if args.command == "routes":
         summary = RouteCatalog.coverage_summary()
