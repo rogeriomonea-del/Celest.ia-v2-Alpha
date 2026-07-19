@@ -241,7 +241,18 @@ def main(argv: list[str] | None = None) -> int:
             )
             return results
 
-        print("Testando cada integração com 1 chamada REAL (rota de teste GRU→MIA)…\n")
+        def _fingerprint(key: str) -> str:
+            if not key:
+                return "<vazia>"
+            if len(key) <= 10:
+                return f"{key[:2]}…{key[-2:]} ({len(key)} caracteres)"
+            return f"{key[:6]}…{key[-4:]} ({len(key)} caracteres)"
+
+        print("Chaves em uso (compare com o painel do provedor):")
+        print(f"  RAPIDAPI_KEY      = {_fingerprint(settings.rapidapi_key)}")
+        print(f"  FIRECRAWL_API_KEY = {_fingerprint(settings.firecrawl_api_key)}")
+        print(f"  SERPAPI_KEY       = {_fingerprint(settings.serpapi_key)}")
+        print("\nTestando cada integração com 1 chamada REAL (rota de teste GRU→MIA)…\n")
         ok = True
         for name, mark, detail in asyncio.run(_doctor()):
             print(f"  [{mark}] {name}\n      {detail}")

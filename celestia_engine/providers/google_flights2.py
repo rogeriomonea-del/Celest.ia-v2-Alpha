@@ -36,6 +36,7 @@ async def quote(
         "currency": "BRL",
         "language_code": "pt-BR",
         "country_code": "BR",
+        "search_type": "best",
     }
     payload = await get_json(
         f"https://{settings.gf2_host}{settings.gf2_endpoint}",

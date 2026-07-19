@@ -13,7 +13,7 @@ from datetime import date, datetime
 
 from ..config import Settings
 from ..models import Cabin, FareQuote, Route, Source
-from .base import ProviderNotConfigured, get_json
+from .base import ProviderError, ProviderNotConfigured, get_json
 
 PARTNERS_URL = (
     "https://partners.api.skyscanner.net/apiservices/v3/flights/indicative/search"
@@ -61,34 +61,99 @@ async def _quote_partners(
     return parse_partners_payload(payload, route, depart, cabin)
 
 
+def _rapid_headers(settings: Settings) -> dict:
+    return {
+        "X-RapidAPI-Key": settings.rapidapi_key,
+        "X-RapidAPI-Host": settings.rapidapi_sky_host,
+    }
+
+
+#: (host, IATA) -> (skyId, entityId) — resolvidos via searchAirport, 1x por processo.
+_PLACE_CACHE: dict[tuple[str, str], tuple[str, str]] = {}
+
+_CABIN_TO_RAPID = {
+    Cabin.ECONOMY: "economy",
+    Cabin.PREMIUM: "premium_economy",
+    Cabin.BUSINESS: "business",
+}
+
+
+async def _resolve_place(settings: Settings, iata: str) -> tuple[str, str]:
+    """sky-scrapper exige skyId + entityId numérico (via /searchAirport)."""
+    host = settings.rapidapi_sky_host
+    cached = _PLACE_CACHE.get((host, iata))
+    if cached:
+        return cached
+    payload = await get_json(
+        f"https://{host}/api/v1/flights/searchAirport",
+        params={"query": iata, "locale": "pt-BR"},
+        headers=_rapid_headers(settings),
+        timeout_s=settings.http_timeout_s,
+    )
+    items = payload.get("data") or []
+    chosen: tuple[str, str] | None = None
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        sky = item.get("skyId") or (item.get("navigation") or {}).get(
+            "relevantFlightParams", {}
+        ).get("skyId")
+        entity = item.get("entityId") or (item.get("navigation") or {}).get("entityId")
+        if sky and entity:
+            if str(sky).upper() == iata:
+                chosen = (str(sky), str(entity))
+                break
+            if chosen is None:
+                chosen = (str(sky), str(entity))
+    if not chosen:
+        raise ProviderError(f"searchAirport não encontrou '{iata}' em {host}")
+    _PLACE_CACHE[(host, iata)] = chosen
+    return chosen
+
+
 async def _quote_rapidapi(
     settings: Settings, route: Route, depart: date, cabin: Cabin
 ) -> list[FareQuote]:
-    # Host configurável (RAPIDAPI_SKY_HOST): "sky-scrapper.p.rapidapi.com"
-    # (padrão) ou "flights-sky.p.rapidapi.com". Os dois wrappers usam nomes de
-    # parâmetro diferentes para a mesma coisa; enviamos ambos os conjuntos —
-    # parâmetros extras são ignorados pelo wrapper que não os usa.
+    """Adaptador por host (RAPIDAPI_SKY_HOST) — cada wrapper tem contrato próprio."""
+    host = settings.rapidapi_sky_host
+    if "flights-sky" in host:
+        # ntd119/flights-sky: 1 chamada, aceita IATA direto
+        params = {
+            "fromEntityId": route.origin,
+            "toEntityId": route.destination,
+            "departDate": depart.isoformat(),
+            "cabinClass": _CABIN_TO_RAPID[cabin],
+            "currency": "BRL",
+            "market": "pt-BR",
+        }
+        payload = await get_json(
+            f"https://{host}/flights/search-one-way",
+            params=params,
+            headers=_rapid_headers(settings),
+            timeout_s=settings.http_timeout_s,
+        )
+        return parse_rapidapi_payload(payload, route, depart, cabin)
+
+    # apiheya/sky-scrapper: 2 etapas — resolve skyId/entityId e busca
+    origin_sky, origin_entity = await _resolve_place(settings, route.origin)
+    dest_sky, dest_entity = await _resolve_place(settings, route.destination)
     params = {
-        # sky-scrapper
-        "originSkyId": route.origin,
-        "destinationSkyId": route.destination,
+        "originSkyId": origin_sky,
+        "destinationSkyId": dest_sky,
+        "originEntityId": origin_entity,
+        "destinationEntityId": dest_entity,
         "date": depart.isoformat(),
-        # flights-sky
-        "fromEntityId": route.origin,
-        "toEntityId": route.destination,
-        "departDate": depart.isoformat(),
-        # comuns
-        "cabinClass": cabin.value,
+        "cabinClass": _CABIN_TO_RAPID[cabin],
+        "adults": "1",
+        "sortBy": "best",
         "currency": "BRL",
         "market": "pt-BR",
+        "countryCode": "BR",
     }
     payload = await get_json(
-        f"https://{settings.rapidapi_sky_host}{settings.rapidapi_sky_endpoint}",
+        f"https://{host}{settings.rapidapi_sky_endpoint}",
         params=params,
-        headers={
-            "X-RapidAPI-Key": settings.rapidapi_key,
-            "X-RapidAPI-Host": settings.rapidapi_sky_host,
-        },
+        headers=_rapid_headers(settings),
         timeout_s=settings.http_timeout_s,
     )
     return parse_rapidapi_payload(payload, route, depart, cabin)

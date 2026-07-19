@@ -36,21 +36,40 @@ ICAO_TO_IATA: dict[str, str] = {
 
 
 async def fetch_plans(settings: Settings, *, company: str, cycle: date) -> list[dict]:
-    """Raw RPL plans for one airline (ICAO code: TAM, GLO, AZU)."""
+    """Raw RPL plans for one airline (ICAO code: TAM, GLO, AZU).
+
+    O path exato não é documentado publicamente; tentamos os candidatos
+    conhecidos em ordem quando o servidor responde 404/rota inexistente.
+    """
     if not settings.has_lyov():
         raise ProviderNotConfigured("RAPIDAPI_KEY ausente — Lyov desativado")
-    payload = await get_json(
-        f"https://{settings.lyov_host}{settings.lyov_path}",
-        params={"company": company, "date": cycle.isoformat()},
-        headers={
-            "X-RapidAPI-Key": settings.rapidapi_key,
-            "X-RapidAPI-Host": settings.lyov_host,
-        },
-        timeout_s=settings.http_timeout_s,
-    )
-    if isinstance(payload, list):
-        return payload
-    return payload.get("flights") or payload.get("data") or []
+    from .base import ProviderError
+
+    candidates = [settings.lyov_path] + [
+        p for p in ("/flights", "/api/flights", "/") if p != settings.lyov_path
+    ]
+    last_error: ProviderError | None = None
+    for path in candidates:
+        try:
+            payload = await get_json(
+                f"https://{settings.lyov_host}{path}",
+                params={"company": company, "date": cycle.isoformat()},
+                headers={
+                    "X-RapidAPI-Key": settings.rapidapi_key,
+                    "X-RapidAPI-Host": settings.lyov_host,
+                },
+                timeout_s=settings.http_timeout_s,
+            )
+            if isinstance(payload, list):
+                return payload
+            return payload.get("flights") or payload.get("data") or []
+        except ProviderError as error:
+            last_error = error
+            text = str(error).lower()
+            if "404" in text or "does not exist" in text:
+                continue
+            raise
+    raise last_error if last_error else ProviderError("Lyov: nenhum path respondeu")
 
 
 def plans_to_routes(plans: list[dict]) -> list[Route]:

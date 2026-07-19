@@ -14,6 +14,34 @@ from pathlib import Path
 _ENV_LOADED = False
 
 
+#: Caracteres invisíveis que sobrevivem a copy-paste e quebram chaves de API.
+_INVISIBLE = "﻿​‌‍⁠ "
+_SMART_QUOTES = "“”‘’"
+
+
+def parse_env_line(line: str) -> tuple[str, str] | None:
+    """Parse one .env line into (key, value), or None for comments/blank.
+
+    Robusto contra os acidentes reais de copy-paste: BOM, zero-width, aspas
+    curvas, espaços e comentários inline (`KEY=valor  # nota`).
+    """
+    for ch in _INVISIBLE:
+        line = line.replace(ch, "")
+    line = line.strip()
+    if not line or line.startswith("#") or "=" not in line:
+        return None
+    key, _, value = line.partition("=")
+    key = key.strip()
+    value = value.strip()
+    # comentário inline: corta no primeiro ' #' fora de aspas
+    if not (value.startswith('"') or value.startswith("'")):
+        value = value.split(" #", 1)[0].split("\t#", 1)[0].rstrip()
+    value = value.strip().strip('"').strip("'")
+    for ch in _SMART_QUOTES:
+        value = value.replace(ch, "")
+    return key, value.strip()
+
+
 def load_dotenv(path: Path | None = None) -> None:
     """Minimal .env loader (KEY=VALUE lines, # comments). No dependency."""
     global _ENV_LOADED
@@ -23,13 +51,10 @@ def load_dotenv(path: Path | None = None) -> None:
     env_path = path or Path(__file__).resolve().parent.parent / ".env"
     if not env_path.is_file():
         return
-    for line in env_path.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, _, value = line.partition("=")
-        key, value = key.strip(), value.strip().strip('"').strip("'")
-        os.environ.setdefault(key, value)
+    for line in env_path.read_text(encoding="utf-8-sig").splitlines():
+        parsed = parse_env_line(line)
+        if parsed:
+            os.environ.setdefault(parsed[0], parsed[1])
 
 
 def _env(name: str, default: str = "") -> str:

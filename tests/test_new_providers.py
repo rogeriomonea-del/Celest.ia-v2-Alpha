@@ -90,7 +90,7 @@ def test_gf2_requires_rapidapi_key():
         asyncio.run(google_flights2.quote(Settings(), ROUTE, DEPART, Cabin.ECONOMY))
 
 
-def test_skyscanner_rapidapi_host_is_configurable(monkeypatch):
+def test_flights_sky_host_single_call_with_iata(monkeypatch):
     captured = {}
 
     async def fake_get_json(url, *, params=None, headers=None, timeout_s=None, **kw):
@@ -106,9 +106,54 @@ def test_skyscanner_rapidapi_host_is_configurable(monkeypatch):
     quotes = asyncio.run(skyscanner.quote(settings, ROUTE, DEPART, Cabin.ECONOMY))
 
     assert quotes and quotes[0].price_brl == 2000.0
-    assert captured["url"].startswith("https://flights-sky.p.rapidapi.com/")
+    assert captured["url"] == "https://flights-sky.p.rapidapi.com/flights/search-one-way"
     assert captured["headers"]["X-RapidAPI-Host"] == "flights-sky.p.rapidapi.com"
-    # both wrappers' param names travel together
-    assert captured["params"]["originSkyId"] == "GRU"
     assert captured["params"]["fromEntityId"] == "GRU"
-    assert captured["params"]["date"] == captured["params"]["departDate"]
+    assert captured["params"]["toEntityId"] == "LIS"
+    assert captured["params"]["departDate"] == DEPART.isoformat()
+
+
+def test_sky_scrapper_resolves_entity_ids_and_caches(monkeypatch):
+    skyscanner._PLACE_CACHE.clear()
+    calls = []
+
+    async def fake_get_json(url, *, params=None, headers=None, timeout_s=None, **kw):
+        calls.append((url, params))
+        if "searchAirport" in url:
+            iata = params["query"]
+            return {
+                "data": [
+                    {"skyId": iata, "entityId": f"entity-{iata}", "presentation": {}}
+                ]
+            }
+        return {"data": {"itineraries": [{"price": {"raw": 3100.0}}]}}
+
+    monkeypatch.setattr(skyscanner, "get_json", fake_get_json)
+    settings = Settings(rapidapi_key="rk-test")  # host padrão: sky-scrapper
+
+    quotes = asyncio.run(skyscanner.quote(settings, ROUTE, DEPART, Cabin.BUSINESS))
+    assert quotes and quotes[0].price_brl == 3100.0
+
+    search_url, search_params = calls[-1]
+    assert search_url.endswith("/api/v1/flights/searchFlights")
+    assert search_params["originSkyId"] == "GRU"
+    assert search_params["originEntityId"] == "entity-GRU"
+    assert search_params["destinationEntityId"] == "entity-LIS"
+    assert search_params["cabinClass"] == "business"
+
+    # segunda busca: lugares vêm do cache — nenhuma nova chamada searchAirport
+    airport_calls = len([c for c in calls if "searchAirport" in c[0]])
+    asyncio.run(skyscanner.quote(settings, ROUTE, DEPART, Cabin.ECONOMY))
+    assert len([c for c in calls if "searchAirport" in c[0]]) == airport_calls
+
+
+def test_env_line_parser_survives_copy_paste_accidents():
+    from celestia_engine.config import parse_env_line
+
+    assert parse_env_line("RAPIDAPI_KEY=abc123 # minha chave") == ("RAPIDAPI_KEY", "abc123")
+    assert parse_env_line("﻿RAPIDAPI_KEY=abc123") == ("RAPIDAPI_KEY", "abc123")
+    assert parse_env_line("KEY=“valor”") == ("KEY", "valor")
+    assert parse_env_line("KEY = ' spaced ' ") == ("KEY", "spaced")
+    assert parse_env_line("# só comentário") is None
+    assert parse_env_line("   ") is None
+    assert parse_env_line("SEM_IGUAL") is None
