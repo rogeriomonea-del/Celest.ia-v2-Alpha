@@ -71,6 +71,11 @@ export default function App() {
     return () => clearTimeout(searchTimer.current)
   }, [runSearch])
 
+  // SEO/UX: o título da aba acompanha a rota pesquisada.
+  useEffect(() => {
+    document.title = `Voos ${params.origin.city} (${params.origin.code}) → ${params.destination.city} (${params.destination.code}) | celest.ia`
+  }, [params.origin, params.destination])
+
   const priceBounds = useMemo(() => {
     if (results.length === 0) return { min: 0, max: 0 }
     const prices = results.map((flight) => flight.price)

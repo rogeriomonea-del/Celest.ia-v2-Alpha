@@ -18,8 +18,6 @@ from .base import ProviderNotConfigured, get_json
 PARTNERS_URL = (
     "https://partners.api.skyscanner.net/apiservices/v3/flights/indicative/search"
 )
-RAPIDAPI_URL = "https://sky-scrapper.p.rapidapi.com/api/v1/flights/searchFlights"
-RAPIDAPI_HOST = "sky-scrapper.p.rapidapi.com"
 
 _CABIN_TO_SKY = {
     Cabin.ECONOMY: "CABIN_CLASS_ECONOMY",
@@ -66,20 +64,30 @@ async def _quote_partners(
 async def _quote_rapidapi(
     settings: Settings, route: Route, depart: date, cabin: Cabin
 ) -> list[FareQuote]:
+    # Host configurável (RAPIDAPI_SKY_HOST): "sky-scrapper.p.rapidapi.com"
+    # (padrão) ou "flights-sky.p.rapidapi.com". Os dois wrappers usam nomes de
+    # parâmetro diferentes para a mesma coisa; enviamos ambos os conjuntos —
+    # parâmetros extras são ignorados pelo wrapper que não os usa.
     params = {
+        # sky-scrapper
         "originSkyId": route.origin,
         "destinationSkyId": route.destination,
         "date": depart.isoformat(),
+        # flights-sky
+        "fromEntityId": route.origin,
+        "toEntityId": route.destination,
+        "departDate": depart.isoformat(),
+        # comuns
         "cabinClass": cabin.value,
         "currency": "BRL",
         "market": "pt-BR",
     }
     payload = await get_json(
-        RAPIDAPI_URL,
+        f"https://{settings.rapidapi_sky_host}{settings.rapidapi_sky_endpoint}",
         params=params,
         headers={
             "X-RapidAPI-Key": settings.rapidapi_key,
-            "X-RapidAPI-Host": RAPIDAPI_HOST,
+            "X-RapidAPI-Host": settings.rapidapi_sky_host,
         },
         timeout_s=settings.http_timeout_s,
     )

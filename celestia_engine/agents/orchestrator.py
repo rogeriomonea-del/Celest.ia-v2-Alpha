@@ -28,7 +28,9 @@ from ..models import (
     SearchStats,
 )
 from ..routes import RouteCatalog
+from ..storage import record_report
 from .base import Agent, AgentContext
+from .mesh import live_routes_between
 from .miles import MilesMathAgent
 from .prefilter import Candidate, PriceScoutAgent
 from .scrapers import SCRAPERS_BY_CARRIER
@@ -49,6 +51,13 @@ class Orchestrator(Agent):
     # ------------------------------------------------------------------ plan
     def plan_candidates(self, request: SearchRequest) -> list[Candidate]:
         routes = RouteCatalog.airline_routes_between(request.origin, request.destination)
+        # malha viva (RPL/DECEA via RouteMeshAgent) complementa a curadoria
+        curated = {route.slug() for route in routes}
+        for route in live_routes_between(
+            self.ctx.settings, request.origin, request.destination
+        ):
+            if route.slug() not in curated:
+                routes.append(route)
         if not routes:
             # fora das malhas CM/LA: ainda dá para cotar via metasearch
             routes = RouteCatalog.candidates(request.origin, request.destination)
@@ -93,7 +102,7 @@ class Orchestrator(Agent):
             f"concluído em {stats.duration_seconds}s — {len(offers)} ofertas, "
             f"{len(options)} opções de compra"
         )
-        return SearchReport(
+        report = SearchReport(
             request=request,
             quotes=sorted(best_quotes.values(), key=lambda q: q.price_brl),
             offers=offers,
@@ -101,6 +110,11 @@ class Orchestrator(Agent):
             stats=stats,
             agent_log=list(self.ctx.log_lines),
         )
+        history_path = record_report(self.ctx.settings, report)
+        if history_path:
+            self.log(f"histórico gravado em {history_path}")
+            report.agent_log = list(self.ctx.log_lines)
+        return report
 
     # ------------------------------------------------------------- internals
     def _shortlist(

@@ -74,6 +74,22 @@ class Settings:
     firecrawl_api_key: str = ""    # FIRECRAWL_API_KEY — scraping gerenciado
     firecrawl_api_url: str = "https://api.firecrawl.dev/v1/scrape"
 
+    # --- RapidAPI hosts (todas usam a mesma RAPIDAPI_KEY) ---
+    # Skyscanner: troque para "flights-sky.p.rapidapi.com" sem tocar em código.
+    rapidapi_sky_host: str = "sky-scrapper.p.rapidapi.com"
+    rapidapi_sky_endpoint: str = "/api/v1/flights/searchFlights"
+    # Google Flights via RapidAPI (google-flights2, DataCrawler)
+    gf2_host: str = "google-flights2.p.rapidapi.com"
+    gf2_endpoint: str = "/api/v1/searchFlights"
+    # Lyov — planos de voo RPL/DECEA das companhias brasileiras
+    lyov_host: str = "brazilian-airlines-real-flights-data.p.rapidapi.com"
+    lyov_path: str = "/api/flights"
+
+    # --- Histórico de pesquisas (CSV que alimenta o ML) ---
+    history_enabled: bool = True
+    history_dir: str = "data"
+    mesh_csv: str = "data/routes_live.csv"
+
     # --- Airline scraping (Playwright; no key, URL templates overridable) ---
     copa_booking_url: str = (
         "https://shopping.copaair.com/flights/{origin}-{destination}"
@@ -107,6 +123,12 @@ class Settings:
     def has_firecrawl(self) -> bool:
         return bool(self.firecrawl_api_key)
 
+    def has_google_flights2(self) -> bool:
+        return bool(self.rapidapi_key)
+
+    def has_lyov(self) -> bool:
+        return bool(self.rapidapi_key)
+
 
 def load_settings() -> Settings:
     load_dotenv()
@@ -116,6 +138,15 @@ def load_settings() -> Settings:
         rapidapi_key=_env("RAPIDAPI_KEY"),
         firecrawl_api_key=_env("FIRECRAWL_API_KEY"),
         firecrawl_api_url=_env("FIRECRAWL_API_URL", Settings.firecrawl_api_url),
+        rapidapi_sky_host=_env("RAPIDAPI_SKY_HOST", Settings.rapidapi_sky_host),
+        rapidapi_sky_endpoint=_env("RAPIDAPI_SKY_ENDPOINT", Settings.rapidapi_sky_endpoint),
+        gf2_host=_env("GF2_HOST", Settings.gf2_host),
+        gf2_endpoint=_env("GF2_ENDPOINT", Settings.gf2_endpoint),
+        lyov_host=_env("LYOV_HOST", Settings.lyov_host),
+        lyov_path=_env("LYOV_PATH", Settings.lyov_path),
+        history_enabled=_env("HISTORY_ENABLED", "1") not in {"0", "false", "no"},
+        history_dir=_env("HISTORY_DIR", Settings.history_dir),
+        mesh_csv=_env("MESH_CSV", Settings.mesh_csv),
         copa_booking_url=_env("COPA_BOOKING_URL", Settings.copa_booking_url),
         latam_offers_url=_env("LATAM_OFFERS_URL", Settings.latam_offers_url),
         scraper_headless=_env("SCRAPER_HEADLESS", "1") not in {"0", "false", "no"},

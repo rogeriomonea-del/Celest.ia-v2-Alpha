@@ -107,6 +107,13 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("routes", help="resumo da malha de rotas")
     sub.add_parser("milheiro", help="tabela de milheiro configurada")
 
+    mesh = sub.add_parser("mesh", help="atualiza a malha viva via Lyov (RPL/DECEA)")
+    mesh.add_argument(
+        "--companies",
+        default="TAM,GLO,AZU",
+        help="códigos ICAO separados por vírgula (padrão: TAM,GLO,AZU)",
+    )
+
     args = parser.parse_args(argv)
 
     if args.command == "routes":
@@ -122,6 +129,19 @@ def main(argv: list[str] | None = None) -> int:
         print("Milheiro configurado (R$ por 1.000 milhas):")
         for program, value in sorted(settings.milheiro_brl.items()):
             print(f"  {program:14} R$ {value:6.2f}")
+        return 0
+
+    if args.command == "mesh":
+        from .agents.base import AgentContext
+        from .agents.mesh import RouteMeshAgent
+
+        settings = load_settings()
+        agent = RouteMeshAgent(AgentContext(settings=settings))
+        companies = tuple(c.strip().upper() for c in args.companies.split(",") if c.strip())
+        routes = asyncio.run(agent.refresh(companies))
+        print(f"Malha viva atualizada: {len(routes)} rotas → {settings.mesh_csv}")
+        for line in agent.ctx.log_lines:
+            print(f"  {line}")
         return 0
 
     request = SearchRequest(

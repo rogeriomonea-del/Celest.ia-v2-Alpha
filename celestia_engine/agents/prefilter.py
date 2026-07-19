@@ -13,7 +13,7 @@ from datetime import date
 
 from ..models import Cabin, FareQuote, Route
 from ..providers import ProviderNotConfigured
-from ..providers import google_flights, skyscanner
+from ..providers import google_flights, google_flights2, skyscanner
 from ..providers.base import ProviderError
 from ..providers.mock import mock_quote
 from .base import Agent
@@ -78,6 +78,11 @@ class PriceScoutAgent(Agent):
                 return await google_flights.quote(settings, route, depart, cabin)
 
             sources.append(("google_flights", google_fetch))
+        if settings.has_google_flights2():
+            async def gf2_fetch(route: Route, depart: date, cabin: Cabin):
+                return await google_flights2.quote(settings, route, depart, cabin)
+
+            sources.append(("google_flights2", gf2_fetch))
         if settings.has_skyscanner():
             async def sky_fetch(route: Route, depart: date, cabin: Cabin):
                 return await skyscanner.quote(settings, route, depart, cabin)

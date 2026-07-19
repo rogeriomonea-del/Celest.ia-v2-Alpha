@@ -65,8 +65,22 @@ python -m celestia_engine search GRU PTY --depart 2026-09-10 \
 
 python -m celestia_engine routes     # malha carregada
 python -m celestia_engine milheiro   # tabela de milheiro
-python -m pytest                     # 27 testes offline
+python -m celestia_engine mesh       # atualiza a malha viva (Lyov/DECEA)
+python -m pytest                     # testes offline
 ```
+
+## Dados que alimentam o ML
+
+Toda busca grava linhas de esquema **fixo** em `data/searches.csv`
+(append-only): cotações do pré-filtro, ofertas raspadas e as estratégias
+calculadas, com contexto completo (rota, datas, milheiro, breakeven,
+estatísticas do orquestrador). É o dataset de treino para previsão de preço
+e recomendação de estratégia — `HISTORY_DIR`/`HISTORY_ENABLED` controlam.
+
+O agente **RouteMeshAgent** (`python -m celestia_engine mesh`) usa a API
+open-source [Lyov](https://github.com/andrebrito16/lyov) (planos RPL oficiais
+do DECEA) para manter `data/routes_live.csv` com a malha real de
+TAM/GOL/Azul; o orquestrador soma essas rotas à curadoria automaticamente.
 
 ## Chaves de API — o que conectar e onde
 
@@ -76,7 +90,8 @@ Todas as chaves vão no arquivo **`.env` na raiz** (copie de `.env.example`).
 |---|---|---|---|
 | `SERPAPI_KEY` | SerpApi (Google Flights) | https://serpapi.com | Pré-filtro de preços |
 | `SKYSCANNER_API_KEY` | Skyscanner Partners v3 | https://developers.skyscanner.net | Pré-filtro + descoberta de rotas |
-| `RAPIDAPI_KEY` | RapidAPI (fallback Skyscanner) | https://rapidapi.com | Alternativa sem aprovação de parceiro |
+| `RAPIDAPI_KEY` | RapidAPI (chave única) | https://rapidapi.com | Assine e use: **google-flights2** (pré-filtro ~45× mais barato que SerpApi), **sky-scrapper**/**flights-sky** (Skyscanner) e **Lyov** (malha RPL/DECEA) |
+| `RAPIDAPI_SKY_HOST` | — | — | Troca o wrapper Skyscanner (`sky-scrapper` ⇄ `flights-sky`) sem código |
 | `FIRECRAWL_API_KEY` | Firecrawl (scraping gerenciado) | https://firecrawl.dev | Copa/LATAM com anti-bot gerenciado; Playwright local vira fallback |
 | `COPA_BOOKING_URL` / `LATAM_OFFERS_URL` | — | — | Ajustar templates se os sites mudarem |
 | `MILHEIRO_*` | — | — | Valor que você paga por 1.000 milhas |
@@ -94,6 +109,11 @@ todos os candidatos (mais caro), ou roda 100% offline com `CELESTIA_MOCK=1`.
 SPA de busca de voos com typeahead IATA, calendário duplo, popover de
 passageiros, abas Melhor/Mais barato/Mais rápido, filtros funcionais e
 skeleton loaders. Deploy automático no Vercel (ver `vercel.json`).
+
+**SEO pronto para marketing**: meta tags completas, Open Graph + Twitter Card
+com imagem dedicada (`public/og.png`), dados estruturados JSON-LD
+(Organization + WebApplication), `robots.txt`, `sitemap.xml`, favicon e
+título dinâmico por rota pesquisada.
 
 ```bash
 cd celestia_dashboard && npm install && npm run dev

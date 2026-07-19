@@ -7,7 +7,13 @@ from celestia_engine.models import Cabin, SearchRequest
 
 
 def _settings(**overrides) -> Settings:
-    settings = Settings(mock_mode=True, prefilter_top_k=2, max_subagents=3)
+    settings = Settings(
+        mock_mode=True,
+        prefilter_top_k=2,
+        max_subagents=3,
+        history_enabled=False,
+        mesh_csv="tests/does-not-exist.csv",
+    )
     for key, value in overrides.items():
         setattr(settings, key, value)
     return settings
