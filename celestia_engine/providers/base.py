@@ -51,7 +51,17 @@ async def _request_json(
             last_error = error
             if attempt < retries - 1:
                 await asyncio.sleep(2**attempt)
-    raise ProviderError(f"{method} {url} failed after {retries} attempts: {last_error}")
+    raise ProviderError(
+        f"{method} {_redact(url)} failed after {retries} attempts: "
+        f"{_redact(str(last_error))}"
+    )
+
+
+def _redact(text: str) -> str:
+    """Strip query strings from URLs in error text — keys never reach logs."""
+    import re
+
+    return re.sub(r"(https?://[^\s'\"?]+)\?[^\s'\"]*", r"\1?<params ocultos>", text)
 
 
 async def get_json(
