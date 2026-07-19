@@ -45,8 +45,19 @@ async def _request_json(
                 if response.status_code == 429 and attempt < retries - 1:
                     await asyncio.sleep(2**attempt)
                     continue
+                if 400 <= response.status_code < 500 and response.status_code != 429:
+                    # 401/403/404 são permanentes: retry só desperdiça tempo.
+                    # O corpo carrega o diagnóstico real (ex.: RapidAPI diz
+                    # "You are not subscribed to this API").
+                    body = response.text.strip()[:300] or "<corpo vazio>"
+                    raise ProviderError(
+                        f"{method} {_redact(url)} → HTTP {response.status_code}. "
+                        f"Resposta do servidor: {_redact(body)}"
+                    )
                 response.raise_for_status()
                 return response.json()
+        except ProviderError:
+            raise
         except (httpx.HTTPError, ValueError) as error:
             last_error = error
             if attempt < retries - 1:
