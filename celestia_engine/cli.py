@@ -26,7 +26,7 @@ def _fmt_brl(value: float) -> str:
     return f"R$ {value:,.2f}".replace(",", "_").replace(".", ",").replace("_", ".")
 
 
-def _print_report(report: SearchReport) -> None:
+def _print_report(report: SearchReport, verbose: bool = False) -> None:
     request = report.request
     print(f"\n=== celest.ia · {request.origin} → {request.destination} · {request.depart} ===")
     stats = report.stats
@@ -35,6 +35,22 @@ def _print_report(report: SearchReport) -> None:
         f"economizados pelo pré-filtro: {stats.scrapes_saved_by_prefilter} | "
         f"subagentes: {stats.subagents_spawned} | {stats.duration_seconds}s"
     )
+
+    failures = [
+        line
+        for line in report.agent_log
+        if "falhou" in line or "indisponível" in line or "nenhuma" in line
+    ]
+    if verbose:
+        print("\n--- Log completo dos agentes ---")
+        for line in report.agent_log:
+            print(f"  {line}")
+    elif failures and (not report.offers or not report.quotes):
+        print("\n--- Diagnóstico (falhas dos agentes) ---")
+        for line in failures[:12]:
+            print(f"  {line}")
+        print("  → dica: rode `python -m celestia_engine status` e confira se você")
+        print("    clicou em Subscribe em cada API no RapidAPI (erro 403 = sem subscribe).")
 
     if report.quotes:
         print("\n--- Pré-filtro (indicativo) ---")
@@ -103,7 +119,11 @@ def main(argv: list[str] | None = None) -> int:
     search.add_argument("--miles-balance", type=int, default=0)
     search.add_argument("--program", default="connectmiles")
     search.add_argument("--json", action="store_true", help="saída em JSON")
+    search.add_argument(
+        "--verbose", action="store_true", help="imprime o log completo dos agentes"
+    )
 
+    sub.add_parser("status", help="quais integrações estão ativas nesta máquina")
     sub.add_parser("routes", help="resumo da malha de rotas")
     sub.add_parser("milheiro", help="tabela de milheiro configurada")
 
@@ -115,6 +135,35 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     args = parser.parse_args(argv)
+
+    if args.command == "status":
+        settings = load_settings()
+        checks = [
+            ("SerpApi (Google Flights premium)", bool(settings.serpapi_key)),
+            ("google-flights2 via RapidAPI (pré-filtro)", settings.has_google_flights2()),
+            (
+                f"Skyscanner via {settings.rapidapi_sky_host}"
+                if settings.rapidapi_key and not settings.skyscanner_api_key
+                else "Skyscanner Partners (oficial)",
+                settings.has_skyscanner(),
+            ),
+            ("Firecrawl (scraping gerenciado Copa/LATAM)", settings.has_firecrawl()),
+            ("Lyov (malha RPL/DECEA)", settings.has_lyov()),
+            ("Histórico CSV p/ ML", settings.history_enabled),
+            ("Modo mock (demo offline)", settings.mock_mode),
+        ]
+        print("Integrações do celest.ia nesta máquina:\n")
+        for name, active in checks:
+            print(f"  [{'✓' if active else '✗'}] {name}")
+        print(f"\n  Histórico: {settings.history_dir}/searches.csv")
+        print(f"  Malha viva: {settings.mesh_csv}")
+        if not any(active for _, active in checks[:3]):
+            print("\n  ⚠ Nenhuma fonte de pré-filtro ativa — a busca raspará tudo (caro).")
+        print(
+            "\n  Lembrete RapidAPI: além da chave, é preciso clicar em Subscribe\n"
+            "  (plano free) em CADA API no site do RapidAPI."
+        )
+        return 0
 
     if args.command == "routes":
         summary = RouteCatalog.coverage_summary()
@@ -159,7 +208,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.json:
         print(_report_to_json(report))
     else:
-        _print_report(report)
+        _print_report(report, verbose=args.verbose)
     return 0
 
 
