@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import sys
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Awaitable, Callable
@@ -26,7 +27,11 @@ class AgentContext:
 
     def log(self, agent: str, message: str) -> None:
         stamp = datetime.utcnow().strftime("%H:%M:%S")
-        self.log_lines.append(f"[{stamp}] {agent}: {message}")
+        line = f"[{stamp}] {agent}: {message}"
+        self.log_lines.append(line)
+        if self.settings.verbose:
+            # tempo real no stderr — o usuário vê o progresso da busca ao vivo
+            print(f"  {line}", file=sys.stderr, flush=True)
 
     async def spawn(
         self, agent: str, label: str, coro_fn: Callable[[], Awaitable[Any]]

@@ -107,6 +107,7 @@ class Settings:
     max_subagents: int = 6         # concurrent scraper subagents
     http_timeout_s: float = 20.0
     mock_mode: bool = False        # force deterministic mock providers
+    verbose: bool = False          # stream agent log to stderr in real time
 
     # --- Miles economics ---
     milheiro_brl: dict[str, float] = field(default_factory=lambda: dict(DEFAULT_MILHEIRO_BRL))

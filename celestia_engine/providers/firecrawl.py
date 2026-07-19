@@ -95,6 +95,7 @@ async def scrape(
         json_body=body,
         headers={"Authorization": f"Bearer {settings.firecrawl_api_key}"},
         timeout_s=max(settings.http_timeout_s, settings.scraper_timeout_ms / 1000 + 10),
+        retries=2,  # scrape é caro/lento — 2 tentativas bastam antes do fallback
     )
     offers = parse_firecrawl_payload(
         payload,

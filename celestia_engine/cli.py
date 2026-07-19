@@ -204,6 +204,13 @@ def main(argv: list[str] | None = None) -> int:
         program=args.program.lower(),
     )
     orchestrator = Orchestrator.from_env()
+    orchestrator.ctx.settings.verbose = args.verbose
+    if not orchestrator.ctx.settings.mock_mode:
+        print(
+            "⏳ Pesquisa real em andamento — pré-filtro + scraping podem levar "
+            "alguns minutos. Use --verbose para acompanhar ao vivo.",
+            flush=True,
+        )
     report = asyncio.run(orchestrator.search(request))
     if args.json:
         print(_report_to_json(report))
