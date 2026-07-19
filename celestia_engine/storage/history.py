@@ -145,10 +145,10 @@ class SearchHistoryStore:
 
 
 def record_report(settings: Settings, report: SearchReport) -> Path | None:
-    """Best-effort persistence — a broken disk must never break a search."""
+    """Best-effort persistence — NADA aqui pode derrubar uma busca."""
     if not settings.history_enabled:
         return None
     try:
         return SearchHistoryStore(settings.history_dir).record(report)
-    except OSError:
+    except Exception:  # noqa: BLE001 - best-effort de verdade
         return None

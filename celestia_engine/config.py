@@ -81,6 +81,9 @@ class Settings:
     # Google Flights via RapidAPI (google-flights2, DataCrawler)
     gf2_host: str = "google-flights2.p.rapidapi.com"
     gf2_endpoint: str = "/api/v1/searchFlights"
+    # Desligue fontes RapidAPI individuais sem remover a chave:
+    gf2_enabled: bool = True           # GF2_ENABLED=0 desativa google-flights2
+    rapidapi_sky_enabled: bool = True  # RAPIDAPI_SKY_ENABLED=0 desativa o Skyscanner via RapidAPI
     # Lyov — planos de voo RPL/DECEA das companhias brasileiras
     lyov_host: str = "brazilian-airlines-real-flights-data.p.rapidapi.com"
     lyov_path: str = "/api/flights"
@@ -119,16 +122,27 @@ class Settings:
         return bool(self.serpapi_key)
 
     def has_skyscanner(self) -> bool:
-        return bool(self.skyscanner_api_key or self.rapidapi_key)
+        return bool(
+            self.skyscanner_api_key or (self.rapidapi_key and self.rapidapi_sky_enabled)
+        )
 
     def has_firecrawl(self) -> bool:
         return bool(self.firecrawl_api_key)
 
     def has_google_flights2(self) -> bool:
-        return bool(self.rapidapi_key)
+        return bool(self.rapidapi_key and self.gf2_enabled)
 
     def has_lyov(self) -> bool:
         return bool(self.rapidapi_key)
+
+
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+
+
+def _rooted(path_str: str) -> str:
+    """Anchor relative data paths at the repo root, not the caller's CWD."""
+    path = Path(path_str)
+    return str(path if path.is_absolute() else _REPO_ROOT / path)
 
 
 def load_settings() -> Settings:
@@ -145,9 +159,11 @@ def load_settings() -> Settings:
         gf2_endpoint=_env("GF2_ENDPOINT", Settings.gf2_endpoint),
         lyov_host=_env("LYOV_HOST", Settings.lyov_host),
         lyov_path=_env("LYOV_PATH", Settings.lyov_path),
+        gf2_enabled=_env("GF2_ENABLED", "1") not in {"0", "false", "no"},
+        rapidapi_sky_enabled=_env("RAPIDAPI_SKY_ENABLED", "1") not in {"0", "false", "no"},
         history_enabled=_env("HISTORY_ENABLED", "1") not in {"0", "false", "no"},
-        history_dir=_env("HISTORY_DIR", Settings.history_dir),
-        mesh_csv=_env("MESH_CSV", Settings.mesh_csv),
+        history_dir=_rooted(_env("HISTORY_DIR", Settings.history_dir)),
+        mesh_csv=_rooted(_env("MESH_CSV", Settings.mesh_csv)),
         copa_booking_url=_env("COPA_BOOKING_URL", Settings.copa_booking_url),
         latam_offers_url=_env("LATAM_OFFERS_URL", Settings.latam_offers_url),
         scraper_headless=_env("SCRAPER_HEADLESS", "1") not in {"0", "false", "no"},

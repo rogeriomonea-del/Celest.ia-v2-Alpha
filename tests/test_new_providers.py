@@ -41,6 +41,50 @@ def test_gf2_parse_flat_list_variant():
     assert len(quotes) == 1 and quotes[0].price_brl == 1500.0
 
 
+def test_gf2_parse_data_as_list_and_own_source():
+    from celestia_engine.models import Source
+
+    payload = {"data": [{"price": 999.9}]}
+    quotes = google_flights2.parse_payload(payload, ROUTE, DEPART, Cabin.ECONOMY)
+    assert len(quotes) == 1 and quotes[0].price_brl == 999.9
+    # provenance must be distinguishable from SerpApi in the ML dataset
+    assert quotes[0].source is Source.GOOGLE_FLIGHTS2
+
+
+def test_rapidapi_source_gating_flags():
+    settings = Settings(rapidapi_key="rk", gf2_enabled=False)
+    assert not settings.has_google_flights2()
+    settings2 = Settings(rapidapi_key="rk", rapidapi_sky_enabled=False)
+    assert not settings2.has_skyscanner()
+    settings3 = Settings(skyscanner_api_key="official", rapidapi_sky_enabled=False)
+    assert settings3.has_skyscanner()
+
+
+def test_record_report_swallows_any_error(monkeypatch, tmp_path):
+    import asyncio as aio
+    from datetime import date as d
+
+    from celestia_engine.agents.orchestrator import Orchestrator
+    from celestia_engine.models import SearchRequest
+    from celestia_engine.storage import SearchHistoryStore, record_report
+
+    settings = Settings(
+        mock_mode=True, history_enabled=False, mesh_csv=str(tmp_path / "no.csv")
+    )
+    report = aio.run(
+        Orchestrator(settings).search(
+            SearchRequest(origin="GRU", destination="MIA", depart=d(2026, 9, 10))
+        )
+    )
+
+    def boom(self, _report):
+        raise ValueError("bug interno qualquer")
+
+    monkeypatch.setattr(SearchHistoryStore, "record", boom)
+    settings.history_enabled = True
+    assert record_report(settings, report) is None  # nunca propaga
+
+
 def test_gf2_requires_rapidapi_key():
     with pytest.raises(ProviderNotConfigured):
         asyncio.run(google_flights2.quote(Settings(), ROUTE, DEPART, Cabin.ECONOMY))

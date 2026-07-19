@@ -8,7 +8,9 @@ candidatos — a curadoria continua como base, o CSV vivo cobre o que mudou.
 
 from __future__ import annotations
 
+import asyncio
 import csv
+import os
 from datetime import date, datetime
 from pathlib import Path
 
@@ -29,21 +31,28 @@ class RouteMeshAgent(Agent):
     ) -> list[Route]:
         cycle = cycle or date.today()
         plans: list[dict] = []
-        for company in companies:
-            if self.ctx.settings.mock_mode:
+        if self.ctx.settings.mock_mode:
+            for company in companies:
                 plans.extend(lyov.mock_plans(company))
                 self.log(f"mock: {company} carregada")
-                continue
-            result = await self.ctx.spawn(
-                self.name,
-                f"lyov {company} {cycle.isoformat()}",
-                lambda c=company: lyov.fetch_plans(
-                    self.ctx.settings, company=c, cycle=cycle
-                ),
+        else:
+            # companhias em paralelo, sob o semáforo global de subagentes
+            results = await asyncio.gather(
+                *(
+                    self.ctx.spawn(
+                        self.name,
+                        f"lyov {company} {cycle.isoformat()}",
+                        lambda c=company: lyov.fetch_plans(
+                            self.ctx.settings, company=c, cycle=cycle
+                        ),
+                    )
+                    for company in companies
+                )
             )
-            if isinstance(result, Exception):
-                continue
-            plans.extend(result)
+            for result in results:
+                if isinstance(result, Exception):
+                    continue
+                plans.extend(result)
         routes = lyov.plans_to_routes(plans)
         self.log(f"{len(plans)} planos RPL → {len(routes)} rotas únicas")
         if routes:
@@ -53,9 +62,11 @@ class RouteMeshAgent(Agent):
 
 
 def save_mesh_csv(routes: list[Route], path: Path) -> Path:
+    """Atomic write: temp file + os.replace, so readers never see a half file."""
     path.parent.mkdir(parents=True, exist_ok=True)
     stamp = datetime.utcnow().isoformat(timespec="seconds")
-    with path.open("w", newline="", encoding="utf-8") as handle:
+    tmp_path = path.with_suffix(".tmp")
+    with tmp_path.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=MESH_FIELDS)
         writer.writeheader()
         for route in sorted(routes, key=lambda r: (r.carrier, r.origin, r.destination)):
@@ -69,29 +80,39 @@ def save_mesh_csv(routes: list[Route], path: Path) -> Path:
                     "updated_at": stamp,
                 }
             )
+    os.replace(tmp_path, path)
     return path
 
 
 def load_live_routes(settings: Settings) -> list[Route]:
-    """Routes from the live mesh CSV; empty list when the file doesn't exist."""
+    """Routes from the live mesh CSV — best-effort like the history store.
+
+    A corrupt/truncated file must never break a search: bad rows are skipped
+    and any reader failure degrades to an empty list.
+    """
     path = Path(settings.mesh_csv)
     if not path.is_file():
         return []
     routes: list[Route] = []
-    with path.open(newline="", encoding="utf-8") as handle:
-        for row in csv.DictReader(handle):
-            try:
+    try:
+        with path.open(newline="", encoding="utf-8") as handle:
+            for row in csv.DictReader(handle):
+                origin = row.get("origin")
+                destination = row.get("destination")
+                carrier = row.get("carrier")
+                if not origin or not destination or not carrier:
+                    continue
                 routes.append(
                     Route(
-                        origin=row["origin"].upper(),
-                        destination=row["destination"].upper(),
-                        carrier=row["carrier"].upper(),
-                        direct=row.get("direct", "1") != "0",
+                        origin=origin.upper(),
+                        destination=destination.upper(),
+                        carrier=carrier.upper(),
+                        direct=(row.get("direct") or "1") != "0",
                         via=row.get("via") or None,
                     )
                 )
-            except KeyError:
-                continue
+    except (OSError, csv.Error, UnicodeDecodeError):
+        return []
     return routes
 
 

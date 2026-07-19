@@ -51,11 +51,17 @@ class Orchestrator(Agent):
     # ------------------------------------------------------------------ plan
     def plan_candidates(self, request: SearchRequest) -> list[Candidate]:
         routes = RouteCatalog.airline_routes_between(request.origin, request.destination)
-        # malha viva (RPL/DECEA via RouteMeshAgent) complementa a curadoria
+        # malha viva (RPL/DECEA via RouteMeshAgent) complementa a curadoria;
+        # qualquer problema no CSV degrada silenciosamente para a curadoria
         curated = {route.slug() for route in routes}
-        for route in live_routes_between(
-            self.ctx.settings, request.origin, request.destination
-        ):
+        try:
+            live = live_routes_between(
+                self.ctx.settings, request.origin, request.destination
+            )
+        except Exception as error:  # noqa: BLE001 - mesh nunca derruba a busca
+            self.log(f"malha viva ignorada ({error})")
+            live = []
+        for route in live:
             if route.slug() not in curated:
                 routes.append(route)
         if not routes:

@@ -15,6 +15,7 @@ class Cabin(str, Enum):
 
 class Source(str, Enum):
     GOOGLE_FLIGHTS = "google_flights"
+    GOOGLE_FLIGHTS2 = "google_flights2"
     SKYSCANNER = "skyscanner"
     COPA = "copa"
     LATAM = "latam"

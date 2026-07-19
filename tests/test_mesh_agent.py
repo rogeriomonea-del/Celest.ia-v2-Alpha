@@ -54,6 +54,19 @@ def test_mesh_agent_mock_refresh_writes_csv(tmp_path):
     assert len(load_live_routes(settings)) == len(routes)
 
 
+def test_corrupt_mesh_csv_never_breaks_search(tmp_path):
+    # truncated row (missing columns) + binary garbage: search must survive
+    mesh_path = tmp_path / "routes_live.csv"
+    mesh_path.write_text("carrier,origin,destination,direct,via,updated_at\nLA,GIG\n\x00garbage")
+    settings = Settings(mock_mode=True, mesh_csv=str(mesh_path), history_enabled=False)
+    assert load_live_routes(settings) == []
+
+    orchestrator = Orchestrator(settings)
+    request = SearchRequest(origin="GRU", destination="MIA", depart=date(2026, 9, 10))
+    report = asyncio.run(orchestrator.search(request))
+    assert report.offers, "search must degrade to curated routes and still work"
+
+
 def test_orchestrator_merges_live_mesh_routes(tmp_path):
     # GIG→LIS curated: LATAM only via GRU. Live mesh adds an LA nonstop.
     mesh_path = tmp_path / "routes_live.csv"

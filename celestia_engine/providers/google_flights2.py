@@ -60,7 +60,13 @@ def parse_payload(
     """
     quotes: list[FareQuote] = []
     data = payload.get("data") or {}
-    itineraries = data.get("itineraries") or {}
+    if isinstance(data, list):
+        # variante achatada: {"data": [ {...}, ... ]}
+        itineraries: object = data
+    elif isinstance(data, dict):
+        itineraries = data.get("itineraries") or {}
+    else:
+        return quotes
     buckets: list[list] = []
     if isinstance(itineraries, dict):
         buckets = [
@@ -88,7 +94,7 @@ def parse_payload(
                         depart=depart,
                         cabin=cabin,
                         price_brl=value,
-                        source=Source.GOOGLE_FLIGHTS,
+                        source=Source.GOOGLE_FLIGHTS2,
                         fetched_at=datetime.utcnow(),
                     )
                 )

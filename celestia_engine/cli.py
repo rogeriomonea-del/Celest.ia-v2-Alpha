@@ -188,10 +188,16 @@ def main(argv: list[str] | None = None) -> int:
         agent = RouteMeshAgent(AgentContext(settings=settings))
         companies = tuple(c.strip().upper() for c in args.companies.split(",") if c.strip())
         routes = asyncio.run(agent.refresh(companies))
-        print(f"Malha viva atualizada: {len(routes)} rotas → {settings.mesh_csv}")
+        if routes:
+            print(f"Malha viva atualizada: {len(routes)} rotas → {settings.mesh_csv}")
+        else:
+            print(
+                "⚠ Nenhuma rota obtida — a malha NÃO foi atualizada. "
+                "Verifique RAPIDAPI_KEY/Subscribe da API Lyov (log abaixo)."
+            )
         for line in agent.ctx.log_lines:
             print(f"  {line}")
-        return 0
+        return 0 if routes else 1
 
     request = SearchRequest(
         origin=args.origin.upper(),

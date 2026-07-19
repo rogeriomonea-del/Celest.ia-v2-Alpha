@@ -71,8 +71,18 @@ export default function App() {
     return () => clearTimeout(searchTimer.current)
   }, [runSearch])
 
-  // SEO/UX: o título da aba acompanha a rota pesquisada.
+  // SEO/UX: o título da aba acompanha a rota, mas só depois de uma busca do
+  // usuário — a carga inicial preserva o título estático otimizado para SEO.
+  const userSearchedRef = useRef(false)
+  const handleUserSearch = useCallback(
+    (nextParams: SearchParams) => {
+      userSearchedRef.current = true
+      runSearch(nextParams)
+    },
+    [runSearch],
+  )
   useEffect(() => {
+    if (!userSearchedRef.current) return
     document.title = `Voos ${params.origin.city} (${params.origin.code}) → ${params.destination.city} (${params.destination.code}) | celest.ia`
   }, [params.origin, params.destination])
 
@@ -131,7 +141,7 @@ export default function App() {
                 Compare tarifas de dezenas de companhias e reserve com confiança.
               </p>
             </div>
-            <SearchBar initialParams={params} loading={loading} onSearch={runSearch} />
+            <SearchBar initialParams={params} loading={loading} onSearch={handleUserSearch} />
           </div>
         </section>
 

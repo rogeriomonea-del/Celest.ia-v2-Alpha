@@ -43,10 +43,11 @@ def test_prefilter_shortlists_and_saves_scrapes():
     assert stats.candidates_total == 6
     assert stats.candidates_scraped == 2  # prefilter_top_k
     assert stats.scrapes_saved_by_prefilter == 4
-    # 6 prefilter quotes + 2 scraper runs
-    assert stats.subagents_spawned == 8
-    # one quote per (carrier-route, date): CM and LA must NOT collapse
+    # prefilter dedupes paid calls by (pair, date): 3 unique fetches + 2 scrapes
+    assert stats.subagents_spawned == 5
+    # ...but every (carrier-route, date) candidate still gets its own quote
     assert len(report.quotes) == 6
+    assert any("deduplicadas" in line for line in report.agent_log)
 
 
 def test_offers_and_options_are_produced_and_ranked():

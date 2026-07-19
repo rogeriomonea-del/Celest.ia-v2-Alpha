@@ -27,42 +27,73 @@ class PriceScoutAgent(Agent):
     async def prefilter(
         self, candidates: list[Candidate], cabin: Cabin
     ) -> dict[tuple[str, str], FareQuote]:
-        """Cheapest indicative quote per (route-key, date). Empty dict = no
-        pre-filter source configured (orchestrator will scrape everything)."""
+        """Cheapest indicative quote per (route-slug, date). Empty dict = no
+        pre-filter source configured (orchestrator will scrape everything).
+
+        As fontes de metasearch cotam por PAR (origem, destino, data) — não por
+        companhia. Por isso as chamadas pagas são deduplicadas por par e o
+        resultado é replicado para cada rota candidata daquele par.
+        """
         sources = self._sources()
         if not sources:
             self.log("nenhuma fonte de pré-filtro configurada — sem shortlist")
             return {}
+        self.log("fontes ativas: " + ", ".join(name for name, _ in sources))
 
-        async def fetch_one(route: Route, depart: date, source_name: str, fetch):
+        groups: dict[tuple[str, str, str], list[Candidate]] = {}
+        for route, depart in candidates:
+            key = (route.origin, route.destination, depart.isoformat())
+            groups.setdefault(key, []).append((route, depart))
+
+        async def fetch_group(
+            key: tuple[str, str, str], route: Route, depart: date, source_name: str, fetch
+        ):
             label = f"{source_name} {route.key()} {depart.isoformat()}"
             result = await self.ctx.spawn(
                 self.name, label, lambda: fetch(route, depart, cabin)
             )
-            return route, depart, source_name, result
+            return key, source_name, result
 
         results = await asyncio.gather(
             *(
-                fetch_one(route, depart, source_name, fetch)
-                for route, depart in candidates
+                fetch_group(key, members[0][0], members[0][1], source_name, fetch)
+                for key, members in groups.items()
                 for source_name, fetch in sources
             )
         )
 
-        best: dict[tuple[str, str], FareQuote] = {}
-        for route, depart, source_name, result in results:
+        cheapest: dict[tuple[str, str, str], FareQuote] = {}
+        for key, source_name, result in results:
             if isinstance(result, ProviderNotConfigured):
                 continue
             if isinstance(result, ProviderError):
-                self.log(f"{source_name} indisponível para {route.key()}: {result}")
+                self.log(f"{source_name} indisponível para {key[0]}-{key[1]}: {result}")
                 continue
             if isinstance(result, Exception):
                 continue
             for quote in result:
-                key = (route.slug(), depart.isoformat())
-                if key not in best or quote.price_brl < best[key].price_brl:
-                    best[key] = quote
-        self.log(f"{len(best)} candidatos cotados no pré-filtro")
+                if key not in cheapest or quote.price_brl < cheapest[key].price_brl:
+                    cheapest[key] = quote
+
+        best: dict[tuple[str, str], FareQuote] = {}
+        for key, members in groups.items():
+            pair_quote = cheapest.get(key)
+            if pair_quote is None:
+                continue
+            for route, depart in members:
+                best[(route.slug(), depart.isoformat())] = FareQuote(
+                    route=route,
+                    depart=pair_quote.depart,
+                    cabin=pair_quote.cabin,
+                    price_brl=pair_quote.price_brl,
+                    source=pair_quote.source,
+                    fetched_at=pair_quote.fetched_at,
+                )
+        saved = sum(len(m) - 1 for m in groups.values()) * len(sources)
+        self.log(
+            f"{len(cheapest)} pares cotados → {len(best)} candidatos cobertos "
+            f"({saved} chamadas deduplicadas)"
+        )
         return best
 
     def _sources(self):
