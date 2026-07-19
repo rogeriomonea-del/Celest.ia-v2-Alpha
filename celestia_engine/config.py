@@ -98,6 +98,16 @@ class Settings:
     # --- Managed scraping (Firecrawl) ---
     firecrawl_api_key: str = ""    # FIRECRAWL_API_KEY — scraping gerenciado
     firecrawl_api_url: str = "https://api.firecrawl.dev/v1/scrape"
+    firecrawl_api_base: str = "https://api.firecrawl.dev"  # base do modo Interact (v2)
+    firecrawl_interact_enabled: bool = True  # tenta o fluxo Interact (sessão viva)
+    # Páginas iniciais onde o Interact preenche o formulário de busca:
+    copa_interact_url: str = "https://www.copaair.com/pt-br/"
+    latam_interact_url: str = "https://www.latamairlines.com/br/pt"
+    usd_brl_rate: float = 5.40     # conversão quando o site cota em USD (USD_BRL_RATE)
+    # Estratégias de scraping habilitadas e ordem-base; o desempenho real
+    # (data/strategy_performance.csv) reordena isto a cada busca.
+    scrape_strategies: str = "firecrawl_interact,firecrawl_scrape,playwright_local"
+    strategy_csv: str = "data/strategy_performance.csv"
 
     # --- RapidAPI hosts (todas usam a mesma RAPIDAPI_KEY) ---
     # Skyscanner: troque para "flights-sky.p.rapidapi.com" sem tocar em código.
@@ -194,6 +204,13 @@ def load_settings() -> Settings:
         history_enabled=_env("HISTORY_ENABLED", "1") not in {"0", "false", "no"},
         history_dir=_rooted(_env("HISTORY_DIR", Settings.history_dir)),
         mesh_csv=_rooted(_env("MESH_CSV", Settings.mesh_csv)),
+        strategy_csv=_rooted(_env("STRATEGY_CSV", Settings.strategy_csv)),
+        firecrawl_api_base=_env("FIRECRAWL_API_BASE", Settings.firecrawl_api_base),
+        firecrawl_interact_enabled=_env("FIRECRAWL_INTERACT", "1") not in {"0", "false", "no"},
+        copa_interact_url=_env("COPA_INTERACT_URL", Settings.copa_interact_url),
+        latam_interact_url=_env("LATAM_INTERACT_URL", Settings.latam_interact_url),
+        usd_brl_rate=_env_float("USD_BRL_RATE", Settings.usd_brl_rate),
+        scrape_strategies=_env("SCRAPE_STRATEGIES", Settings.scrape_strategies),
         copa_booking_url=_env("COPA_BOOKING_URL", Settings.copa_booking_url),
         latam_offers_url=_env("LATAM_OFFERS_URL", Settings.latam_offers_url),
         scraper_headless=_env("SCRAPER_HEADLESS", "1") not in {"0", "false", "no"},

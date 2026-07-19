@@ -63,11 +63,24 @@ CELESTIA_MOCK=1 python -m celestia_engine search GRU MIA --depart 2026-09-10 --f
 python -m celestia_engine search GRU PTY --depart 2026-09-10 \
     --cabin business --miles-balance 120000 --program connectmiles --flex 2
 
-python -m celestia_engine routes     # malha carregada
-python -m celestia_engine milheiro   # tabela de milheiro
-python -m celestia_engine mesh       # atualiza a malha viva (Lyov/DECEA)
-python -m pytest                     # testes offline
+python -m celestia_engine routes      # malha carregada
+python -m celestia_engine milheiro    # tabela de milheiro
+python -m celestia_engine mesh        # atualiza a malha viva (Lyov/DECEA)
+python -m celestia_engine status      # integrações ativas
+python -m celestia_engine doctor      # testa cada integração com 1 chamada real
+python -m celestia_engine strategies  # desempenho aprendido de cada estratégia
+python -m pytest                      # testes offline
 ```
+
+## Scraping com estratégias que se auto-otimizam
+
+O scraping das companhias tem **3 estratégias** (Firecrawl Interact → Firecrawl
+estático → Playwright local). O orquestrador não fixa uma: a cada busca ele
+ordena as estratégias pelo **desempenho real** gravado em
+`data/strategy_performance.csv` e registra o resultado de volta — aprende sozinho
+qual fluxo vale mais a pena por site. O modo **Interact** abre uma sessão de
+browser viva e extrai tarifas de várias companhias de uma vez. Detalhes em
+[`docs/scraping-protocol.md`](docs/scraping-protocol.md).
 
 ## Dados que alimentam o ML
 

@@ -125,6 +125,9 @@ def main(argv: list[str] | None = None) -> int:
 
     sub.add_parser("status", help="quais integrações estão ativas nesta máquina")
     sub.add_parser(
+        "strategies", help="desempenho aprendido de cada estratégia de scraping"
+    )
+    sub.add_parser(
         "doctor", help="testa cada integração com 1 chamada real e mostra o resultado"
     )
     sub.add_parser("routes", help="resumo da malha de rotas")
@@ -263,6 +266,23 @@ def main(argv: list[str] | None = None) -> int:
             "\nDica: 403 no RapidAPI = falta clicar Subscribe naquela API específica."
         )
         return 0 if ok else 1
+
+    if args.command == "strategies":
+        from .storage import performance_summary
+
+        settings = load_settings()
+        summary = performance_summary(settings)
+        print(f"Estratégias base: {settings.scrape_strategies}")
+        print(f"Histórico: {settings.strategy_csv}\n")
+        if not summary:
+            print("Sem histórico ainda — rode algumas buscas para o sistema aprender.")
+            return 0
+        print("Score por site (maior = tentada primeiro):")
+        for site, scores in summary.items():
+            print(f"  {site}:")
+            for strategy, score in sorted(scores.items(), key=lambda kv: -kv[1]):
+                print(f"    {score:.2f}  {strategy}")
+        return 0
 
     if args.command == "routes":
         summary = RouteCatalog.coverage_summary()

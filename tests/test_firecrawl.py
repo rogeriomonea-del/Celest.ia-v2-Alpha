@@ -98,7 +98,16 @@ def _sentinel_offer(via: str) -> FlightOffer:
     )
 
 
-def test_agent_prefers_firecrawl_when_configured(monkeypatch):
+def _fc_settings(tmp_path):
+    # firecrawl_scrape isolado: só interact + playwright, CSV de estratégia próprio
+    return Settings(
+        firecrawl_api_key="fc-test",
+        scrape_strategies="firecrawl_scrape,playwright_local",
+        strategy_csv=str(tmp_path / "strat.csv"),
+    )
+
+
+def test_agent_prefers_firecrawl_when_configured(monkeypatch, tmp_path):
     async def fake_firecrawl(settings, **kwargs):
         return [_sentinel_offer("firecrawl")]
 
@@ -110,12 +119,13 @@ def test_agent_prefers_firecrawl_when_configured(monkeypatch):
         "celestia_engine.agents.scrapers.scrape_airline", fail_playwright
     )
 
-    agent = CopaScraperAgent(AgentContext(settings=Settings(firecrawl_api_key="fc-test")))
+    agent = CopaScraperAgent(AgentContext(settings=_fc_settings(tmp_path)))
     offers = asyncio.run(agent.fetch_offers(ROUTE, DEPART))
     assert offers and all(o.raw["via"] == "firecrawl" for o in offers)
+    assert offers[0].raw["strategy"] == "firecrawl_scrape"
 
 
-def test_agent_falls_back_to_playwright_on_firecrawl_error(monkeypatch):
+def test_agent_falls_back_to_playwright_on_firecrawl_error(monkeypatch, tmp_path):
     async def failing_firecrawl(settings, **kwargs):
         raise ProviderError("bloqueado")
 
@@ -127,8 +137,9 @@ def test_agent_falls_back_to_playwright_on_firecrawl_error(monkeypatch):
         "celestia_engine.agents.scrapers.scrape_airline", fake_playwright
     )
 
-    ctx = AgentContext(settings=Settings(firecrawl_api_key="fc-test"))
+    ctx = AgentContext(settings=_fc_settings(tmp_path))
     agent = CopaScraperAgent(ctx)
     offers = asyncio.run(agent.fetch_offers(ROUTE, DEPART))
     assert offers and all(o.raw["via"] == "playwright" for o in offers)
-    assert any("fallback para Playwright" in line for line in ctx.log_lines)
+    assert offers[0].raw["strategy"] == "playwright_local"
+    assert any("firecrawl_scrape falhou" in line for line in ctx.log_lines)

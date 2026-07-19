@@ -1,26 +1,67 @@
-"""Agentes de scraping por companhia (Copa e LATAM).
+"""Agentes de scraping por companhia (Copa e LATAM) com estratégias aprendidas.
 
-Cada agente sabe raspar UMA companhia. O orquestrador os instancia por
-candidato aprovado no pré-filtro; internamente cada scrape roda como
-subagente sob o semáforo global.
+Cada companhia pode ser raspada por 3 estratégias, da mais promissora à mais
+robusta:
 
-Cadeia de execução por cabine:
-1. **Firecrawl** (se FIRECRAWL_API_KEY configurada) — scraping gerenciado
-   com anti-bot e extração estruturada;
-2. **Playwright local** — fallback automático quando o Firecrawl falha ou
-   não está configurado.
+1. **firecrawl_interact** — sessão de browser viva (Firecrawl v2): preenche o
+   formulário e extrai tarifas de várias companhias de uma vez. Mais rápido e
+   econômico; é o fluxo preferido quando funciona.
+2. **firecrawl_scrape** — Firecrawl estático (/v1/scrape) sobre o deep-link.
+3. **playwright_local** — Chromium local interceptando o JSON de preços.
+
+A ORDEM em que são tentadas não é fixa: `StrategySelector` a reordena a cada
+busca com base no desempenho real gravado em ``data/strategy_performance.csv``
+(self-improvement). Toda tentativa — sucesso ou falha — é registrada, então o
+sistema aprende qual fluxo vale mais a pena para cada site.
 """
 
 from __future__ import annotations
 
+import time
 from datetime import date
 
 from ..models import Cabin, FlightOffer, Route
-from ..providers import firecrawl
+from ..providers import firecrawl, firecrawl_interact
 from ..providers.airline_scraper import scrape_airline
-from ..providers.base import ProviderError
+from ..providers.base import ProviderError, ProviderNotConfigured
 from ..providers.mock import mock_offers
+from ..storage import rank_strategies, record_attempt
 from .base import Agent
+
+
+async def _strategy_firecrawl_interact(agent, route, depart):
+    return await firecrawl_interact.scrape_flights(
+        agent.ctx.settings, site=agent.site, route=route, depart=depart
+    )
+
+
+async def _strategy_firecrawl_scrape(agent, route, depart):
+    offers: list[FlightOffer] = []
+    for cabin in (Cabin.ECONOMY, Cabin.BUSINESS):
+        offers.extend(
+            await firecrawl.scrape(
+                agent.ctx.settings, site=agent.site, route=route, depart=depart, cabin=cabin
+            )
+        )
+    return offers
+
+
+async def _strategy_playwright_local(agent, route, depart):
+    offers: list[FlightOffer] = []
+    for cabin in (Cabin.ECONOMY, Cabin.BUSINESS):
+        offers.extend(
+            await scrape_airline(
+                agent.ctx.settings, site=agent.site, route=route, depart=depart, cabin=cabin
+            )
+        )
+    return offers
+
+
+STRATEGY_FUNCS = {
+    "firecrawl_interact": _strategy_firecrawl_interact,
+    "firecrawl_scrape": _strategy_firecrawl_scrape,
+    "playwright_local": _strategy_playwright_local,
+}
 
 
 class AirlineScraperAgent(Agent):
@@ -28,31 +69,59 @@ class AirlineScraperAgent(Agent):
     carrier: str = ""
     program: str = ""
 
+    def _available_strategies(self) -> list[str]:
+        settings = self.ctx.settings
+        wanted = [s.strip() for s in settings.scrape_strategies.split(",") if s.strip()]
+        available = []
+        for name in wanted:
+            if name not in STRATEGY_FUNCS:
+                continue
+            if name.startswith("firecrawl") and not settings.has_firecrawl():
+                continue
+            available.append(name)
+        return available
+
     async def fetch_offers(self, route: Route, depart: date) -> list[FlightOffer]:
         if self.ctx.settings.mock_mode:
             return mock_offers(self.carrier, self.program, route, depart)
-        offers: list[FlightOffer] = []
-        # scrape economy and business shelves — miles/upgrade data rides along.
-        for cabin in (Cabin.ECONOMY, Cabin.BUSINESS):
-            offers.extend(await self._fetch_cabin(route, depart, cabin))
-        return offers
 
-    async def _fetch_cabin(
-        self, route: Route, depart: date, cabin: Cabin
-    ) -> list[FlightOffer]:
-        settings = self.ctx.settings
-        if settings.has_firecrawl():
+        strategies = self._available_strategies()
+        if not strategies:
+            raise ProviderError("nenhuma estratégia de scraping disponível")
+        order = rank_strategies(self.ctx.settings, self.site, strategies)
+        self.log(f"ordem de estratégias ({self.site}): {', '.join(order)}")
+
+        last_error: Exception | None = None
+        for strategy in order:
+            started = time.monotonic()
             try:
-                return await firecrawl.scrape(
-                    settings, site=self.site, route=route, depart=depart, cabin=cabin
+                offers = await STRATEGY_FUNCS[strategy](self, route, depart)
+            except ProviderNotConfigured as error:
+                record_attempt(
+                    self.ctx.settings, site=self.site, strategy=strategy,
+                    success=False, offers_found=0, duration_s=time.monotonic() - started,
                 )
+                self.log(f"{strategy} indisponível: {error}")
+                continue
             except ProviderError as error:
-                self.log(
-                    f"firecrawl falhou para {route.key()} {cabin.value} "
-                    f"({error}) — fallback para Playwright local"
+                record_attempt(
+                    self.ctx.settings, site=self.site, strategy=strategy,
+                    success=False, offers_found=0, duration_s=time.monotonic() - started,
                 )
-        return await scrape_airline(
-            settings, site=self.site, route=route, depart=depart, cabin=cabin
+                self.log(f"{strategy} falhou: {error}")
+                last_error = error
+                continue
+            record_attempt(
+                self.ctx.settings, site=self.site, strategy=strategy,
+                success=True, offers_found=len(offers), duration_s=time.monotonic() - started,
+            )
+            for offer in offers:
+                offer.raw.setdefault("strategy", strategy)
+            self.log(f"{strategy} ✓ — {len(offers)} ofertas em {time.monotonic()-started:.1f}s")
+            return offers
+
+        raise last_error or ProviderError(
+            f"todas as estratégias falharam para {self.site} {route.key()}"
         )
 
 
