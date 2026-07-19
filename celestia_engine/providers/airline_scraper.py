@@ -156,7 +156,7 @@ async def scrape_airline(
         destination=route.destination,
         date=depart.isoformat(),
         adults=1,
-        cabin=cabin.value,
+        cabin=cabin.value.capitalize(),  # LATAM espera "Economy"/"Business"
     )
     hints = PRICING_URL_HINTS[site]
     payloads: list[dict] = []

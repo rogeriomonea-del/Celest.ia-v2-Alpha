@@ -81,7 +81,7 @@ async def scrape(
         destination=route.destination,
         date=depart.isoformat(),
         adults=1,
-        cabin=cabin.value,
+        cabin=cabin.value.capitalize(),  # LATAM espera "Economy"/"Business"
     )
     body = {
         "url": target,

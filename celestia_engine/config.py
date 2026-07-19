@@ -119,13 +119,18 @@ class Settings:
     mesh_csv: str = "data/routes_live.csv"
 
     # --- Airline scraping (Playwright; no key, URL templates overridable) ---
+    # Formato real capturado do site (parâmetros area1/area2/date1 na raiz):
     copa_booking_url: str = (
-        "https://shopping.copaair.com/flights/{origin}-{destination}"
-        "?date={date}&adults={adults}&cabin={cabin}"
+        "https://shopping.copaair.com/?roundtrip=false&adults={adults}"
+        "&children=0&infants=0&sf=br&langid=pt&date1={date}&promocode="
+        "&area1={origin}&area2={destination}"
+        "&advanced_air_search=false&flexible_dates_v2=false"
     )
     latam_offers_url: str = (
-        "https://www.latamairlines.com/br/pt/oferta-voos"
-        "?origin={origin}&destination={destination}&outbound={date}&adt={adults}&cabin={cabin}"
+        "https://www.latamairlines.com/br/pt/ofertas-voos"
+        "?origin={origin}&outbound={date}T00%3A00%3A00.000Z"
+        "&destination={destination}&inbound=null&adt={adults}&chd=0&inf=0"
+        "&trip=OW&cabin={cabin}&redemption=false&sort=RECOMMENDED"
     )
     scraper_headless: bool = True
     scraper_timeout_ms: int = 45_000
