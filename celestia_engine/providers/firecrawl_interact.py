@@ -330,22 +330,21 @@ def parse_interact_output(
                     "layovers": _clean_layovers(item.get("layovers")),
                     "aircraft": item.get("aircraft"),
                     "baggage": item.get("baggage"),
+                    "booking_url": _clean_url(item.get("booking_url")),
                 },
             )
         )
     return offers
 
 
-#: Rótulos de companhia que o metasearch pode devolver → código IATA.
-_AIRLINE_LABELS = {
-    "copa": "CM", "avianca": "AV", "latam": "LA", "gol": "G3", "azul": "AD",
-    "american": "AA", "united": "UA", "delta": "DL", "tap": "TP", "iberia": "IB",
-}
+def _clean_url(value) -> str | None:
+    """Só aceita URL http(s) completa — o LLM às vezes devolve texto solto."""
+    url = str(value or "").strip()
+    return url if url.startswith(("http://", "https://")) else None
 
 
 def _carrier_of(label: str, default: str) -> str:
-    low = label.lower()
-    for name, code in _AIRLINE_LABELS.items():
-        if name in low:
-            return code
-    return default
+    """Rótulo livre → IATA usando o registro central da malha de companhias."""
+    from ..airlines import resolve_carrier_label
+
+    return resolve_carrier_label(label, default)

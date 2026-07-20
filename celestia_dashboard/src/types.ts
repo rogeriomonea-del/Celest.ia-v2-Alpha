@@ -35,6 +35,8 @@ export interface Flight {
   tags: FlightTag[]
   baggage: { carryOn: boolean; checkedBags: number }
   emissions: 'low' | 'average' | 'high'
+  /** Link real de reserva (Firecrawl/companhia/Google Flights); ausente = demo. */
+  bookingUrl?: string | null
 }
 
 export interface PassengerCounts {

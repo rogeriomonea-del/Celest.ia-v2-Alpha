@@ -28,7 +28,7 @@ from ..models import (
     SearchStats,
 )
 from ..routes import RouteCatalog
-from ..storage import record_report
+from ..storage import record_carriers, record_report
 from .base import Agent, AgentContext
 from .flex_scout import FlexDateScoutAgent
 from .mesh import live_routes_between
@@ -114,6 +114,11 @@ class Orchestrator(Agent):
 
         # 5. auditoria final
         offers = self._audit(offers)
+
+        # aprendizado da malha: companhias inéditas entram no CSV de descobertas
+        new_carriers = record_carriers(self.ctx.settings, offers)
+        if new_carriers:
+            self.log(f"malha: companhia(s) nova(s) descoberta(s): {', '.join(new_carriers)}")
 
         stats.subagents_spawned = self.ctx.subagents_spawned
         stats.duration_seconds = round(time.monotonic() - started, 2)

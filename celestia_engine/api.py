@@ -26,6 +26,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, field_validator
 
 from .agents.orchestrator import Orchestrator
+from .airlines import booking_url_for
 from .config import Settings, load_settings
 from .models import (
     Cabin,
@@ -173,7 +174,23 @@ def _stops_of(offer: FlightOffer) -> list[dict]:
     return []
 
 
-def _flight_json(offer: FlightOffer) -> dict:
+def _booking_url(offer: FlightOffer, settings: Settings) -> str:
+    """Link do botão "Ver oferta": o capturado pelo scraper, senão o deep-link
+    da companhia (registro da malha), senão a busca no Google Flights."""
+    raw_url = str((offer.raw or {}).get("booking_url") or "").strip()
+    if raw_url.startswith(("http://", "https://")):
+        return raw_url
+    return booking_url_for(
+        settings,
+        carrier=offer.carrier,
+        origin=offer.origin,
+        destination=offer.destination,
+        depart=offer.depart,
+        cabin=offer.cabin.value,
+    )
+
+
+def _flight_json(offer: FlightOffer, settings: Settings) -> dict:
     raw = offer.raw or {}
     return {
         "id": offer.itinerary_key() + f":{offer.cabin.value}",
@@ -196,6 +213,7 @@ def _flight_json(offer: FlightOffer) -> dict:
         "stops": _stops_of(offer),
         **_schedule_of(offer),
         "indicative": False,
+        "bookingUrl": _booking_url(offer, settings),
     }
 
 
@@ -214,7 +232,7 @@ def _option_json(option: PurchaseOption) -> dict:
     }
 
 
-def _indicative_flight_json(quote) -> dict:
+def _indicative_flight_json(quote, settings: Settings) -> dict:
     """Cotação do pré-filtro (metasearch) apresentada como card indicativo.
 
     Usada quando o scraping não devolveu ofertas (rota fora da malha Copa/LATAM,
@@ -255,15 +273,23 @@ def _indicative_flight_json(quote) -> dict:
         "durationMin": duration,
         "scheduleEstimated": True,
         "indicative": True,
+        "bookingUrl": booking_url_for(
+            settings,
+            carrier=route.carrier,
+            origin=route.origin,
+            destination=route.destination,
+            depart=quote.depart,
+            cabin=quote.cabin.value,
+        ),
     }
 
 
 def _report_json(report: SearchReport, settings: Settings) -> dict:
     stats = report.stats
-    flights = [_flight_json(offer) for offer in report.offers]
+    flights = [_flight_json(offer, settings) for offer in report.offers]
     if not flights and report.quotes:
         # scraping vazio mas o pré-filtro cotou: mostra as tarifas indicativas
-        flights = [_indicative_flight_json(quote) for quote in report.quotes[:12]]
+        flights = [_indicative_flight_json(quote, settings) for quote in report.quotes[:12]]
     return {
         "mode": "mock" if settings.mock_mode else "real",
         "flights": flights,

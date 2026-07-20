@@ -82,6 +82,25 @@ def test_search_validation_errors():
     assert client.post("/api/search", json={**BODY, "depart": "10/09/2026"}).status_code == 422
 
 
+def test_every_flight_has_a_booking_url():
+    data = _client().post("/api/search", json=BODY).json()
+    for flight in data["flights"]:
+        assert flight["bookingUrl"].startswith(("http://", "https://"))
+    # ofertas raspadas CM/LA usam o deep-link da companhia
+    assert any(
+        "copaair.com" in f["bookingUrl"] or "latamairlines.com" in f["bookingUrl"]
+        for f in data["flights"]
+    )
+    # indicativas (CGH-MCO, metasearch) caem no link do Google Flights
+    indicative = _client().post(
+        "/api/search", json={**BODY, "origin": "CGH", "destination": "MCO"}
+    ).json()
+    assert all(
+        f["bookingUrl"].startswith("https://www.google.com/travel/flights")
+        for f in indicative["flights"]
+    )
+
+
 def test_route_outside_cm_la_mesh_returns_indicative_quotes():
     # CGH-MCO não tem rota Copa/LATAM: scraping vazio, mas o pré-filtro cota —
     # a API devolve as cotações como cards indicativos em vez de 0 voos.

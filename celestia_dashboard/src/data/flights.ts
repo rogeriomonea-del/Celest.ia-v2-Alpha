@@ -11,6 +11,21 @@ export const AIRLINES: Record<string, Airline> = {
   LH: { code: 'LH', name: 'Lufthansa', logoGradient: 'from-amber-400 to-yellow-600' },
   KL: { code: 'KL', name: 'KLM', logoGradient: 'from-cyan-500 to-sky-700' },
   CM: { code: 'CM', name: 'Copa Airlines', logoGradient: 'from-blue-600 to-indigo-800' },
+  AV: { code: 'AV', name: 'Avianca', logoGradient: 'from-red-600 to-rose-800' },
+  AA: { code: 'AA', name: 'American Airlines', logoGradient: 'from-slate-500 to-blue-800' },
+  UA: { code: 'UA', name: 'United Airlines', logoGradient: 'from-blue-500 to-indigo-900' },
+  DL: { code: 'DL', name: 'Delta Air Lines', logoGradient: 'from-red-700 to-blue-900' },
+  AC: { code: 'AC', name: 'Air Canada', logoGradient: 'from-red-500 to-red-800' },
+  AM: { code: 'AM', name: 'Aeroméxico', logoGradient: 'from-blue-700 to-slate-900' },
+  B6: { code: 'B6', name: 'JetBlue', logoGradient: 'from-blue-400 to-blue-700' },
+  UX: { code: 'UX', name: 'Air Europa', logoGradient: 'from-sky-600 to-blue-900' },
+  LX: { code: 'LX', name: 'SWISS', logoGradient: 'from-red-600 to-red-900' },
+  BA: { code: 'BA', name: 'British Airways', logoGradient: 'from-blue-800 to-red-700' },
+  AZ: { code: 'AZ', name: 'ITA Airways', logoGradient: 'from-sky-700 to-blue-950' },
+  EK: { code: 'EK', name: 'Emirates', logoGradient: 'from-red-600 to-amber-700' },
+  QR: { code: 'QR', name: 'Qatar Airways', logoGradient: 'from-purple-800 to-fuchsia-950' },
+  TK: { code: 'TK', name: 'Turkish Airlines', logoGradient: 'from-red-500 to-slate-800' },
+  AR: { code: 'AR', name: 'Aerolíneas Argentinas', logoGradient: 'from-sky-400 to-blue-600' },
 }
 
 interface FlightTemplate {

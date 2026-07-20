@@ -115,6 +115,23 @@ Inspecione o aprendizado com:
 python -m celestia_engine strategies
 ```
 
+### Memória de falhas por rota
+
+Além do placar por site, cada desfecho por **(site, estratégia, rota)** — com o
+texto do erro — vai para `data/search_failures.csv`. Estratégias com
+**3 falhas seguidas naquela rota** são rebaixadas para o fim da fila na
+próxima busca (nunca banidas: seguem como último recurso, e um sucesso zera a
+sequência). O sistema não repete primeiro o que acabou de falhar.
+
+### Malha de companhias que cresce sozinha
+
+O registro curado (`celestia_engine/airlines.py`, ~28 companhias com nome,
+programa de milhas e deep-link de reserva) resolve rótulos do metasearch para
+IATA e alimenta o botão **"Ver oferta"** (link capturado pelo Firecrawl →
+deep-link da companhia → busca no Google Flights, nunca vazio). Companhias
+inéditas que aparecerem em qualquer busca são gravadas em
+`data/airlines_discovered.csv` — a malha conhecida se expande com o uso.
+
 ## Configuração relevante (`.env`)
 
 ```

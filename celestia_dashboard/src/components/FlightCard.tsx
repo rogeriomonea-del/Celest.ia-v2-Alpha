@@ -186,12 +186,25 @@ export function FlightCard({ flight, isCheapest, isFastest }: FlightCardProps) {
             </p>
             <p className="text-xs text-slate-500">por pessoa</p>
           </div>
-          <button
-            type="button"
-            className="rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition-colors hover:bg-indigo-700"
-          >
-            Ver oferta
-          </button>
+          {flight.bookingUrl ? (
+            <a
+              href={flight.bookingUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition-colors hover:bg-indigo-700"
+            >
+              Ver oferta
+            </a>
+          ) : (
+            <button
+              type="button"
+              disabled
+              title="Disponível quando a busca é feita pelo motor real"
+              className="cursor-not-allowed rounded-xl bg-slate-300 px-5 py-2.5 text-sm font-bold text-white shadow-sm"
+            >
+              Ver oferta
+            </button>
+          )}
         </div>
       </div>
 

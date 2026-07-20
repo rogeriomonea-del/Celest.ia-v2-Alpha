@@ -25,7 +25,12 @@ from ..providers import firecrawl, firecrawl_interact
 from ..providers.airline_scraper import scrape_airline
 from ..providers.base import ProviderError, ProviderNotConfigured
 from ..providers.mock import mock_offers
-from ..storage import rank_strategies, record_attempt
+from ..storage import (
+    demote_failing_strategies,
+    rank_strategies,
+    record_attempt,
+    record_route_outcome,
+)
 from .base import Agent
 
 
@@ -93,6 +98,14 @@ class AirlineScraperAgent(Agent):
         if not strategies:
             raise ProviderError("nenhuma estratégia de scraping disponível")
         order = rank_strategies(self.ctx.settings, self.site, strategies)
+        # memória de falhas POR ROTA: estratégias que falharam seguidas nesta
+        # rota vão para o fim da fila (não repete primeiro o que já falhou)
+        demoted_order = demote_failing_strategies(
+            self.ctx.settings, self.site, route.key(), order
+        )
+        if demoted_order != order:
+            self.log(f"memória de falhas ({route.key()}): ordem ajustada")
+        order = demoted_order
         self.log(f"ordem de estratégias ({self.site}): {', '.join(order)}")
 
         last_error: Exception | None = None
@@ -110,12 +123,21 @@ class AirlineScraperAgent(Agent):
                     self.ctx.settings, site=self.site, strategy=strategy,
                     success=False, offers_found=0, duration_s=time.monotonic() - started,
                 )
+                record_route_outcome(
+                    self.ctx.settings, site=self.site, strategy=strategy,
+                    route=route.key(), depart=depart.isoformat(),
+                    success=False, error=str(error),
+                )
                 self.log(f"{strategy} falhou: {error}")
                 last_error = error
                 continue
             record_attempt(
                 self.ctx.settings, site=self.site, strategy=strategy,
                 success=True, offers_found=len(offers), duration_s=time.monotonic() - started,
+            )
+            record_route_outcome(
+                self.ctx.settings, site=self.site, strategy=strategy,
+                route=route.key(), depart=depart.isoformat(), success=True,
             )
             for offer in offers:
                 offer.raw.setdefault("strategy", strategy)

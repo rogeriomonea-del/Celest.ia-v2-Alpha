@@ -50,12 +50,14 @@ OFFER_SCHEMA_HINT = (
     '"duration_minutes":680,"stops":1,'
     '"layovers":[{"airport":"PTY","minutes":95}],'
     '"aircraft":"Boeing 737-800","baggage":{"carry_on":true,"checked":1},'
-    '"seats_left":5}]}.\n'
+    '"seats_left":5,"booking_url":"https://..."}]}.\n'
     "Regras: extraia TODAS as opções visíveis (todas as companhias e todas as "
     "cabines). cabin deve ser 'economy', 'premium' ou 'business'. currency é o "
     "código ISO (USD/BRL). price_miles só quando o site mostrar emissão em "
-    "milhas/pontos; senão null. Preencha o máximo de campos possível e use null "
-    "quando o dado não existir. Não invente valores."
+    "milhas/pontos; senão null. booking_url é o link (href) do botão de "
+    "comprar/selecionar a tarifa OU a URL atual da página de resultados — "
+    "sempre uma URL completa começando com http. Preencha o máximo de campos "
+    "possível e use null quando o dado não existir. Não invente valores."
 )
 
 
