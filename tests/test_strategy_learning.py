@@ -95,3 +95,12 @@ def test_strategies_skipped_without_firecrawl_key(tmp_path):
     s = _settings(tmp_path)  # sem firecrawl key
     agent = CopaScraperAgent(AgentContext(settings=s))
     assert agent._available_strategies() == ["playwright_local"]
+
+
+def test_disabled_interact_is_excluded_not_penalized(tmp_path):
+    # FIRECRAWL_INTERACT=0 com chave presente: interact NÃO disputa
+    s = _settings(tmp_path, firecrawl_api_key="fc", firecrawl_interact_enabled=False)
+    agent = CopaScraperAgent(AgentContext(settings=s))
+    available = agent._available_strategies()
+    assert "firecrawl_interact" not in available
+    assert available == ["firecrawl_scrape", "playwright_local"]

@@ -62,3 +62,39 @@ def test_parse_garbage_or_no_offers_returns_empty():
     assert _parse("desculpe, não consegui extrair nada") == []
     assert _parse('{"resultado":"vazio"}') == []
     assert _parse('{"offers":[{"airline":"COPA","price":"n/a"}]}') == []
+
+
+def test_flight_numbers_as_string_is_not_exploded():
+    # o LLM devolveu flight_numbers como string em vez de array
+    text = '{"offers":[{"airline":"COPA","flight_numbers":"CM 702","cabin":"economy","price":1000,"currency":"BRL"}]}'
+    offers = _parse(text)
+    assert offers[0].flight_numbers == ("CM 702",)  # não ("C","M","7","0","2")
+
+
+def test_open_session_handles_null_metadata():
+    import asyncio
+
+    import httpx
+
+    from celestia_engine.config import Settings
+    from celestia_engine.providers import firecrawl_interact
+    from celestia_engine.providers.base import ProviderError
+
+    async def run(monkeypatched_payload):
+        async def fake_post_json(url, **kw):
+            return monkeypatched_payload
+
+        firecrawl_interact.post_json = fake_post_json  # type: ignore
+        return await firecrawl_interact.open_session(
+            Settings(firecrawl_api_key="fc"), "https://x"
+        )
+
+    real_post = firecrawl_interact.post_json
+    try:
+        # metadata explicitamente null não deve virar AttributeError
+        import pytest
+
+        with pytest.raises(ProviderError):
+            asyncio.run(run({"data": {"metadata": None}}))
+    finally:
+        firecrawl_interact.post_json = real_post

@@ -55,9 +55,10 @@ async def open_session(settings: Settings, url: str) -> str:
         timeout_s=max(settings.http_timeout_s, 40),
         retries=2,
     )
-    scrape_id = (payload.get("data") or {}).get("metadata", {}).get("scrapeId") or (
-        payload.get("data") or {}
-    ).get("metadata", {}).get("scrape_id")
+    # metadata pode vir ausente OU explicitamente null — dict.get(k, {}) só
+    # protege o primeiro caso, então normalizamos para {} defensivamente.
+    meta = (payload.get("data") or {}).get("metadata") or {}
+    scrape_id = meta.get("scrapeId") or meta.get("scrape_id")
     if not scrape_id:
         raise ProviderError("firecrawl interact: /v2/scrape não retornou scrapeId")
     return scrape_id
@@ -213,8 +214,13 @@ def parse_interact_output(
             if str(item.get("cabin", "")).lower().startswith(("business", "exec"))
             else Cabin.ECONOMY
         )
+        # o LLM pode devolver flight_numbers como string em vez de array; sem
+        # normalizar, iterar uma string explode em caracteres soltos.
+        raw_numbers = item.get("flight_numbers")
+        if isinstance(raw_numbers, str):
+            raw_numbers = [raw_numbers]
         numbers = tuple(
-            str(n) for n in (item.get("flight_numbers") or []) if str(n).strip()
+            str(n) for n in (raw_numbers or []) if str(n).strip()
         ) or (f"{carrier} ?",)
         airline = str(item.get("airline") or carrier)
         offers.append(

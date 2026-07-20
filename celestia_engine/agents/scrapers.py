@@ -78,6 +78,10 @@ class AirlineScraperAgent(Agent):
                 continue
             if name.startswith("firecrawl") and not settings.has_firecrawl():
                 continue
+            # estratégia desligada por config não entra na disputa (para não
+            # acumular "falhas" e afundar seu score de aprendizado)
+            if name == "firecrawl_interact" and not settings.firecrawl_interact_enabled:
+                continue
             available.append(name)
         return available
 
@@ -97,10 +101,8 @@ class AirlineScraperAgent(Agent):
             try:
                 offers = await STRATEGY_FUNCS[strategy](self, route, depart)
             except ProviderNotConfigured as error:
-                record_attempt(
-                    self.ctx.settings, site=self.site, strategy=strategy,
-                    success=False, offers_found=0, duration_s=time.monotonic() - started,
-                )
+                # "não configurado/desligado" é skip, NÃO falha de desempenho —
+                # não registra, para não poluir o ranking de aprendizado.
                 self.log(f"{strategy} indisponível: {error}")
                 continue
             except ProviderError as error:
