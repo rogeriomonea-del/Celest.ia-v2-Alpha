@@ -101,7 +101,10 @@ apontando para a API em outro domínio.
 
 ### Hospedagem
 
-- **Site** (estático): Vercel, Hostinger Website Hosting (suba o conteúdo de
+- **Tudo junto num VPS (recomendado)** — Hostinger VPS/Ubuntu: guia completo em
+  [`docs/deploy-hostinger.md`](docs/deploy-hostinger.md); a instalação inteira é
+  `bash deploy/hostinger-setup.sh seudominio.com` (nginx + systemd + HTTPS).
+- **Site** (estático): Vercel, Hostinger Website Hosting (conteúdo de
   `celestia_dashboard/dist/` após `npm run build`), Netlify etc.
 - **Motor/API** (Python): Hostinger **VPS**, Railway, Render ou Fly.io —
   `pip install -r requirements.txt && python -m celestia_engine serve --host 0.0.0.0`.

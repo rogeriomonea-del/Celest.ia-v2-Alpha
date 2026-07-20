@@ -13,7 +13,9 @@ import { AIRPORTS } from './data/airports'
 import type { CabinClass, Flight, FlightStop, SearchParams } from './types'
 
 const API_BASE: string = import.meta.env.VITE_API_URL ?? ''
-const SEARCH_TIMEOUT_MS = 180_000 // scraping real pode levar minutos
+// Deve ser MAIOR que o teto do motor (API_SEARCH_TIMEOUT_S, padrão 300s) e que
+// o proxy_read_timeout do nginx — senão o site desiste antes do motor terminar.
+const SEARCH_TIMEOUT_MS = 310_000
 
 // ------------------------------------------------------------ resposta da API
 export interface EngineFlight {
