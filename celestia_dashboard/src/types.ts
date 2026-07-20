@@ -48,6 +48,21 @@ export type CabinClass = 'economy' | 'premium' | 'business'
 export type SortKey = 'best' | 'cheapest' | 'fastest'
 export type DepartureWindow = 'early' | 'morning' | 'afternoon' | 'evening'
 
+/**
+ * Date flexibility presets. The radius (in days) each preset maps to mirrors
+ * the engine's `FLEX_PRESETS` (celestia_engine/models.py): 1w=±7, 2w=±14,
+ * 3w=±21, 1m=±30. `custom` uses an explicit window instead of a radius.
+ */
+export type FlexPreset = '1w' | '2w' | '3w' | '1m' | 'custom'
+
+export interface Flexibility {
+  enabled: boolean
+  preset: FlexPreset
+  /** Only used when `preset === 'custom'`: the explicit period to scan. */
+  windowStart: Date | null
+  windowEnd: Date | null
+}
+
 export interface SearchParams {
   origin: Airport
   destination: Airport
@@ -56,6 +71,9 @@ export interface SearchParams {
   passengers: PassengerCounts
   tripType: TripType
   cabin: CabinClass
+  /** When enabled, the engine reads the price calendar and keeps the cheapest
+   * dates in the window instead of scraping every date around `departDate`. */
+  flexibility: Flexibility
 }
 
 export interface Filters {

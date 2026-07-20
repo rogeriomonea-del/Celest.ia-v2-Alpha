@@ -70,7 +70,7 @@ def test_no_prefilter_scrapes_everything():
     # mock_mode off and no API keys -> no prefilter sources -> scrape all
     settings = _settings(mock_mode=False)
     orchestrator = Orchestrator(settings)
-    candidates = orchestrator.plan_candidates(_request())
+    candidates = asyncio.run(orchestrator.plan_candidates(_request()))
     shortlist = orchestrator._shortlist(candidates, {}, report_stats := __import__(
         "celestia_engine.models", fromlist=["SearchStats"]
     ).SearchStats())

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { ArrowLeftRight, PlaneLanding, PlaneTakeoff, Search } from 'lucide-react'
 import { AirportInput } from './AirportInput'
 import { DateRangePicker } from './DateRangePicker'
+import { FlexibilityToggle } from './FlexibilityToggle'
 import { PassengerSelector } from './PassengerSelector'
 import type { SearchParams, TripType } from '../types'
 
@@ -109,6 +110,12 @@ export function SearchBar({ initialParams, loading, onSearch }: SearchBarProps) 
           onCabinChange={(cabin) => setDraft((current) => ({ ...current, cabin }))}
         />
       </div>
+
+      <FlexibilityToggle
+        value={draft.flexibility}
+        departDate={draft.departDate}
+        onChange={(flexibility) => setDraft((current) => ({ ...current, flexibility }))}
+      />
 
       {sameRoute && (
         <p className="mt-3 text-center text-sm font-medium text-red-600">

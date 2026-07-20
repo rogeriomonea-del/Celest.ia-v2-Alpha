@@ -1,8 +1,9 @@
 import { useRef, useState } from 'react'
 import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useClickOutside } from '../hooks/useClickOutside'
-import { addMonths, getMonthMatrix, isBetween, isSameDay, startOfDay } from '../utils/dates'
-import { formatFullDate, formatMonthYear, formatShortDate } from '../utils/format'
+import { addMonths } from '../utils/dates'
+import { formatFullDate, formatShortDate } from '../utils/format'
+import { MonthGrid } from './MonthGrid'
 import type { TripType } from '../types'
 
 interface DateRangePickerProps {
@@ -10,82 +11,6 @@ interface DateRangePickerProps {
   returnDate: Date | null
   tripType: TripType
   onChange: (departDate: Date | null, returnDate: Date | null) => void
-}
-
-const WEEKDAYS = [
-  { short: 'D', full: 'domingo' },
-  { short: 'S', full: 'segunda-feira' },
-  { short: 'T', full: 'terça-feira' },
-  { short: 'Q', full: 'quarta-feira' },
-  { short: 'Q', full: 'quinta-feira' },
-  { short: 'S', full: 'sexta-feira' },
-  { short: 'S', full: 'sábado' },
-]
-
-interface MonthGridProps {
-  viewDate: Date
-  departDate: Date | null
-  returnDate: Date | null
-  hoverDate: Date | null
-  onSelect: (date: Date) => void
-  onHover: (date: Date | null) => void
-}
-
-function MonthGrid({ viewDate, departDate, returnDate, hoverDate, onSelect, onHover }: MonthGridProps) {
-  const today = startOfDay(new Date())
-  const weeks = getMonthMatrix(viewDate.getFullYear(), viewDate.getMonth())
-  const previewEnd = returnDate ?? (departDate && hoverDate && hoverDate > departDate ? hoverDate : null)
-
-  return (
-    <div className="w-full sm:w-64">
-      <p className="mb-2 text-center text-sm font-semibold text-slate-900">
-        {formatMonthYear(viewDate)}
-      </p>
-      <div className="grid grid-cols-7 gap-y-1 text-center">
-        {WEEKDAYS.map((weekday, index) => (
-          <span key={index} className="pb-1 text-xs font-medium text-slate-500">
-            <span aria-hidden="true">{weekday.short}</span>
-            <span className="sr-only">{weekday.full}</span>
-          </span>
-        ))}
-        {weeks.flat().map((date, index) => {
-          if (!date) return <span key={index} />
-          const disabled = date < today
-          const isStart = isSameDay(date, departDate)
-          const isEnd = isSameDay(date, returnDate)
-          const inRange =
-            departDate && previewEnd ? isBetween(date, departDate, previewEnd) : false
-          const isPreviewEnd = !returnDate && previewEnd ? isSameDay(date, previewEnd) : false
-
-          return (
-            <button
-              key={index}
-              type="button"
-              disabled={disabled}
-              aria-label={formatFullDate(date)}
-              aria-pressed={isStart || isEnd}
-              onClick={() => onSelect(date)}
-              onMouseEnter={() => onHover(date)}
-              onMouseLeave={() => onHover(null)}
-              className={`mx-auto flex h-9 w-9 items-center justify-center rounded-full text-sm transition-colors ${
-                disabled
-                  ? 'cursor-not-allowed text-slate-300'
-                  : isStart || isEnd
-                    ? 'bg-indigo-600 font-bold text-white shadow-sm'
-                    : isPreviewEnd
-                      ? 'bg-indigo-100 font-semibold text-indigo-700'
-                      : inRange
-                        ? 'rounded-none bg-indigo-50 text-indigo-700'
-                        : 'text-slate-700 hover:bg-slate-100'
-              }`}
-            >
-              {date.getDate()}
-            </button>
-          )
-        })}
-      </div>
-    </div>
-  )
 }
 
 export function DateRangePicker({ departDate, returnDate, tripType, onChange }: DateRangePickerProps) {
@@ -218,8 +143,8 @@ export function DateRangePicker({ departDate, returnDate, tripType, onChange }: 
           <div className="flex flex-col gap-6 sm:flex-row sm:justify-center">
             <MonthGrid
               viewDate={viewDate}
-              departDate={departDate}
-              returnDate={returnDate}
+              startDate={departDate}
+              endDate={returnDate}
               hoverDate={hoverDate}
               onSelect={handleSelect}
               onHover={setHoverDate}
@@ -227,8 +152,8 @@ export function DateRangePicker({ departDate, returnDate, tripType, onChange }: 
             <div className="hidden sm:block">
               <MonthGrid
                 viewDate={addMonths(viewDate, 1)}
-                departDate={departDate}
-                returnDate={returnDate}
+                startDate={departDate}
+                endDate={returnDate}
                 hoverDate={hoverDate}
                 onSelect={handleSelect}
                 onHover={setHoverDate}

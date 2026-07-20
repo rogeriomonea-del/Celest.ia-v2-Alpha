@@ -30,6 +30,7 @@ from ..models import (
 from ..routes import RouteCatalog
 from ..storage import record_report
 from .base import Agent, AgentContext
+from .flex_scout import FlexDateScoutAgent
 from .mesh import live_routes_between
 from .miles import MilesMathAgent
 from .prefilter import Candidate, PriceScoutAgent
@@ -43,13 +44,14 @@ class Orchestrator(Agent):
         super().__init__(AgentContext(settings=settings))
         self.scout = PriceScoutAgent(self.ctx)
         self.miles_math = MilesMathAgent(self.ctx)
+        self.flex_scout = FlexDateScoutAgent(self.ctx)
 
     @classmethod
     def from_env(cls) -> "Orchestrator":
         return cls(load_settings())
 
     # ------------------------------------------------------------------ plan
-    def plan_candidates(self, request: SearchRequest) -> list[Candidate]:
+    def _routes_for(self, request: SearchRequest) -> list:
         routes = RouteCatalog.airline_routes_between(request.origin, request.destination)
         # malha viva (RPL/DECEA via RouteMeshAgent) complementa a curadoria;
         # qualquer problema no CSV degrada silenciosamente para a curadoria
@@ -67,10 +69,21 @@ class Orchestrator(Agent):
         if not routes:
             # fora das malhas CM/LA: ainda dá para cotar via metasearch
             routes = RouteCatalog.candidates(request.origin, request.destination)
-        dates = [
+        return routes
+
+    async def _resolve_dates(self, request: SearchRequest) -> list:
+        """Datas a considerar. Com flexibilidade, o flex-scout lê o calendário
+        de preços e devolve só as mais baratas; senão, ±flex_days."""
+        if request.flexibility and request.flexibility.enabled:
+            return await self.flex_scout.cheapest_dates(request)
+        return [
             request.depart + timedelta(days=offset)
             for offset in range(-request.flex_days, request.flex_days + 1)
         ]
+
+    async def plan_candidates(self, request: SearchRequest) -> list[Candidate]:
+        routes = self._routes_for(request)
+        dates = await self._resolve_dates(request)
         candidates = [(route, depart) for route in routes for depart in dates]
         self.log(
             f"plano: {len(routes)} rota(s) × {len(dates)} data(s) = {len(candidates)} candidatos"
@@ -86,7 +99,7 @@ class Orchestrator(Agent):
             f"cabine-alvo={request.cabin_target.value} programa={request.program}"
         )
 
-        candidates = self.plan_candidates(request)
+        candidates = await self.plan_candidates(request)
         stats.candidates_total = len(candidates)
 
         # 2. pré-filtro barato

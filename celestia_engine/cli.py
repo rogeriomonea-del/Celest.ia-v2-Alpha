@@ -116,6 +116,21 @@ def main(argv: list[str] | None = None) -> int:
     search.add_argument("--return", dest="return_date", default=None, help="YYYY-MM-DD")
     search.add_argument("--cabin", default="business", choices=[c.value for c in Cabin])
     search.add_argument("--flex", type=int, default=0, help="± dias de flexibilidade")
+    search.add_argument(
+        "--flex-weeks",
+        type=int,
+        choices=[1, 2, 3, 4],
+        help="flexibilidade ampla (lê o calendário): 1/2/3 semanas ou 4=1 mês",
+    )
+    search.add_argument(
+        "--flex-window",
+        nargs=2,
+        metavar=("INICIO", "FIM"),
+        help="período flexível personalizado YYYY-MM-DD YYYY-MM-DD",
+    )
+    search.add_argument(
+        "--flex-max-dates", type=int, default=5, help="quantas datas baratas raspar"
+    )
     search.add_argument("--miles-balance", type=int, default=0)
     search.add_argument("--program", default="connectmiles")
     search.add_argument("--json", action="store_true", help="saída em JSON")
@@ -318,6 +333,22 @@ def main(argv: list[str] | None = None) -> int:
             print(f"  {line}")
         return 0 if routes else 1
 
+    flexibility = None
+    if args.flex_window:
+        from .models import Flexibility
+
+        flexibility = Flexibility(
+            enabled=True,
+            preset="custom",
+            window_start=date.fromisoformat(args.flex_window[0]),
+            window_end=date.fromisoformat(args.flex_window[1]),
+        )
+    elif args.flex_weeks:
+        from .models import Flexibility
+
+        preset = {1: "1w", 2: "2w", 3: "3w", 4: "1m"}[args.flex_weeks]
+        flexibility = Flexibility(enabled=True, preset=preset)
+
     request = SearchRequest(
         origin=args.origin.upper(),
         destination=args.destination.upper(),
@@ -325,6 +356,8 @@ def main(argv: list[str] | None = None) -> int:
         return_date=date.fromisoformat(args.return_date) if args.return_date else None,
         cabin_target=Cabin(args.cabin),
         flex_days=max(0, args.flex),
+        flexibility=flexibility,
+        flex_max_dates=max(1, args.flex_max_dates),
         miles_balance=args.miles_balance,
         program=args.program.lower(),
     )

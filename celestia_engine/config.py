@@ -103,6 +103,8 @@ class Settings:
     # Páginas iniciais onde o Interact preenche o formulário de busca:
     copa_interact_url: str = "https://www.copaair.com/pt-br/"
     latam_interact_url: str = "https://www.latamairlines.com/br/pt"
+    # Google Flights para o flex-date scout (calendário de preços):
+    google_flights_interact_url: str = "https://www.google.com/travel/flights?hl=pt-BR&curr=BRL"
     usd_brl_rate: float = 5.40     # conversão quando o site cota em USD (USD_BRL_RATE)
     # Estratégias de scraping habilitadas e ordem-base; o desempenho real
     # (data/strategy_performance.csv) reordena isto a cada busca.
@@ -209,6 +211,9 @@ def load_settings() -> Settings:
         firecrawl_interact_enabled=_env("FIRECRAWL_INTERACT", "1") not in {"0", "false", "no"},
         copa_interact_url=_env("COPA_INTERACT_URL", Settings.copa_interact_url),
         latam_interact_url=_env("LATAM_INTERACT_URL", Settings.latam_interact_url),
+        google_flights_interact_url=_env(
+            "GOOGLE_FLIGHTS_INTERACT_URL", Settings.google_flights_interact_url
+        ),
         usd_brl_rate=_env_float("USD_BRL_RATE", Settings.usd_brl_rate),
         scrape_strategies=_env("SCRAPE_STRATEGIES", Settings.scrape_strategies),
         copa_booking_url=_env("COPA_BOOKING_URL", Settings.copa_booking_url),

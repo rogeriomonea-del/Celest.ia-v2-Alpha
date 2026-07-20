@@ -33,6 +33,7 @@ function buildDefaultSearch(): SearchParams {
     passengers: { adults: 1, children: 0, infants: 0 },
     tripType: 'roundtrip',
     cabin: 'economy',
+    flexibility: { enabled: false, preset: '2w', windowStart: null, windowEnd: null },
   }
 }
 

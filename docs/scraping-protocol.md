@@ -33,6 +33,35 @@ currency, departure_time, duration, stops). O parser converte **USD → BRL**
 (`USD_BRL_RATE`) quando o site cota em dólar e mapeia rótulos de companhia
 (COPA, Avianca, LATAM…) para os códigos IATA.
 
+## Pré-varredura do calendário (flexibilidade de datas)
+
+Antes de gastar scraping caro em cada data, o **FlexDateScoutAgent**
+(`agents/flex_scout.py`) corta as datas caras usando o **calendário de preços
+do Google Flights**. Quando o pedido traz `flexibility.enabled`:
+
+1. Resolve a janela a varrer a partir do preset — `1w`=±7, `2w`=±14, `3w`=±21,
+   `1m`=±30 dias ao redor da ida — ou de um período personalizado
+   (`custom` com `window_start`/`window_end`).
+2. Uma **única sessão Interact** abre o Google Flights, define somente-ida,
+   rota e classe, abre o seletor de datas e lê o preço de cada data da janela
+   (`firecrawl_interact.scan_calendar` → `parse_calendar_output`, com a mesma
+   conversão USD → BRL).
+3. O scout devolve apenas as `flex_max_dates` datas **mais baratas**; são as
+   únicas que seguem para o scraping caro. Assim, uma janela de 1 mês (~61
+   datas) vira 5 candidatas antes de qualquer token de scraping ser gasto.
+4. Se o calendário não puder ser lido (sem Firecrawl, erro, vazio), degrada
+   para uma amostragem simétrica da janela — **nunca** derruba a busca.
+
+O botão **"Tenho flexibilidade nas datas"** no frontend (`FlexibilityToggle`)
+expõe exatamente esses presets (1, 2, 3 semanas, 1 mês, ou "Selecionar outro
+período"). Pela CLI:
+
+```bash
+python -m celestia_engine search GRU MCO --depart 2026-09-20 --flex-weeks 2
+python -m celestia_engine search GRU MCO --depart 2026-09-20 \
+    --flex-window 2026-09-01 2026-10-15 --flex-max-dates 6
+```
+
 ## Como o orquestrador decide (self-improvement)
 
 O sistema **não fixa** uma estratégia. A cada busca:
@@ -67,6 +96,7 @@ FIRECRAWL_INTERACT=1             # liga/desliga o modo Interact
 FIRECRAWL_API_BASE=https://api.firecrawl.dev
 COPA_INTERACT_URL=https://www.copaair.com/pt-br/
 LATAM_INTERACT_URL=https://www.latamairlines.com/br/pt
+GOOGLE_FLIGHTS_INTERACT_URL=https://www.google.com/travel/flights?hl=pt-BR&curr=BRL
 USD_BRL_RATE=5.40               # conversão quando o site cota em USD
 SCRAPE_STRATEGIES=firecrawl_interact,firecrawl_scrape,playwright_local
 STRATEGY_CSV=data/strategy_performance.csv

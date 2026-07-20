@@ -21,7 +21,7 @@ import re
 from datetime import date
 
 from ..config import Settings
-from ..models import Cabin, FlightOffer, Route, Source
+from ..models import Cabin, DatePrice, FlightOffer, Route, Source
 from .base import ProviderError, ProviderNotConfigured, post_json
 
 # empresa/programa/fonte por site
@@ -142,8 +142,82 @@ async def scrape_flights(
     return offers
 
 
-def _find_json(text: str) -> dict | None:
-    """Extrai o primeiro objeto JSON com 'offers' do texto (tolera cercas ```)."""
+_CABIN_GF = {Cabin.ECONOMY: "Econômica", Cabin.PREMIUM: "Premium", Cabin.BUSINESS: "Executiva"}
+
+
+async def scan_calendar(
+    settings: Settings,
+    *,
+    origin: str,
+    destination: str,
+    cabin: Cabin,
+    start,
+    end,
+) -> list[DatePrice]:
+    """Lê o calendário de preços do Google Flights numa janela de datas.
+
+    Uma única sessão Interact abre o Google Flights, define rota/classe e o
+    intervalo amplo, e extrai o preço de cada data disponível. Serve para
+    CORTAR datas caras antes de gastar scraping — a saída alimenta o
+    FlexDateScoutAgent, que escolhe as datas mais baratas para raspar.
+    """
+    if not settings.has_firecrawl():
+        raise ProviderNotConfigured("FIRECRAWL_API_KEY ausente — scan de calendário desativado")
+    if not settings.firecrawl_interact_enabled:
+        raise ProviderNotConfigured("FIRECRAWL_INTERACT=0 — scan de calendário desativado")
+
+    scrape_id = await open_session(settings, settings.google_flights_interact_url)
+    try:
+        await interact(
+            settings,
+            scrape_id,
+            f"1. Selecione 'Somente ida'. 2. Origem {origin}, destino {destination}. "
+            f"3. Classe {_CABIN_GF[cabin]}. Selecione a primeira sugestão de cada campo.",
+        )
+        raw = await interact(
+            settings,
+            scrape_id,
+            "Abra o seletor de datas / calendário de preços e leia os preços por data. "
+            f"Considere apenas datas entre {start.isoformat()} e {end.isoformat()}. "
+            "Responda APENAS com JSON válido no formato "
+            '{"calendar":[{"date":"2026-09-20","price":1562,"currency":"BRL"}]}. '
+            "currency é o código ISO (BRL/USD). Não invente datas sem preço.",
+        )
+    finally:
+        await close_session(settings, scrape_id)
+
+    return parse_calendar_output(raw, usd_brl_rate=settings.usd_brl_rate)
+
+
+def parse_calendar_output(text: str, *, usd_brl_rate: float) -> list[DatePrice]:
+    from datetime import date as _date
+
+    obj = _find_json(text, key="calendar")
+    if not obj:
+        return []
+    out: list[DatePrice] = []
+    for item in obj.get("calendar") or []:
+        if not isinstance(item, dict):
+            continue
+        raw_date = str(item.get("date") or "")
+        try:
+            parsed = _date.fromisoformat(raw_date[:10])
+        except ValueError:
+            continue
+        try:
+            price = float(item.get("price"))
+        except (TypeError, ValueError):
+            continue
+        if price <= 0:
+            continue
+        currency = str(item.get("currency") or "BRL").upper()
+        price_brl = round(price * usd_brl_rate, 2) if currency == "USD" else round(price, 2)
+        out.append(DatePrice(date=parsed, price_brl=price_brl, source=Source.GOOGLE_FLIGHTS))
+    return out
+
+
+def _find_json(text: str, key: str = "offers") -> dict | None:
+    """Extrai o primeiro objeto JSON que contém `key` (tolera cercas ```)."""
     fenced = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.DOTALL)
     candidates = []
     if fenced:
@@ -166,7 +240,7 @@ def _find_json(text: str) -> dict | None:
     for candidate in candidates:
         try:
             obj = json.loads(candidate)
-            if isinstance(obj, dict) and "offers" in obj:
+            if isinstance(obj, dict) and key in obj:
                 return obj
         except (ValueError, TypeError):
             continue

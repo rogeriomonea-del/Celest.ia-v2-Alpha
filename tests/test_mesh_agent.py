@@ -75,7 +75,7 @@ def test_orchestrator_merges_live_mesh_routes(tmp_path):
     orchestrator = Orchestrator(settings)
     request = SearchRequest(origin="GIG", destination="LIS", depart=date(2026, 9, 10))
 
-    candidates = orchestrator.plan_candidates(request)
+    candidates = asyncio.run(orchestrator.plan_candidates(request))
     slugs = {route.slug() for route, _ in candidates}
     assert "LA:GIG-GRU-LIS" in slugs   # curated via-hub route
     assert "LA:GIG--LIS" in slugs      # live mesh nonstop merged in

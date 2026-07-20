@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from enum import Enum
 
 
@@ -118,6 +118,37 @@ class PurchaseOption:
     notes: list[str] = field(default_factory=list)
 
 
+#: Presets de flexibilidade → raio em dias ao redor da data escolhida.
+FLEX_PRESETS: dict[str, int] = {"1w": 7, "2w": 14, "3w": 21, "1m": 30}
+
+
+@dataclass
+class Flexibility:
+    """Janela de datas flexíveis (para o flex-date scout do calendário)."""
+
+    enabled: bool = False
+    preset: str = ""  # "1w" | "2w" | "3w" | "1m" | "custom"
+    window_start: date | None = None
+    window_end: date | None = None
+
+    def resolve_window(self, depart: date) -> tuple[date, date]:
+        """Intervalo [início, fim] a varrer no calendário de preços."""
+        if self.preset == "custom" and self.window_start and self.window_end:
+            start, end = self.window_start, self.window_end
+            return (start, end) if start <= end else (end, start)
+        radius = FLEX_PRESETS.get(self.preset, 7)
+        return depart - timedelta(days=radius), depart + timedelta(days=radius)
+
+
+@dataclass
+class DatePrice:
+    """Preço indicativo de uma data, lido do calendário do Google Flights."""
+
+    date: date
+    price_brl: float
+    source: Source
+
+
 @dataclass
 class SearchRequest:
     origin: str
@@ -127,6 +158,8 @@ class SearchRequest:
     cabin_target: Cabin = Cabin.BUSINESS
     passengers: int = 1
     flex_days: int = 0  # also search +/- N days around depart
+    flexibility: Flexibility | None = None  # janela ampla + scout de calendário
+    flex_max_dates: int = 5  # quantas datas mais baratas manter para scraping
     miles_balance: int = 0
     program: str = "connectmiles"
 
