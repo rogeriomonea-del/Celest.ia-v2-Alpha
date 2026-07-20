@@ -317,9 +317,17 @@ def main(argv: list[str] | None = None) -> int:
         from .api import create_app
 
         settings = load_settings()
+        # progresso dos agentes ao vivo no terminal — sem isso uma busca real
+        # (que pode levar minutos) parece travada
+        settings.verbose = True
         mode = "MOCK (demo)" if settings.mock_mode else "REAL"
         print(f"celest.ia API [{mode}] em http://{args.host}:{args.port}/api")
         print("o site (npm run dev) já aponta para cá via proxy /api")
+        if not settings.mock_mode:
+            print(
+                "atenção: busca REAL leva minutos (scraping). O progresso dos "
+                "agentes aparece aqui neste terminal."
+            )
         uvicorn.run(create_app(settings), host=args.host, port=args.port, log_level="info")
         return 0
 

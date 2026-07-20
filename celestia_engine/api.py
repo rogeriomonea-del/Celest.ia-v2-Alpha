@@ -289,13 +289,24 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.post("/api/search")
     async def search(body: SearchIn) -> dict:
+        import asyncio
+
+        s: Settings = app.state.settings
         request = _to_request(body)
-        orchestrator = Orchestrator(app.state.settings)
+        orchestrator = Orchestrator(s)
         try:
-            report = await orchestrator.search(request)
+            report = await asyncio.wait_for(
+                orchestrator.search(request), timeout=s.api_search_timeout_s
+            )
+        except asyncio.TimeoutError as error:
+            raise HTTPException(
+                504,
+                f"busca excedeu {s.api_search_timeout_s:.0f}s — scraping real pode "
+                "demorar; aumente API_SEARCH_TIMEOUT_S no .env ou tente de novo",
+            ) from error
         except Exception as error:  # noqa: BLE001 - erro do motor vira 502 legível
             raise HTTPException(502, f"busca falhou: {error}") from error
-        return _report_json(report, app.state.settings)
+        return _report_json(report, s)
 
     return app
 

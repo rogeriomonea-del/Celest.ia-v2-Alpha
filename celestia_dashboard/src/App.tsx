@@ -14,7 +14,13 @@ import {
 } from './components/Skeletons'
 import { findAirport } from './data/airports'
 import { buildFlights } from './data/flights'
-import { mapEngineFlights, searchFlights, type EngineSearchResponse } from './api'
+import {
+  fetchApiMode,
+  mapEngineFlights,
+  searchFlights,
+  type ApiMode,
+  type EngineSearchResponse,
+} from './api'
 import { applyFilters, sortFlights } from './utils/flightLogic'
 import { addDays, startOfDay } from './utils/dates'
 import { formatShortDate } from './utils/format'
@@ -60,18 +66,31 @@ export default function App() {
   const [showMobileFilters, setShowMobileFilters] = useState(false)
   /** Relatório do motor quando a busca foi real; null = modo demonstração. */
   const [engine, setEngine] = useState<EngineSearchResponse | null>(null)
+  /** Modo detectado no /api/status: real, mock ou API fora do ar. */
+  const [apiMode, setApiMode] = useState<ApiMode | null>(null)
+  /** Em modo real não buscamos sozinhos (custa créditos e minutos). */
+  const [idle, setIdle] = useState(false)
+  const [searchError, setSearchError] = useState<string | null>(null)
+  const apiModeRef = useRef<ApiMode>('off')
   const searchTimer = useRef<ReturnType<typeof setTimeout>>()
   const searchSeq = useRef(0)
 
   const runSearch = useCallback((nextParams: SearchParams) => {
     setParams(nextParams)
+    setIdle(false)
+    setSearchError(null)
     setLoading(true)
     const seq = ++searchSeq.current
     clearTimeout(searchTimer.current)
 
-    const apply = (flights: Flight[], engineData: EngineSearchResponse | null) => {
+    const apply = (
+      flights: Flight[],
+      engineData: EngineSearchResponse | null,
+      error: string | null = null,
+    ) => {
       if (seq !== searchSeq.current) return // resposta antiga: descarta
       setEngine(engineData)
+      setSearchError(error)
       setResults(flights)
       setFilters(buildDefaultFilters(flights))
       setLoading(false)
@@ -82,7 +101,13 @@ export default function App() {
     // dados fictícios — sempre sinalizada como tal no banner.
     searchFlights(nextParams)
       .then((response) => apply(mapEngineFlights(response, nextParams.cabin), response))
-      .catch(() => {
+      .catch((error: unknown) => {
+        if (apiModeRef.current === 'real') {
+          // A API real está de pé mas a busca falhou/estourou o tempo:
+          // NUNCA mascarar com dados fictícios — erro honesto.
+          apply([], null, error instanceof Error ? error.message : 'busca falhou')
+          return
+        }
         searchTimer.current = setTimeout(() => {
           apply(buildFlights(nextParams.origin.code, nextParams.destination.code), null)
         }, SEARCH_LATENCY_MS)
@@ -90,8 +115,23 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    runSearch(buildDefaultSearch())
-    return () => clearTimeout(searchTimer.current)
+    let cancelled = false
+    fetchApiMode().then((mode) => {
+      if (cancelled) return
+      apiModeRef.current = mode
+      setApiMode(mode)
+      if (mode === 'real') {
+        // Busca real raspa as companhias (minutos + créditos): espera o clique.
+        setIdle(true)
+        setLoading(false)
+      } else {
+        runSearch(buildDefaultSearch())
+      }
+    })
+    return () => {
+      cancelled = true
+      clearTimeout(searchTimer.current)
+    }
   }, [runSearch])
 
   // SEO/UX: o título da aba acompanha a rota, mas só depois de uma busca do
@@ -179,9 +219,11 @@ export default function App() {
               </h2>
               <p role="status" aria-live="polite" className="text-sm text-slate-500">
                 {dateSummary} ·{' '}
-                {loading
-                  ? 'buscando…'
-                  : `${filteredFlights.length} de ${results.length} voos`}
+                {idle
+                  ? 'pronto para buscar'
+                  : loading
+                    ? 'buscando…'
+                    : `${filteredFlights.length} de ${results.length} voos`}
               </p>
             </div>
             <button
@@ -195,7 +237,17 @@ export default function App() {
             </button>
           </div>
 
-          {!loading && engine === null && (
+          {!loading && !idle && searchError !== null && (
+            <div className="mb-5 flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+              <SearchX className="h-4 w-4 shrink-0" aria-hidden="true" />
+              <p>
+                <strong className="font-semibold">A busca real falhou</strong> — {searchError}.
+                Veja o terminal da API para o detalhe e tente novamente.
+              </p>
+            </div>
+          )}
+
+          {!loading && !idle && searchError === null && engine === null && (
             <div className="mb-5 flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
               <FlaskConical className="h-4 w-4 shrink-0" aria-hidden="true" />
               <p>
@@ -230,6 +282,21 @@ export default function App() {
             </div>
           )}
 
+          {idle ? (
+            <div className="flex flex-col items-center rounded-2xl border border-slate-200 bg-white px-6 py-16 text-center shadow-sm">
+              <span className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-indigo-50">
+                <Cpu className="h-7 w-7 text-indigo-600" aria-hidden="true" />
+              </span>
+              <h3 className="text-base font-bold text-slate-900">
+                Motor real conectado — pronto para buscar
+              </h3>
+              <p className="mt-1 max-w-md text-sm text-slate-500">
+                A busca real raspa as companhias e o metasearch de verdade, o que
+                leva alguns minutos e consome créditos — por isso ela só roda
+                quando você clicar em <strong>Buscar voos</strong> ali em cima.
+              </p>
+            </div>
+          ) : (
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-[18rem_minmax(0,1fr)]">
             {/* Sidebar */}
             <div className={`${showMobileFilters ? 'block' : 'hidden'} lg:block`}>
@@ -253,7 +320,9 @@ export default function App() {
                 <>
                   <div className="flex items-center gap-2 text-sm font-medium text-slate-500">
                     <Plane className="h-4 w-4 animate-pulse text-indigo-600" aria-hidden="true" />
-                    Buscando as melhores tarifas em mais de 30 parceiros…
+                    {apiMode === 'real'
+                      ? 'Busca real em andamento — o motor está raspando as companhias. Pode levar alguns minutos; acompanhe o progresso no terminal da API.'
+                      : 'Buscando as melhores tarifas em mais de 30 parceiros…'}
                   </div>
                   <SortTabsSkeleton />
                   {Array.from({ length: SKELETON_COUNT }, (_, index) => (
@@ -298,6 +367,7 @@ export default function App() {
               )}
             </div>
           </div>
+          )}
         </section>
       </main>
 

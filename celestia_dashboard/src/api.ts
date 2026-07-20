@@ -72,6 +72,25 @@ export interface EngineSearchResponse {
   agentLog: string[]
 }
 
+/** Como a API está operando: real (scraping), mock (demo do motor) ou fora do ar. */
+export type ApiMode = 'real' | 'mock' | 'off'
+
+/** Sonda rápida do /api/status no carregamento da página. Nunca lança. */
+export async function fetchApiMode(): Promise<ApiMode> {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), 4000)
+  try {
+    const response = await fetch(`${API_BASE}/api/status`, { signal: controller.signal })
+    if (!response.ok) return 'off'
+    const status = (await response.json()) as { mockMode?: boolean }
+    return status.mockMode ? 'mock' : 'real'
+  } catch {
+    return 'off'
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 // ------------------------------------------------------------------- request
 /** Data local → YYYY-MM-DD sem sofrer com fuso (toISOString desloca o dia). */
 function isoDate(date: Date): string {

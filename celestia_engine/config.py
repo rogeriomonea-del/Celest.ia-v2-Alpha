@@ -151,6 +151,7 @@ class Settings:
     prefilter_top_k: int = 4       # candidates that survive the price pre-filter
     max_subagents: int = 6         # concurrent scraper subagents
     http_timeout_s: float = 20.0
+    api_search_timeout_s: float = 300.0  # teto de uma busca via API (serve)
     mock_mode: bool = False        # force deterministic mock providers
     verbose: bool = False          # stream agent log to stderr in real time
 
@@ -223,6 +224,7 @@ def load_settings() -> Settings:
         prefilter_top_k=_env_int("PREFILTER_TOP_K", 4),
         max_subagents=_env_int("MAX_SUBAGENTS", 6),
         http_timeout_s=_env_float("HTTP_TIMEOUT_S", 20.0),
+        api_search_timeout_s=_env_float("API_SEARCH_TIMEOUT_S", 300.0),
         mock_mode=_env("CELESTIA_MOCK", "") in {"1", "true", "yes"},
     )
     for program in list(settings.milheiro_brl):
