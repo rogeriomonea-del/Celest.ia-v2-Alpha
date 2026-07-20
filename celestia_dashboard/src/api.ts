@@ -76,6 +76,9 @@ export interface EngineSearchResponse {
   quotes: { route: string; depart: string; priceBrl: number; source: string }[]
   stats: EngineStats
   agentLog: string[]
+  /** Garantia nunca-vazio: quando NENHUMA fonte respondeu com preço, a API
+   * devolve o link da busca já montada no Google Flights. */
+  lastResort: { bookingUrl: string; reason: string } | null
 }
 
 /** Como a API está operando: real (scraping), mock (demo do motor) ou fora do ar. */

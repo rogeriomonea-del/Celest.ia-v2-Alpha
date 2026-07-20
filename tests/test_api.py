@@ -82,6 +82,34 @@ def test_search_validation_errors():
     assert client.post("/api/search", json={**BODY, "depart": "10/09/2026"}).status_code == 422
 
 
+def test_never_empty_handed_last_resort_link(monkeypatch):
+    # Pior caso absoluto: nenhuma fonte respondeu (sem ofertas E sem cotações).
+    # O usuário ainda recebe o link da busca pronta no Google Flights.
+    from celestia_engine import api as api_module
+    from celestia_engine.models import SearchReport, SearchStats
+
+    class EmptyOrchestrator:
+        def __init__(self, settings):
+            pass
+
+        async def search(self, request):
+            return SearchReport(request=request, quotes=[], offers=[],
+                                options=[], stats=SearchStats(), agent_log=[])
+
+    monkeypatch.setattr(api_module, "Orchestrator", EmptyOrchestrator)
+    data = _client().post("/api/search", json=BODY).json()
+    assert data["flights"] == []
+    assert data["lastResort"]["bookingUrl"].startswith(
+        "https://www.google.com/travel/flights"
+    )
+    assert "GRU" in data["lastResort"]["bookingUrl"]
+
+
+def test_last_resort_absent_when_there_are_results():
+    data = _client().post("/api/search", json=BODY).json()
+    assert data["flights"] and data["lastResort"] is None
+
+
 def test_every_flight_has_a_booking_url():
     data = _client().post("/api/search", json=BODY).json()
     for flight in data["flights"]:

@@ -343,13 +343,23 @@ export default function App() {
                       {engine !== null && results.length === 0 ? (
                         <>
                           <h3 className="text-base font-bold text-slate-900">
-                            O motor não encontrou tarifas para esta busca
+                            Nenhuma fonte respondeu com preço desta vez
                           </h3>
                           <p className="mt-1 max-w-md text-sm text-slate-500">
-                            Dicas: use um aeroporto internacional como origem (GRU em vez
-                            de CGH), ative a flexibilidade de datas ou confira o terminal
-                            da API para ver onde o scraping parou.
+                            Você não sai de mãos vazias: abra a busca já montada no
+                            Google Flights, ou tente com origem internacional (GRU),
+                            flexibilidade de datas, e veja o terminal da API.
                           </p>
+                          {engine.lastResort && (
+                            <a
+                              href={engine.lastResort.bookingUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="mt-5 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition-colors hover:bg-indigo-700"
+                            >
+                              Abrir busca pronta no Google Flights
+                            </a>
+                          )}
                         </>
                       ) : (
                         <>

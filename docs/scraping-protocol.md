@@ -60,6 +60,20 @@ python -m celestia_engine scripts
 `scan_calendar` (usado pelo flex-date scout) delegam para esses scripts, então
 há **uma única fonte de verdade** por fluxo.
 
+## Escada de resultados (garantia nunca-vazio)
+
+**Diretriz:** o sistema não julga se um voo "vale a pena" — ele sempre entrega
+o mais barato que alguma fonte devolveu, e o usuário **nunca** sai de mãos
+vazias. A única limpeza é a auditoria (duplicatas e preços inválidos ≤ 0).
+
+1. **Ofertas raspadas** (Copa/LATAM via estratégias) — reserváveis, dados
+   ricos, alimentam as 4 estratégias de compra.
+2. **Cotações do pré-filtro** (Google Flights/Skyscanner) — quando o scraping
+   não devolve nada, viram cards de *tarifa indicativa* com link de reserva.
+3. **`lastResort`** — se NENHUMA fonte respondeu com preço, a API devolve o
+   link da busca já montada no Google Flights para o mesmo par/data, e o site
+   mostra o botão "Abrir busca pronta no Google Flights" no lugar do vazio.
+
 ## Pré-varredura do calendário (flexibilidade de datas)
 
 Antes de gastar scraping caro em cada data, o **FlexDateScoutAgent**

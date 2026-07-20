@@ -26,7 +26,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, field_validator
 
 from .agents.orchestrator import Orchestrator
-from .airlines import booking_url_for
+from .airlines import booking_url_for, google_flights_url
 from .config import Settings, load_settings
 from .models import (
     Cabin,
@@ -285,14 +285,33 @@ def _indicative_flight_json(quote, settings: Settings) -> dict:
 
 
 def _report_json(report: SearchReport, settings: Settings) -> dict:
+    """Escada de resultados — o usuário NUNCA sai de mãos vazias:
+
+    1. ofertas raspadas (reserváveis, dados ricos);
+    2. senão, cotações do pré-filtro como tarifas indicativas;
+    3. senão (nenhuma fonte respondeu com preço), ``lastResort``: o link da
+       busca já montada no Google Flights para o mesmo par/data. O sistema
+       não julga se um voo "vale a pena" — sempre entrega o mais barato que
+       alguma fonte devolveu, e no pior caso entrega o caminho para ver.
+    """
     stats = report.stats
+    request = report.request
     flights = [_flight_json(offer, settings) for offer in report.offers]
     if not flights and report.quotes:
         # scraping vazio mas o pré-filtro cotou: mostra as tarifas indicativas
         flights = [_indicative_flight_json(quote, settings) for quote in report.quotes[:12]]
+    last_resort = None
+    if not flights:
+        last_resort = {
+            "bookingUrl": google_flights_url(
+                request.origin, request.destination, request.depart
+            ),
+            "reason": "nenhuma fonte respondeu com preço para esta busca",
+        }
     return {
         "mode": "mock" if settings.mock_mode else "real",
         "flights": flights,
+        "lastResort": last_resort,
         "options": [_option_json(option) for option in report.options],
         "quotes": [
             {
