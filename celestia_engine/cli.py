@@ -143,6 +143,9 @@ def main(argv: list[str] | None = None) -> int:
         "strategies", help="desempenho aprendido de cada estratégia de scraping"
     )
     sub.add_parser(
+        "scripts", help="lista os scripts (playbooks) do Firecrawl Interact"
+    )
+    sub.add_parser(
         "doctor", help="testa cada integração com 1 chamada real e mostra o resultado"
     )
     sub.add_parser("routes", help="resumo da malha de rotas")
@@ -297,6 +300,21 @@ def main(argv: list[str] | None = None) -> int:
             print(f"  {site}:")
             for strategy, score in sorted(scores.items(), key=lambda kv: -kv[1]):
                 print(f"    {score:.2f}  {strategy}")
+        return 0
+
+    if args.command == "scripts":
+        from .providers.firecrawl_scripts import SCRIPTS
+
+        settings = load_settings()
+        print("Scripts (playbooks) do Firecrawl Interact:\n")
+        for name, script in SCRIPTS.items():
+            url = script.url(settings)
+            print(f"  {name:24} [{script.kind}]  {script.description}")
+            print(f"  {'':24} alvo: {url}")
+        print(
+            "\nA IA orquestradora testa qual script rende mais por site e grava o "
+            "desempenho em data/strategy_performance.csv (self-improvement)."
+        )
         return 0
 
     if args.command == "routes":

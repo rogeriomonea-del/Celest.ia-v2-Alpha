@@ -28,10 +28,37 @@ mesmo `scrapeId` em todos os passos para economizar créditos:
 5) DELETE {base}/v2/scrape/{id}/interact          -> encerra a sessão (sempre)
 ```
 
-O último passo pede o JSON estruturado (`offers[]` com airline, cabin, price,
-currency, departure_time, duration, stops). O parser converte **USD → BRL**
-(`USD_BRL_RATE`) quando o site cota em dólar e mapeia rótulos de companhia
-(COPA, Avianca, LATAM…) para os códigos IATA.
+O último passo pede o JSON estruturado. A extração vai **muito além do preço** —
+para cada voo: `airline`/`airline_iata`, `flight_numbers`, `cabin`, `fare_brand`,
+`price` + `currency`, `price_miles`, `taxes`, `departure_time`/`arrival_time`
+(+`arrival_day_offset`), `duration_minutes`, `stops`, `layovers[]` (aeroporto +
+minutos), `aircraft`, `baggage` e `seats_left`. O parser converte **USD → BRL**
+(`USD_BRL_RATE`), mapeia rótulos de companhia (COPA, Avianca, LATAM…) para IATA
+e mantém uma oferta que tenha preço em **dinheiro OU em milhas**.
+
+## Scripts (playbooks) do Interact
+
+Cada fluxo do Interact é um **script nomeado e reutilizável** em
+`providers/firecrawl_scripts.py` (passos + extração rica). A IA orquestradora
+enumera os scripts, testa qual rende mais por site e grava o desempenho no CSV
+de self-improvement.
+
+| script | tipo | alvo | o que faz |
+|---|---|---|---|
+| `copa_direct` | offers | copaair.com | busca direto na Copa (dinheiro **e** ConnectMiles) |
+| `latam_direct` | offers | latamairlines.com | busca direto na LATAM (dinheiro **e** LATAM Pass) |
+| `google_flights_search` | offers | google.com/travel/flights | metasearch: voos de **várias** companhias de uma vez |
+| `google_flights_calendar` | calendar | google.com/travel/flights | varre o calendário de preços p/ cortar datas caras |
+
+Liste-os e veja as URLs-alvo com:
+
+```bash
+python -m celestia_engine scripts
+```
+
+`scrape_flights` (usado pela estratégia `firecrawl_interact` da Copa/LATAM) e
+`scan_calendar` (usado pelo flex-date scout) delegam para esses scripts, então
+há **uma única fonte de verdade** por fluxo.
 
 ## Pré-varredura do calendário (flexibilidade de datas)
 

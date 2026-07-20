@@ -22,7 +22,7 @@ from datetime import date
 
 from ..config import Settings
 from ..models import Cabin, DatePrice, FlightOffer, Route, Source
-from .base import ProviderError, ProviderNotConfigured, post_json
+from .base import ProviderError, post_json
 
 # empresa/programa/fonte por site
 _SITE_META = {
@@ -30,17 +30,8 @@ _SITE_META = {
     "latam": ("LA", "latampass", Source.LATAM),
 }
 
-_CABIN_WORD = {Cabin.ECONOMY: "Econômica", Cabin.PREMIUM: "Premium", Cabin.BUSINESS: "Executiva"}
-
-_EXTRACT_INSTRUCTION = (
-    "Extraia TODAS as tarifas visíveis nos resultados e responda APENAS com um "
-    "JSON válido, sem texto ao redor, no formato: "
-    '{"offers":[{"airline":"COPA","flight_numbers":["CM 702"],'
-    '"cabin":"economy","price":1226,"currency":"USD",'
-    '"departure_time":"01:40","duration_minutes":680,"stops":1}]}. '
-    "cabin deve ser 'economy' ou 'business'. currency é o código ISO (USD/BRL). "
-    "Se um campo não existir, use null."
-)
+#: rótulo de cabine em pt-BR usado nos prompts (Copa/LATAM/Google Flights).
+_CABIN_GF = {Cabin.ECONOMY: "Econômica", Cabin.PREMIUM: "Premium", Cabin.BUSINESS: "Executiva"}
 
 
 async def _headers(settings: Settings) -> dict:
@@ -92,57 +83,23 @@ async def close_session(settings: Settings, scrape_id: str) -> None:
 async def scrape_flights(
     settings: Settings, *, site: str, route: Route, depart: date
 ) -> list[FlightOffer]:
-    """Estratégia firecrawl_interact: retorna ofertas de TODAS as cabines."""
-    if not settings.has_firecrawl():
-        raise ProviderNotConfigured("FIRECRAWL_API_KEY ausente — Interact desativado")
-    if not settings.firecrawl_interact_enabled:
-        raise ProviderNotConfigured("FIRECRAWL_INTERACT=0 — modo Interact desativado")
+    """Estratégia firecrawl_interact: retorna ofertas de TODAS as cabines.
+
+    Delega ao script nomeado do site (``copa_direct``/``latam_direct``) —
+    ver ``firecrawl_scripts``. Mantido como API pública estável.
+    """
+    from . import firecrawl_scripts
 
     carrier, program, source = _SITE_META[site]
-    url = settings.copa_interact_url if site == "copa" else settings.latam_interact_url
-    depart_br = f"{depart.day:02d}/{depart.month:02d}/{depart.year}"
-
-    scrape_id = await open_session(settings, url)
-    try:
-        await interact(
-            settings,
-            scrape_id,
-            f"1. No campo de origem digite {route.origin}. "
-            f"2. No campo de destino digite {route.destination}. "
-            "Selecione a primeira sugestão de cada campo.",
-        )
-        await interact(
-            settings,
-            scrape_id,
-            f"Defina somente ida com data de partida {depart_br}. "
-            "Confirme 1 adulto e pesquise os voos.",
-        )
-        raw_output = await interact(
-            settings,
-            scrape_id,
-            "Aguarde os resultados carregarem. " + _EXTRACT_INSTRUCTION,
-        )
-    finally:
-        await close_session(settings, scrape_id)
-
-    offers = parse_interact_output(
-        raw_output,
+    return await firecrawl_scripts.run_offer_script(
+        settings,
+        firecrawl_scripts.SITE_SCRIPT[site],
         carrier=carrier,
         program=program,
+        source=source,
         route=route,
         depart=depart,
-        source=source,
-        usd_brl_rate=settings.usd_brl_rate,
     )
-    if not offers:
-        raise ProviderError(
-            f"firecrawl interact {site} {route.key()}: extração vazia "
-            f"(output: {raw_output[:120]!r})"
-        )
-    return offers
-
-
-_CABIN_GF = {Cabin.ECONOMY: "Econômica", Cabin.PREMIUM: "Premium", Cabin.BUSINESS: "Executiva"}
 
 
 async def scan_calendar(
@@ -156,37 +113,21 @@ async def scan_calendar(
 ) -> list[DatePrice]:
     """Lê o calendário de preços do Google Flights numa janela de datas.
 
-    Uma única sessão Interact abre o Google Flights, define rota/classe e o
-    intervalo amplo, e extrai o preço de cada data disponível. Serve para
-    CORTAR datas caras antes de gastar scraping — a saída alimenta o
-    FlexDateScoutAgent, que escolhe as datas mais baratas para raspar.
+    Delega ao script ``google_flights_calendar``. Uma única sessão Interact
+    abre o Google Flights, define rota/classe e o intervalo amplo, e extrai o
+    preço de cada data — para CORTAR datas caras antes de gastar scraping (o
+    FlexDateScoutAgent escolhe as mais baratas).
     """
-    if not settings.has_firecrawl():
-        raise ProviderNotConfigured("FIRECRAWL_API_KEY ausente — scan de calendário desativado")
-    if not settings.firecrawl_interact_enabled:
-        raise ProviderNotConfigured("FIRECRAWL_INTERACT=0 — scan de calendário desativado")
+    from . import firecrawl_scripts
 
-    scrape_id = await open_session(settings, settings.google_flights_interact_url)
-    try:
-        await interact(
-            settings,
-            scrape_id,
-            f"1. Selecione 'Somente ida'. 2. Origem {origin}, destino {destination}. "
-            f"3. Classe {_CABIN_GF[cabin]}. Selecione a primeira sugestão de cada campo.",
-        )
-        raw = await interact(
-            settings,
-            scrape_id,
-            "Abra o seletor de datas / calendário de preços e leia os preços por data. "
-            f"Considere apenas datas entre {start.isoformat()} e {end.isoformat()}. "
-            "Responda APENAS com JSON válido no formato "
-            '{"calendar":[{"date":"2026-09-20","price":1562,"currency":"BRL"}]}. '
-            "currency é o código ISO (BRL/USD). Não invente datas sem preço.",
-        )
-    finally:
-        await close_session(settings, scrape_id)
-
-    return parse_calendar_output(raw, usd_brl_rate=settings.usd_brl_rate)
+    return await firecrawl_scripts.run_calendar_script(
+        settings,
+        origin=origin,
+        destination=destination,
+        cabin=cabin,
+        start=start,
+        end=end,
+    )
 
 
 def _parse_cal_date(raw: str):
@@ -273,6 +214,66 @@ def _parse_duration(value) -> int:
     return 0
 
 
+def _money_to_brl(value, currency: str, usd_brl_rate: float) -> float | None:
+    """Converte um valor monetário para BRL (USD→BRL pela taxa). None se inválido."""
+    try:
+        amount = float(value)
+    except (TypeError, ValueError):
+        return None
+    if amount <= 0:
+        return None
+    return round(amount * usd_brl_rate, 2) if currency == "USD" else round(amount, 2)
+
+
+def _to_positive_int(value) -> int | None:
+    try:
+        number = int(value)
+    except (TypeError, ValueError):
+        return None
+    return number if number > 0 else None
+
+
+def _cabin_of(value) -> Cabin:
+    text = str(value or "").lower()
+    if text.startswith(("business", "exec")):
+        return Cabin.BUSINESS
+    if text.startswith(("premium", "prem")):
+        return Cabin.PREMIUM
+    return Cabin.ECONOMY
+
+
+def _flight_numbers(raw_numbers, carrier: str) -> tuple[str, ...]:
+    # o LLM pode devolver flight_numbers como string em vez de array; sem
+    # normalizar, iterar uma string explode em caracteres soltos.
+    if isinstance(raw_numbers, str):
+        raw_numbers = [raw_numbers]
+    numbers = tuple(str(n) for n in (raw_numbers or []) if str(n).strip())
+    return numbers or (f"{carrier} ?",)
+
+
+def _clean_layovers(value) -> list[dict]:
+    """Normaliza a lista de conexões: [{airport, minutes}]."""
+    if not isinstance(value, list):
+        return []
+    out: list[dict] = []
+    for layover in value:
+        if not isinstance(layover, dict):
+            continue
+        airport = str(layover.get("airport") or "").strip().upper()
+        if airport:
+            out.append({"airport": airport, "minutes": _parse_duration(layover.get("minutes"))})
+    return out
+
+
+def _resolve_carrier(airline: str, iata: str, default: str) -> str:
+    iata = iata.strip().upper()
+    if len(iata) == 2 and iata.isalpha():
+        return iata
+    if default and airline.upper().startswith(default):
+        return default
+    return _carrier_of(airline, default)
+
+
 def parse_interact_output(
     text: str,
     *,
@@ -283,6 +284,12 @@ def parse_interact_output(
     source: Source,
     usd_brl_rate: float,
 ) -> list[FlightOffer]:
+    """Extrai ofertas ricas do JSON devolvido pela extração do Interact.
+
+    Além do preço em dinheiro, captura milhas, impostos, horários (ida/volta),
+    duração, escalas (aeroporto + tempo), aeronave, família tarifária, bagagem e
+    assentos restantes. Uma oferta vale se tiver preço em dinheiro OU em milhas.
+    """
     obj = _find_json(text)
     if not obj:
         return []
@@ -290,48 +297,39 @@ def parse_interact_output(
     for item in obj.get("offers") or []:
         if not isinstance(item, dict):
             continue
-        price = item.get("price")
-        try:
-            price = float(price)
-        except (TypeError, ValueError):
-            continue
-        if price <= 0:
-            continue
         currency = str(item.get("currency") or "BRL").upper()
-        price_brl = round(price * usd_brl_rate, 2) if currency == "USD" else round(price, 2)
-        cabin = (
-            Cabin.BUSINESS
-            if str(item.get("cabin", "")).lower().startswith(("business", "exec"))
-            else Cabin.ECONOMY
-        )
-        # o LLM pode devolver flight_numbers como string em vez de array; sem
-        # normalizar, iterar uma string explode em caracteres soltos.
-        raw_numbers = item.get("flight_numbers")
-        if isinstance(raw_numbers, str):
-            raw_numbers = [raw_numbers]
-        numbers = tuple(
-            str(n) for n in (raw_numbers or []) if str(n).strip()
-        ) or (f"{carrier} ?",)
+        price_brl = _money_to_brl(item.get("price"), currency, usd_brl_rate)
+        price_miles = _to_positive_int(item.get("price_miles"))
+        if price_brl is None and price_miles is None:
+            continue  # sem dinheiro e sem milhas → não é uma oferta cotável
         airline = str(item.get("airline") or carrier)
         offers.append(
             FlightOffer(
-                carrier=carrier if airline.upper().startswith(carrier) else _carrier_of(airline, carrier),
-                flight_numbers=numbers,
+                carrier=_resolve_carrier(airline, str(item.get("airline_iata") or ""), carrier),
+                flight_numbers=_flight_numbers(item.get("flight_numbers"), carrier),
                 origin=route.origin,
                 destination=route.destination,
                 depart=depart,
-                cabin=cabin,
+                cabin=_cabin_of(item.get("cabin")),
                 price_cash_brl=price_brl,
-                taxes_brl=0.0,
-                miles_program=program,
+                taxes_brl=_money_to_brl(item.get("taxes"), currency, usd_brl_rate) or 0.0,
+                price_miles=price_miles,
+                miles_program=program or None,
+                seats_left=_to_positive_int(item.get("seats_left")),
                 source=source,
                 raw={
                     "via": "firecrawl_interact",
                     "airline_label": airline,
                     "currency": currency,
+                    "fare_brand": item.get("fare_brand"),
                     "departure_time": item.get("departure_time"),
+                    "arrival_time": item.get("arrival_time"),
+                    "arrival_day_offset": item.get("arrival_day_offset"),
                     "duration_min": _parse_duration(item.get("duration_minutes")),
                     "stops": item.get("stops"),
+                    "layovers": _clean_layovers(item.get("layovers")),
+                    "aircraft": item.get("aircraft"),
+                    "baggage": item.get("baggage"),
                 },
             )
         )
