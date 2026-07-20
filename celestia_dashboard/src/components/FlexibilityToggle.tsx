@@ -70,6 +70,11 @@ export function FlexibilityToggle({ value, departDate, onChange }: FlexibilityTo
     setCustomOpen(preset === 'custom')
   }
 
+  const now = new Date()
+  const canGoBack =
+    viewDate.getFullYear() > now.getFullYear() ||
+    (viewDate.getFullYear() === now.getFullYear() && viewDate.getMonth() > now.getMonth())
+
   const handleCustomSelect = (date: Date) => {
     const { windowStart, windowEnd } = value
     if (!windowStart || windowEnd || date < windowStart) {
@@ -80,9 +85,9 @@ export function FlexibilityToggle({ value, departDate, onChange }: FlexibilityTo
     }
   }
 
-  const window = resolveFlexWindow(value, departDate)
-  const windowLabel = window
-    ? `Vamos varrer o calendário de ${formatShortDate(window[0])} a ${formatShortDate(window[1])} e manter as datas mais baratas.`
+  const flexWindow = resolveFlexWindow(value, departDate)
+  const windowLabel = flexWindow
+    ? `Vamos varrer o calendário de ${formatShortDate(flexWindow[0])} a ${formatShortDate(flexWindow[1])} e manter as datas mais baratas.`
     : value.preset === 'custom'
       ? 'Escolha o início e o fim do período que você aceita voar.'
       : 'Selecione uma data de ida para calcular o período.'
@@ -145,7 +150,16 @@ export function FlexibilityToggle({ value, departDate, onChange }: FlexibilityTo
           </p>
 
           {value.preset === 'custom' && (
-            <div ref={customRef} className="relative">
+            <div
+              ref={customRef}
+              className="relative"
+              onKeyDown={(event) => {
+                if (event.key === 'Escape' && customOpen) {
+                  event.stopPropagation()
+                  setCustomOpen(false)
+                }
+              }}
+            >
               <button
                 type="button"
                 onClick={() => setCustomOpen((current) => !current)}
@@ -165,8 +179,9 @@ export function FlexibilityToggle({ value, departDate, onChange }: FlexibilityTo
                     <button
                       type="button"
                       aria-label="Mês anterior"
+                      disabled={!canGoBack}
                       onClick={() => setViewDate((current) => addMonths(current, -1))}
-                      className="flex h-8 w-8 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100"
+                      className="flex h-8 w-8 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-30"
                     >
                       <ChevronLeft className="h-5 w-5" />
                     </button>

@@ -89,3 +89,40 @@ def test_orchestrator_flex_search_uses_cheap_dates():
                     asyncio.run(orchestrator.plan_candidates(_flex_request()))}
     assert len(unique_dates) == 3
     assert report.offers  # busca completa com as datas baratas
+
+
+def test_scout_degrades_when_all_dates_outside_window(monkeypatch):
+    # o calendário devolve datas, mas TODAS fora da janela pedida: não pode
+    # estourar IndexError — deve degradar para a janela simétrica.
+    from celestia_engine.models import DatePrice, Source
+
+    async def only_outside(settings, **kw):
+        return [DatePrice(date=date(2026, 11, 1), price_brl=999.0, source=Source.GOOGLE_FLIGHTS)]
+
+    monkeypatch.setattr(firecrawl_interact, "scan_calendar", only_outside)
+    agent = FlexDateScoutAgent(AgentContext(settings=Settings(firecrawl_api_key="fc")))
+    dates = asyncio.run(agent.cheapest_dates(_flex_request()))
+    assert dates and len(dates) <= 3  # degradou sem lançar
+
+
+def test_window_fallback_never_returns_past_dates():
+    from datetime import timedelta
+
+    from celestia_engine.agents.flex_scout import _window_fallback
+
+    today = date.today()
+    req = SearchRequest(
+        origin="GRU", destination="MCO", depart=today + timedelta(days=10), flex_max_dates=5
+    )
+    dates = _window_fallback(req, today - timedelta(days=30), today + timedelta(days=30))
+    assert dates, "fallback nunca é vazio"
+    assert all(d >= today for d in dates)  # nenhuma data passada vai ao scraper
+    assert req.depart in dates  # a ida pedida está entre as candidatas
+
+
+def test_parse_calendar_accepts_br_date_format():
+    text = '{"calendar":[{"date":"20/09/2026","price":1400,"currency":"BRL"}]}'
+    prices = parse_calendar_output(text, usd_brl_rate=5.0)
+    assert len(prices) == 1
+    assert prices[0].date == date(2026, 9, 20)
+    assert prices[0].price_brl == 1400.0

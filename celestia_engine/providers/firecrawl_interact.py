@@ -189,9 +189,27 @@ async def scan_calendar(
     return parse_calendar_output(raw, usd_brl_rate=settings.usd_brl_rate)
 
 
-def parse_calendar_output(text: str, *, usd_brl_rate: float) -> list[DatePrice]:
+def _parse_cal_date(raw: str):
+    """Aceita ISO (2026-09-20) e o formato BR (20/09/2026) que o Google Flights
+    pt-BR pode devolver; retorna None se não reconhecer."""
     from datetime import date as _date
 
+    raw = raw.strip()
+    try:
+        return _date.fromisoformat(raw[:10])
+    except ValueError:
+        pass
+    match = re.match(r"(\d{1,2})/(\d{1,2})/(\d{4})", raw)
+    if match:
+        day, month, year = (int(part) for part in match.groups())
+        try:
+            return _date(year, month, day)
+        except ValueError:
+            return None
+    return None
+
+
+def parse_calendar_output(text: str, *, usd_brl_rate: float) -> list[DatePrice]:
     obj = _find_json(text, key="calendar")
     if not obj:
         return []
@@ -199,10 +217,8 @@ def parse_calendar_output(text: str, *, usd_brl_rate: float) -> list[DatePrice]:
     for item in obj.get("calendar") or []:
         if not isinstance(item, dict):
             continue
-        raw_date = str(item.get("date") or "")
-        try:
-            parsed = _date.fromisoformat(raw_date[:10])
-        except ValueError:
+        parsed = _parse_cal_date(str(item.get("date") or ""))
+        if parsed is None:
             continue
         try:
             price = float(item.get("price"))

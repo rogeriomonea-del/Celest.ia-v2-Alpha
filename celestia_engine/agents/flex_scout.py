@@ -53,7 +53,14 @@ class FlexDateScoutAgent(Agent):
             self.log("calendário vazio — usando janela simétrica")
             return _window_fallback(request, start, end)
 
+        # scan_calendar/o LLM podem devolver datas fora da janela pedida (ex.:
+        # end+1 no limite do grid). Filtramos e degradamos se sobrar nada —
+        # senão in_window[0] estouraria IndexError, quebrando o contrato de
+        # "nunca lança".
         in_window = [p for p in prices if start <= p.date <= end]
+        if not in_window:
+            self.log("calendário sem datas na janela — usando janela simétrica")
+            return _window_fallback(request, start, end)
         in_window.sort(key=lambda p: p.price_brl)
         chosen = [p.date for p in in_window[: max(1, request.flex_max_dates)]]
         cheapest = in_window[0]
@@ -65,18 +72,29 @@ class FlexDateScoutAgent(Agent):
 
 
 def _window_fallback(request: SearchRequest, start, end) -> list:
-    """Amostra a janela em passos, limitada a flex_max_dates (evita explodir)."""
-    total_days = (end - start).days
-    if total_days <= 0:
-        return [request.depart]
+    """Amostra a janela em passos, limitada a flex_max_dates (evita explodir).
+
+    Nunca devolve datas passadas (o scraper só perderia tempo com elas) e
+    sempre inclui a data de ida pedida quando ela ainda cabe na janela.
+    """
+    from datetime import date as _date_cls
+
+    lo = max(start, _date_cls.today())
+    hi = end
+    depart = request.depart
+    if hi < lo:
+        return [depart]
     n = max(1, request.flex_max_dates)
-    step = max(1, total_days // n)
-    dates = []
-    day = start
-    while day <= end and len(dates) < n:
-        dates.append(day)
+    # a ida pedida entra primeiro, então nunca é descartada pelo limite de n
+    dates: set = set()
+    if lo <= depart <= hi:
+        dates.add(depart)
+    step = max(1, (hi - lo).days // n)
+    day = lo
+    while day <= hi and len(dates) < n:
+        dates.add(day)
         day = day + timedelta(days=step)
-    return dates or [request.depart]
+    return sorted(dates) or [depart]
 
 
 def _mock_calendar(origin: str, destination: str, start, end) -> list[DatePrice]:
