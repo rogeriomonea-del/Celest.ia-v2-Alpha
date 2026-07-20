@@ -185,6 +185,11 @@ export function FlightCard({ flight, isCheapest, isFastest }: FlightCardProps) {
               {formatBRL(flight.price)}
             </p>
             <p className="text-xs text-slate-500">por pessoa</p>
+            {flight.milesEquivalent != null && (
+              <p className="text-[11px] font-semibold text-indigo-600">
+                ≈ {flight.milesEquivalent.toLocaleString('pt-BR')} milhas
+              </p>
+            )}
           </div>
           {flight.bookingUrl ? (
             <a

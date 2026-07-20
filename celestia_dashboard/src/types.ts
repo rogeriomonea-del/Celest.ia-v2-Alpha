@@ -37,6 +37,8 @@ export interface Flight {
   emissions: 'low' | 'average' | 'high'
   /** Link real de reserva (Firecrawl/companhia/Google Flights); ausente = demo. */
   bookingUrl?: string | null
+  /** Milhas equivalentes ao preço, no milheiro do programa do usuário. */
+  milesEquivalent?: number | null
 }
 
 export interface PassengerCounts {

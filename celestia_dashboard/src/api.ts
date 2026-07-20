@@ -46,6 +46,8 @@ export interface EngineFlight {
   indicative: boolean
   /** Link de reserva: capturado pelo scraper, deep-link da cia ou Google Flights. */
   bookingUrl: string
+  /** Milhas equivalentes ao preço em dinheiro, no milheiro do programa do usuário. */
+  milesEquivalent: number | null
 }
 
 export interface EngineOption {
@@ -208,6 +210,7 @@ export function mapEngineFlights(response: EngineSearchResponse, cabin: CabinCla
       baggage: { carryOn: true, checkedBags: flight.cabin === 'economy' ? 1 : 2 },
       emissions: 'average',
       bookingUrl: flight.bookingUrl || null,
+      milesEquivalent: flight.milesEquivalent,
     }
   })
 }

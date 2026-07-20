@@ -109,6 +109,18 @@ class Orchestrator(Agent):
         # 3. scraping caro só na shortlist, em subagentes paralelos
         offers = await self._scrape_shortlist(shortlist, stats)
 
+        # 3b. premium: os voos ricos do metasearch (mesma chamada paga do
+        # pré-filtro) entram no resultado — raspados primeiro, para a
+        # auditoria preferir a versão reservável quando o voo coincidir
+        meta_offers = list(getattr(self.scout, "metasearch_offers", []) or [])
+        if meta_offers:
+            carriers = sorted({o.carrier for o in meta_offers})
+            self.log(
+                f"metasearch: +{len(meta_offers)} voo(s) de {len(carriers)} "
+                f"companhia(s) ({', '.join(carriers)})"
+            )
+            offers = offers + meta_offers
+
         # 4. matemática de milhas/estratégias
         options = self.miles_math.evaluate_offers(offers, request)
 

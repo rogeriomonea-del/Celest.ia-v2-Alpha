@@ -148,8 +148,9 @@ class Settings:
     scraper_timeout_ms: int = 45_000
 
     # --- Orchestrator knobs ---
-    prefilter_top_k: int = 4       # candidates that survive the price pre-filter
-    max_subagents: int = 6         # concurrent scraper subagents
+    prefilter_top_k: int = 8       # candidates that survive the price pre-filter
+    max_subagents: int = 8         # concurrent scraper subagents
+    metasearch_top_n: int = 8      # voos ricos do metasearch mantidos por par/data
     http_timeout_s: float = 20.0
     api_search_timeout_s: float = 300.0  # teto de uma busca via API (serve)
     mock_mode: bool = False        # force deterministic mock providers
@@ -221,8 +222,9 @@ def load_settings() -> Settings:
         latam_offers_url=_env("LATAM_OFFERS_URL", Settings.latam_offers_url),
         scraper_headless=_env("SCRAPER_HEADLESS", "1") not in {"0", "false", "no"},
         scraper_timeout_ms=_env_int("SCRAPER_TIMEOUT_MS", 45_000),
-        prefilter_top_k=_env_int("PREFILTER_TOP_K", 4),
-        max_subagents=_env_int("MAX_SUBAGENTS", 6),
+        prefilter_top_k=_env_int("PREFILTER_TOP_K", 8),
+        max_subagents=_env_int("MAX_SUBAGENTS", 8),
+        metasearch_top_n=_env_int("METASEARCH_TOP_N", 8),
         http_timeout_s=_env_float("HTTP_TIMEOUT_S", 20.0),
         api_search_timeout_s=_env_float("API_SEARCH_TIMEOUT_S", 300.0),
         mock_mode=_env("CELESTIA_MOCK", "") in {"1", "true", "yes"},

@@ -41,6 +41,47 @@ def mock_quote(route: Route, depart: date, cabin: Cabin) -> list[FareQuote]:
     ]
 
 
+#: companhias que o metasearch mock devolve (rotativo, determinístico)
+_META_CARRIERS = [("G3", "GOL"), ("AD", "Azul"), ("TP", "TAP Air Portugal"),
+                  ("AA", "American Airlines"), ("AF", "Air France")]
+
+
+def mock_metasearch_offers(
+    route: Route, depart: date, cabin: Cabin, n: int = 3
+) -> list[FlightOffer]:
+    """Voos indicativos multi-companhia, como o gf2 real devolve (premium)."""
+    base = _base_price(route, depart) * _CABIN_MULTIPLIER[cabin]
+    seed = _seed("meta", route.origin, route.destination, depart.isoformat())
+    offers: list[FlightOffer] = []
+    for index in range(max(1, n)):
+        code, label = _META_CARRIERS[(seed + index) % len(_META_CARRIERS)]
+        price = round(base * (0.92 + 0.07 * index), 2)
+        dep_min = (5 * 60 + (seed // (index + 1)) % (16 * 60)) % (24 * 60)
+        duration = 300 + (seed + index * 97) % 420
+        offers.append(
+            FlightOffer(
+                carrier=code,
+                flight_numbers=(f"{code} {100 + (seed + index) % 800}",),
+                origin=route.origin,
+                destination=route.destination,
+                depart=depart,
+                cabin=cabin,
+                price_cash_brl=price,
+                source=Source.MOCK,
+                raw={
+                    "via": "google_flights2",
+                    "indicative": True,
+                    "airline_label": label,
+                    "departure_time": f"{dep_min // 60:02d}:{dep_min % 60:02d}",
+                    "duration_min": duration,
+                    "stops": index % 2,
+                    "layovers": [],
+                },
+            )
+        )
+    return offers
+
+
 def mock_offers(
     carrier: str, program: str, route: Route, depart: date
 ) -> list[FlightOffer]:

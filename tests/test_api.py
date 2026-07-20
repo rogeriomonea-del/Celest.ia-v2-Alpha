@@ -119,29 +119,45 @@ def test_every_flight_has_a_booking_url():
         "copaair.com" in f["bookingUrl"] or "latamairlines.com" in f["bookingUrl"]
         for f in data["flights"]
     )
-    # indicativas (CGH-MCO, metasearch) caem no link do Google Flights
+    # indicativas (CGH-MCO, metasearch) também têm link válido — deep-link da
+    # companhia quando o registro tem template, senão Google Flights
     indicative = _client().post(
         "/api/search", json={**BODY, "origin": "CGH", "destination": "MCO"}
     ).json()
+    assert indicative["flights"]
     assert all(
-        f["bookingUrl"].startswith("https://www.google.com/travel/flights")
+        f["bookingUrl"].startswith(("http://", "https://"))
         for f in indicative["flights"]
     )
 
 
-def test_route_outside_cm_la_mesh_returns_indicative_quotes():
-    # CGH-MCO não tem rota Copa/LATAM: scraping vazio, mas o pré-filtro cota —
-    # a API devolve as cotações como cards indicativos em vez de 0 voos.
+def test_route_outside_cm_la_mesh_returns_indicative_metasearch():
+    # CGH-MCO não tem rota Copa/LATAM: nada raspável, mas o metasearch rico
+    # devolve voos indicativos multi-companhia (premium) — nunca 0 resultados.
     response = _client().post("/api/search", json={**BODY, "origin": "CGH", "destination": "MCO"})
     assert response.status_code == 200
     data = response.json()
-    assert data["flights"], "cotações do metasearch devem virar cards"
+    assert data["flights"], "voos do metasearch devem aparecer"
     assert all(f["indicative"] is True for f in data["flights"])
-    assert all(f["flightNumbers"] == [] for f in data["flights"])
     assert all(f["priceBrl"] > 0 for f in data["flights"])
-    # ofertas raspadas continuam NÃO indicativas
-    scraped = _client().post("/api/search", json=BODY).json()
-    assert scraped["flights"] and all(f["indicative"] is False for f in scraped["flights"])
+    carriers = {f["carrier"] for f in data["flights"]}
+    assert len(carriers) >= 2, "metasearch premium traz várias companhias"
+
+
+def test_scraped_and_metasearch_results_are_merged():
+    # Rota NA malha (GRU-MIA): raspados (CM/LA, não-indicativos) + metasearch
+    # (outras cias, indicativos) aparecem JUNTOS — mais opções por pesquisa.
+    data = _client().post("/api/search", json=BODY).json()
+    scraped = [f for f in data["flights"] if not f["indicative"]]
+    meta = [f for f in data["flights"] if f["indicative"]]
+    assert scraped, "ofertas raspadas presentes"
+    assert meta, "voos do metasearch mesclados no resultado"
+    assert {f["carrier"] for f in scraped} & {"CM", "LA"}
+    assert {f["carrier"] for f in meta} - {"CM", "LA"}, "metasearch traz outras cias"
+    # módulo de milhas visível em todo card com preço em dinheiro
+    assert all(
+        f["milesEquivalent"] > 0 for f in data["flights"] if f["priceBrl"] is not None
+    )
 
 
 def test_custom_flex_window_roundtrips():

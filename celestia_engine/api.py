@@ -190,7 +190,15 @@ def _booking_url(offer: FlightOffer, settings: Settings) -> str:
     )
 
 
-def _flight_json(offer: FlightOffer, settings: Settings) -> dict:
+def _miles_equivalent(price_brl: float | None, milheiro: float) -> int | None:
+    """Quantas milhas (ao milheiro do programa do usuário) equivalem ao preço
+    em dinheiro — o módulo de milhas visível em TODO resultado."""
+    if price_brl is None or price_brl <= 0 or milheiro <= 0:
+        return None
+    return int(round(price_brl / milheiro * 1000))
+
+
+def _flight_json(offer: FlightOffer, settings: Settings, milheiro: float) -> dict:
     raw = offer.raw or {}
     return {
         "id": offer.itinerary_key() + f":{offer.cabin.value}",
@@ -212,8 +220,9 @@ def _flight_json(offer: FlightOffer, settings: Settings) -> dict:
         "aircraft": raw.get("aircraft"),
         "stops": _stops_of(offer),
         **_schedule_of(offer),
-        "indicative": False,
+        "indicative": bool(raw.get("indicative")),
         "bookingUrl": _booking_url(offer, settings),
+        "milesEquivalent": _miles_equivalent(offer.price_cash_brl, milheiro),
     }
 
 
@@ -232,7 +241,7 @@ def _option_json(option: PurchaseOption) -> dict:
     }
 
 
-def _indicative_flight_json(quote, settings: Settings) -> dict:
+def _indicative_flight_json(quote, settings: Settings, milheiro: float) -> dict:
     """Cotação do pré-filtro (metasearch) apresentada como card indicativo.
 
     Usada quando o scraping não devolveu ofertas (rota fora da malha Copa/LATAM,
@@ -273,6 +282,7 @@ def _indicative_flight_json(quote, settings: Settings) -> dict:
         "durationMin": duration,
         "scheduleEstimated": True,
         "indicative": True,
+        "milesEquivalent": _miles_equivalent(quote.price_brl, milheiro),
         "bookingUrl": booking_url_for(
             settings,
             carrier=route.carrier,
@@ -296,10 +306,14 @@ def _report_json(report: SearchReport, settings: Settings) -> dict:
     """
     stats = report.stats
     request = report.request
-    flights = [_flight_json(offer, settings) for offer in report.offers]
+    milheiro = settings.milheiro_for(request.program)
+    flights = [_flight_json(offer, settings, milheiro) for offer in report.offers]
     if not flights and report.quotes:
         # scraping vazio mas o pré-filtro cotou: mostra as tarifas indicativas
-        flights = [_indicative_flight_json(quote, settings) for quote in report.quotes[:12]]
+        flights = [
+            _indicative_flight_json(quote, settings, milheiro)
+            for quote in report.quotes[:12]
+        ]
     last_resort = None
     if not flights:
         last_resort = {
