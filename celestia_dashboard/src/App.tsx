@@ -272,6 +272,9 @@ export default function App() {
                 {engine.stats.scrapesSavedByPrefilter > 0 &&
                   `, ${engine.stats.scrapesSavedByPrefilter} scrapes economizados pelo pré-filtro`}
                 .
+                {engine.flights.length > 0 &&
+                  engine.flights.every((flight) => flight.indicative) &&
+                  ' Preços indicativos do metasearch (Google Flights/Skyscanner) — esta rota não é raspável direto na Copa/LATAM.'}
               </p>
             </div>
           )}
@@ -337,20 +340,35 @@ export default function App() {
                       <span className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-slate-100">
                         <SearchX className="h-7 w-7 text-slate-400" aria-hidden="true" />
                       </span>
-                      <h3 className="text-base font-bold text-slate-900">
-                        Nenhum voo corresponde aos filtros
-                      </h3>
-                      <p className="mt-1 max-w-sm text-sm text-slate-500">
-                        Tente ampliar o preço máximo ou incluir mais companhias e horários.
-                      </p>
-                      {filters && (
-                        <button
-                          type="button"
-                          onClick={() => setFilters(buildDefaultFilters(results))}
-                          className="mt-5 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition-colors hover:bg-indigo-700"
-                        >
-                          Limpar filtros
-                        </button>
+                      {engine !== null && results.length === 0 ? (
+                        <>
+                          <h3 className="text-base font-bold text-slate-900">
+                            O motor não encontrou tarifas para esta busca
+                          </h3>
+                          <p className="mt-1 max-w-md text-sm text-slate-500">
+                            Dicas: use um aeroporto internacional como origem (GRU em vez
+                            de CGH), ative a flexibilidade de datas ou confira o terminal
+                            da API para ver onde o scraping parou.
+                          </p>
+                        </>
+                      ) : (
+                        <>
+                          <h3 className="text-base font-bold text-slate-900">
+                            Nenhum voo corresponde aos filtros
+                          </h3>
+                          <p className="mt-1 max-w-sm text-sm text-slate-500">
+                            Tente ampliar o preço máximo ou incluir mais companhias e horários.
+                          </p>
+                          {filters && (
+                            <button
+                              type="button"
+                              onClick={() => setFilters(buildDefaultFilters(results))}
+                              className="mt-5 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition-colors hover:bg-indigo-700"
+                            >
+                              Limpar filtros
+                            </button>
+                          )}
+                        </>
                       )}
                     </div>
                   ) : (

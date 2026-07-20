@@ -40,6 +40,8 @@ export interface EngineFlight {
   arrivalDayOffset: number
   durationMin: number
   scheduleEstimated: boolean
+  /** true = cotação do pré-filtro (metasearch), não um itinerário reservável. */
+  indicative: boolean
 }
 
 export interface EngineOption {
@@ -142,7 +144,21 @@ function cityOf(code: string): string {
   return AIRPORTS.find((airport) => airport.code === code)?.city ?? code
 }
 
+const SOURCE_LABELS: Record<string, string> = {
+  google_flights: 'Google Flights',
+  google_flights2: 'Google Flights',
+  skyscanner: 'Skyscanner',
+  mock: 'Demo',
+}
+
 function airlineOf(carrier: string, label: string) {
+  if (carrier === '*') {
+    return {
+      code: '*',
+      name: SOURCE_LABELS[label] ?? 'Metasearch',
+      logoGradient: 'from-indigo-400 to-violet-600',
+    }
+  }
   return (
     AIRLINES[carrier] ?? {
       code: carrier,
@@ -167,7 +183,9 @@ export function mapEngineFlights(response: EngineSearchResponse, cabin: CabinCla
     return {
       id: flight.id,
       airline: airlineOf(flight.carrier, flight.airlineLabel),
-      flightNumber: flight.flightNumbers.join(' · '),
+      flightNumber: flight.indicative
+        ? 'Tarifa indicativa do metasearch'
+        : flight.flightNumbers.join(' · '),
       departure: { time: flight.departureTime, airportCode: flight.origin },
       arrival: {
         time: flight.arrivalTime,

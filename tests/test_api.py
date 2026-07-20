@@ -82,6 +82,21 @@ def test_search_validation_errors():
     assert client.post("/api/search", json={**BODY, "depart": "10/09/2026"}).status_code == 422
 
 
+def test_route_outside_cm_la_mesh_returns_indicative_quotes():
+    # CGH-MCO não tem rota Copa/LATAM: scraping vazio, mas o pré-filtro cota —
+    # a API devolve as cotações como cards indicativos em vez de 0 voos.
+    response = _client().post("/api/search", json={**BODY, "origin": "CGH", "destination": "MCO"})
+    assert response.status_code == 200
+    data = response.json()
+    assert data["flights"], "cotações do metasearch devem virar cards"
+    assert all(f["indicative"] is True for f in data["flights"])
+    assert all(f["flightNumbers"] == [] for f in data["flights"])
+    assert all(f["priceBrl"] > 0 for f in data["flights"])
+    # ofertas raspadas continuam NÃO indicativas
+    scraped = _client().post("/api/search", json=BODY).json()
+    assert scraped["flights"] and all(f["indicative"] is False for f in scraped["flights"])
+
+
 def test_custom_flex_window_roundtrips():
     body = {
         **BODY,

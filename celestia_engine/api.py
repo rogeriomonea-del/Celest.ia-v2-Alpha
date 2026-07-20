@@ -195,6 +195,7 @@ def _flight_json(offer: FlightOffer) -> dict:
         "aircraft": raw.get("aircraft"),
         "stops": _stops_of(offer),
         **_schedule_of(offer),
+        "indicative": False,
     }
 
 
@@ -213,11 +214,59 @@ def _option_json(option: PurchaseOption) -> dict:
     }
 
 
+def _indicative_flight_json(quote) -> dict:
+    """Cotação do pré-filtro (metasearch) apresentada como card indicativo.
+
+    Usada quando o scraping não devolveu ofertas (rota fora da malha Copa/LATAM,
+    anti-bot, etc.): o usuário ainda vê os preços reais do Google Flights/
+    Skyscanner em vez de uma página vazia. Sem número de voo — é uma tarifa
+    de referência, não um itinerário reservável.
+    """
+    route = quote.route
+    seed = int(
+        hashlib.sha256(f"{route.slug()}:{quote.depart.isoformat()}".encode()).hexdigest()[:6], 16
+    )
+    departure = f"{5 + seed % 17:02d}:{(seed % 4) * 15:02d}"
+    duration = 150 + seed % 480 + (95 if route.via else 0)
+    dep_h, dep_m = int(departure[:2]), int(departure[3:])
+    total = dep_h * 60 + dep_m + duration
+    return {
+        "id": f"quote:{route.slug()}:{quote.depart.isoformat()}:{quote.cabin.value}",
+        "carrier": route.carrier,
+        "airlineLabel": quote.source.value,
+        "flightNumbers": [],
+        "origin": route.origin,
+        "destination": route.destination,
+        "depart": quote.depart.isoformat(),
+        "cabin": quote.cabin.value,
+        "priceBrl": quote.price_brl,
+        "taxesBrl": 0.0,
+        "priceMiles": None,
+        "milesProgram": None,
+        "seatsLeft": None,
+        "source": quote.source.value,
+        "strategy": None,
+        "fareBrand": None,
+        "aircraft": None,
+        "stops": [{"airport": route.via, "layoverMin": 95}] if route.via else [],
+        "departureTime": departure,
+        "arrivalTime": f"{(total // 60) % 24:02d}:{total % 60:02d}",
+        "arrivalDayOffset": total // (24 * 60),
+        "durationMin": duration,
+        "scheduleEstimated": True,
+        "indicative": True,
+    }
+
+
 def _report_json(report: SearchReport, settings: Settings) -> dict:
     stats = report.stats
+    flights = [_flight_json(offer) for offer in report.offers]
+    if not flights and report.quotes:
+        # scraping vazio mas o pré-filtro cotou: mostra as tarifas indicativas
+        flights = [_indicative_flight_json(quote) for quote in report.quotes[:12]]
     return {
         "mode": "mock" if settings.mock_mode else "real",
-        "flights": [_flight_json(offer) for offer in report.offers],
+        "flights": flights,
         "options": [_option_json(option) for option in report.options],
         "quotes": [
             {
