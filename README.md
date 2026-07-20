@@ -69,8 +69,43 @@ python -m celestia_engine mesh        # atualiza a malha viva (Lyov/DECEA)
 python -m celestia_engine status      # integrações ativas
 python -m celestia_engine doctor      # testa cada integração com 1 chamada real
 python -m celestia_engine strategies  # desempenho aprendido de cada estratégia
+python -m celestia_engine scripts     # playbooks do Firecrawl Interact
 python -m pytest                      # testes offline
 ```
+
+## Site + motor juntos (a ponte)
+
+O site consome o motor pela API HTTP (`celestia_engine/api.py`). Dois
+terminais:
+
+```bash
+# terminal 1 — a API do motor (a ponte), porta 8000
+python -m celestia_engine serve                    # real (usa o .env)
+CELESTIA_MOCK=1 python -m celestia_engine serve    # demo offline
+
+# terminal 2 — o site
+cd celestia_dashboard && npm install && npm run dev   # http://localhost:5173
+```
+
+O dev server já faz proxy de `/api` para a porta 8000. Ao buscar no site:
+
+- **API no ar** → busca real do motor (banner verde com estatísticas +
+  painel "Como comprar mais barato" com as 4 estratégias de milhas);
+- **API fora do ar** (ex.: site estático na Vercel) → o site degrada para o
+  modo demonstração com dados fictícios e avisa no banner âmbar.
+
+Endpoints: `POST /api/search`, `GET /api/scripts`, `GET /api/status`,
+`GET /api/health`. Em produção, sirva o `dist/` e proxie `/api` para o
+uvicorn no mesmo domínio (nginx), ou builde o site com `VITE_API_URL`
+apontando para a API em outro domínio.
+
+### Hospedagem
+
+- **Site** (estático): Vercel, Hostinger Website Hosting (suba o conteúdo de
+  `celestia_dashboard/dist/` após `npm run build`), Netlify etc.
+- **Motor/API** (Python): Hostinger **VPS**, Railway, Render ou Fly.io —
+  `pip install -r requirements.txt && python -m celestia_engine serve --host 0.0.0.0`.
+  Hospedagem compartilhada (PHP) **não** roda o motor.
 
 ## Scraping com estratégias que se auto-otimizam
 

@@ -151,6 +151,12 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("routes", help="resumo da malha de rotas")
     sub.add_parser("milheiro", help="tabela de milheiro configurada")
 
+    serve = sub.add_parser(
+        "serve", help="sobe a API HTTP (a ponte que o site consome em /api)"
+    )
+    serve.add_argument("--host", default="127.0.0.1")
+    serve.add_argument("--port", type=int, default=8000)
+
     mesh = sub.add_parser("mesh", help="atualiza a malha viva via Lyov (RPL/DECEA)")
     mesh.add_argument(
         "--companies",
@@ -300,6 +306,21 @@ def main(argv: list[str] | None = None) -> int:
             print(f"  {site}:")
             for strategy, score in sorted(scores.items(), key=lambda kv: -kv[1]):
                 print(f"    {score:.2f}  {strategy}")
+        return 0
+
+    if args.command == "serve":
+        try:
+            import uvicorn
+        except ImportError:
+            print("uvicorn/fastapi não instalados — rode: pip install -r requirements.txt")
+            return 1
+        from .api import create_app
+
+        settings = load_settings()
+        mode = "MOCK (demo)" if settings.mock_mode else "REAL"
+        print(f"celest.ia API [{mode}] em http://{args.host}:{args.port}/api")
+        print("o site (npm run dev) já aponta para cá via proxy /api")
+        uvicorn.run(create_app(settings), host=args.host, port=args.port, log_level="info")
         return 0
 
     if args.command == "scripts":

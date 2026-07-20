@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowRight, Plane, SearchX, SlidersHorizontal, TrendingDown } from 'lucide-react'
+import { ArrowRight, Cpu, FlaskConical, Plane, SearchX, SlidersHorizontal } from 'lucide-react'
 import { Header } from './components/Header'
 import { Footer } from './components/Footer'
 import { SearchBar } from './components/SearchBar'
 import { SortTabs } from './components/SortTabs'
 import { FlightCard } from './components/FlightCard'
 import { FilterSidebar } from './components/FilterSidebar'
+import { StrategyPanel } from './components/StrategyPanel'
 import {
   FilterSidebarSkeleton,
   FlightCardSkeleton,
@@ -13,6 +14,7 @@ import {
 } from './components/Skeletons'
 import { findAirport } from './data/airports'
 import { buildFlights } from './data/flights'
+import { mapEngineFlights, searchFlights, type EngineSearchResponse } from './api'
 import { applyFilters, sortFlights } from './utils/flightLogic'
 import { addDays, startOfDay } from './utils/dates'
 import { formatShortDate } from './utils/format'
@@ -41,7 +43,10 @@ function buildDefaultFilters(flights: Flight[]): Filters {
   return {
     stops: [0, 1, 2],
     airlines: [...new Set(flights.map((flight) => flight.airline.code))],
-    maxPrice: Math.ceil(Math.max(...flights.map((flight) => flight.price)) / PRICE_STEP) * PRICE_STEP,
+    maxPrice:
+      flights.length > 0
+        ? Math.ceil(Math.max(...flights.map((flight) => flight.price)) / PRICE_STEP) * PRICE_STEP
+        : 0,
     departureWindows: [],
   }
 }
@@ -53,18 +58,35 @@ export default function App() {
   const [loading, setLoading] = useState(true)
   const [sortKey, setSortKey] = useState<SortKey>('best')
   const [showMobileFilters, setShowMobileFilters] = useState(false)
+  /** Relatório do motor quando a busca foi real; null = modo demonstração. */
+  const [engine, setEngine] = useState<EngineSearchResponse | null>(null)
   const searchTimer = useRef<ReturnType<typeof setTimeout>>()
+  const searchSeq = useRef(0)
 
   const runSearch = useCallback((nextParams: SearchParams) => {
     setParams(nextParams)
     setLoading(true)
+    const seq = ++searchSeq.current
     clearTimeout(searchTimer.current)
-    searchTimer.current = setTimeout(() => {
-      const flights = buildFlights(nextParams.origin.code, nextParams.destination.code)
+
+    const apply = (flights: Flight[], engineData: EngineSearchResponse | null) => {
+      if (seq !== searchSeq.current) return // resposta antiga: descarta
+      setEngine(engineData)
       setResults(flights)
       setFilters(buildDefaultFilters(flights))
       setLoading(false)
-    }, SEARCH_LATENCY_MS)
+    }
+
+    // 1º tenta o motor real via API (/api/search). Se a API não estiver de
+    // pé (ex.: site estático sem backend), degrada para a demonstração com
+    // dados fictícios — sempre sinalizada como tal no banner.
+    searchFlights(nextParams)
+      .then((response) => apply(mapEngineFlights(response, nextParams.cabin), response))
+      .catch(() => {
+        searchTimer.current = setTimeout(() => {
+          apply(buildFlights(nextParams.origin.code, nextParams.destination.code), null)
+        }, SEARCH_LATENCY_MS)
+      })
   }, [])
 
   useEffect(() => {
@@ -173,13 +195,38 @@ export default function App() {
             </button>
           </div>
 
-          {!loading && (
-            <div className="mb-5 flex items-center gap-2 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
-              <TrendingDown className="h-4 w-4 shrink-0" aria-hidden="true" />
+          {!loading && engine === null && (
+            <div className="mb-5 flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              <FlaskConical className="h-4 w-4 shrink-0" aria-hidden="true" />
               <p>
-                <strong className="font-semibold">Os preços estão baixos.</strong> Tarifas nesta
-                rota estão 12% abaixo da média dos últimos 3 meses.
+                <strong className="font-semibold">Modo demonstração</strong> — estes voos são
+                fictícios. Suba a API do motor (<code>python -m celestia_engine serve</code>)
+                para buscar tarifas de verdade.
               </p>
+            </div>
+          )}
+
+          {!loading && engine !== null && (
+            <div className="mb-5 flex items-center gap-2 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+              <Cpu className="h-4 w-4 shrink-0" aria-hidden="true" />
+              <p>
+                <strong className="font-semibold">
+                  {engine.mode === 'real'
+                    ? 'Busca real do motor celest.ia'
+                    : 'Motor celest.ia em modo demo (mock)'}
+                </strong>{' '}
+                — {engine.flights.length} oferta(s) de {engine.stats.candidatesTotal} candidatos
+                em {engine.stats.durationSeconds}s
+                {engine.stats.scrapesSavedByPrefilter > 0 &&
+                  `, ${engine.stats.scrapesSavedByPrefilter} scrapes economizados pelo pré-filtro`}
+                .
+              </p>
+            </div>
+          )}
+
+          {!loading && engine !== null && engine.options.length > 0 && (
+            <div className="mb-5">
+              <StrategyPanel options={engine.options} />
             </div>
           )}
 

@@ -173,9 +173,15 @@ class Orchestrator(Agent):
             agent_cls = SCRAPERS_BY_CARRIER[route.carrier]
             agent = agent_cls(self.ctx)
             label = f"{agent.name} {route.key()} {depart.isoformat()}"
-            return await self.ctx.spawn(
+            result = await self.ctx.spawn(
                 self.name, label, lambda: agent.fetch_offers(route, depart)
             )
+            if not isinstance(result, Exception):
+                # anota a conexão planejada da rota (ex.: via PTY) para a API/UI
+                # poder desenhar as escalas mesmo quando o scraper não as devolve
+                for offer in result:
+                    offer.raw.setdefault("route_via", route.via or "")
+            return result
 
         results = await asyncio.gather(
             *(scrape_one(route, depart) for route, depart in shortlist)
