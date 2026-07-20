@@ -12,6 +12,7 @@ primeiro no que acabou de falhar.
 from __future__ import annotations
 
 import csv
+from collections import deque
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -79,7 +80,8 @@ def failure_streaks(settings: Settings, site: str, route: str) -> dict[str, int]
     streaks: dict[str, int] = {}
     try:
         with path.open(newline="", encoding="utf-8") as handle:
-            rows = list(csv.DictReader(handle))[-_TAIL_ROWS:]
+            # deque(maxlen) mantém só a cauda sem materializar o CSV inteiro
+            rows = deque(csv.DictReader(handle), maxlen=_TAIL_ROWS)
     except (OSError, csv.Error, UnicodeDecodeError):
         return {}
     for row in rows:

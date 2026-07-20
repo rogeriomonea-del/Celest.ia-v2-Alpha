@@ -24,6 +24,17 @@ from ..models import (
 )
 
 
+def _brl(value: float) -> str:
+    """1234.5 → "1.234,50" (pt-BR). O replace ingênuo gerava "1.234.50"."""
+    grouped = f"{value:,.2f}"  # 1,234.50
+    return grouped.replace(",", "\x00").replace(".", ",").replace("\x00", ".")
+
+
+def _miles(value: int) -> str:
+    """40000 → "40.000" (agrupamento pt-BR para milhas inteiras)."""
+    return f"{value:,}".replace(",", ".")
+
+
 class PurchaseCalculator:
     def __init__(self, milheiro_brl_per_1000: float):
         if milheiro_brl_per_1000 <= 0:
@@ -80,7 +91,7 @@ class PurchaseCalculator:
             cash=economy.price_cash_brl,
             miles=economy.upgrade_miles,
             cabin_final=Cabin.BUSINESS,
-            notes=[f"upgrade de {economy.upgrade_miles:,} milhas".replace(",", ".")],
+            notes=[f"upgrade de {_miles(economy.upgrade_miles)} milhas"],
         )
 
     def full_miles(self, offer: FlightOffer) -> PurchaseOption | None:
@@ -93,9 +104,7 @@ class PurchaseCalculator:
             miles=offer.price_miles,
             cabin_final=offer.cabin,
             notes=[
-                f"{offer.price_miles:,} milhas + R$ {offer.taxes_brl:,.2f} de taxas".replace(
-                    ",", "."
-                )
+                f"{_miles(offer.price_miles)} milhas + R$ {_brl(offer.taxes_brl)} de taxas"
             ],
         )
 
@@ -108,7 +117,7 @@ class PurchaseCalculator:
             cash=economy.price_cash_brl + economy.upgrade_cash_brl,
             miles=0,
             cabin_final=Cabin.BUSINESS,
-            notes=[f"upgrade de R$ {economy.upgrade_cash_brl:,.2f}".replace(",", ".")],
+            notes=[f"upgrade de R$ {_brl(economy.upgrade_cash_brl)}"],
         )
 
     # -------------------------------------------------------------- evaluate
@@ -148,11 +157,11 @@ class PurchaseCalculator:
                 if request.miles_balance < option.miles:
                     missing = option.miles - request.miles_balance
                     option.notes.append(
-                        f"saldo insuficiente: faltam {missing:,} milhas".replace(",", ".")
+                        f"saldo insuficiente: faltam {_miles(missing)} milhas"
                     )
                 option.notes.append(
-                    f"equivalente em dinheiro: R$ {self.miles_value_brl(option.miles):,.2f} "
-                    f"(milheiro R$ {self.milheiro:.2f})".replace(",", ".")
+                    f"equivalente em dinheiro: R$ {_brl(self.miles_value_brl(option.miles))} "
+                    f"(milheiro R$ {_brl(self.milheiro)})"
                 )
 
         options.sort(key=lambda o: o.effective_total_brl)

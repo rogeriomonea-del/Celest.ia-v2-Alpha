@@ -84,7 +84,8 @@ def test_agent_tries_ranked_order_and_falls_back(tmp_path, monkeypatch):
     assert offers and offers[0].raw["strategy"] == "firecrawl_scrape"
 
     # os dois resultados foram gravados; próxima ordem promove o vencedor
-    rows = list(csv.DictReader(open(s.strategy_csv, encoding="utf-8")))
+    with open(s.strategy_csv, encoding="utf-8") as handle:
+        rows = list(csv.DictReader(handle))
     outcomes = {(r["strategy"], r["outcome"]) for r in rows}
     assert ("firecrawl_interact", "fail") in outcomes
     assert ("firecrawl_scrape", "success") in outcomes

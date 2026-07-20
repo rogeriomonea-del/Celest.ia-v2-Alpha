@@ -62,9 +62,11 @@ async def _request_json(
             last_error = error
             if attempt < retries - 1:
                 await asyncio.sleep(2**attempt)
+    # httpx.ReadTimeout & cia. têm str() vazio — sem o nome da classe o log
+    # vira "failed after N attempts: " e esconde a causa real (timeout!)
+    detail = _redact(str(last_error)) or type(last_error).__name__
     raise ProviderError(
-        f"{method} {_redact(url)} failed after {retries} attempts: "
-        f"{_redact(str(last_error))}"
+        f"{method} {_redact(url)} failed after {retries} attempts: {detail}"
     )
 
 

@@ -24,7 +24,7 @@ DOMAIN="${1:?uso: bash deploy/hostinger-setup.sh seudominio.com [--with-playwrig
 WITH_PLAYWRIGHT="${2:-}"
 APP_DIR=/opt/celestia
 
-if [ ! -f celestia_engine/__main__.py ] && [ ! -d celestia_engine ]; then
+if [ ! -f celestia_engine/__main__.py ]; then
   echo "ERRO: rode este script na RAIZ do projeto (onde está a pasta celestia_engine/)."
   exit 1
 fi

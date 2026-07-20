@@ -121,11 +121,12 @@ class Orchestrator(Agent):
             )
             offers = offers + meta_offers
 
-        # 4. matemática de milhas/estratégias
-        options = self.miles_math.evaluate_offers(offers, request)
-
-        # 5. auditoria final
+        # 4. auditoria ANTES da matemática: opções nunca referenciam ofertas
+        # que a auditoria removeria (duplicatas/preços inválidos)
         offers = self._audit(offers)
+
+        # 5. matemática de milhas/estratégias sobre as ofertas auditadas
+        options = self.miles_math.evaluate_offers(offers, request)
 
         # aprendizado da malha: companhias inéditas entram no CSV de descobertas
         new_carriers = record_carriers(self.ctx.settings, offers)

@@ -60,7 +60,8 @@ async def interact(settings: Settings, scrape_id: str, prompt: str) -> str:
         f"{settings.firecrawl_api_base}/v2/scrape/{scrape_id}/interact",
         json_body={"prompt": prompt},
         headers=await _headers(settings),
-        timeout_s=max(settings.http_timeout_s, 60),
+        # sessão viva preenchendo formulário real: 60s estourava (ReadTimeout)
+        timeout_s=max(settings.http_timeout_s, 150),
         retries=1,
     )
     data = payload.get("data") or payload
