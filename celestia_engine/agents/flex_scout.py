@@ -45,8 +45,9 @@ class FlexDateScoutAgent(Agent):
                     start=start,
                     end=end,
                 )
-            except ProviderError as error:
-                self.log(f"calendário indisponível ({error}) — usando janela simétrica")
+            except Exception as error:  # noqa: BLE001 - contrato: nunca lança
+                detail = str(error) or type(error).__name__
+                self.log(f"calendário indisponível ({detail}) — usando janela simétrica")
                 return _window_fallback(request, start, end)
 
         if not prices:

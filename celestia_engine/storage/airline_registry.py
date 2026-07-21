@@ -8,12 +8,12 @@ sozinha com o uso, sem editar código. Best-effort: I/O nunca quebra a busca.
 
 from __future__ import annotations
 
-import csv
 from datetime import datetime, timezone
 from pathlib import Path
 
 from ..airlines import AIRLINE_REGISTRY
 from ..config import Settings
+from .csvio import READ_ERRORS, append_rows, read_rows
 
 DISCOVERED_FIELDS = [
     "first_seen_utc",
@@ -35,12 +35,11 @@ def load_discovered(settings: Settings) -> dict[str, dict]:
         return {}
     out: dict[str, dict] = {}
     try:
-        with path.open(newline="", encoding="utf-8") as handle:
-            for row in csv.DictReader(handle):
-                code = (row.get("code") or "").strip().upper()
-                if len(code) == 2 and code not in out:
-                    out[code] = row
-    except (OSError, csv.Error, UnicodeDecodeError):
+        for row in read_rows(path):
+            code = (row.get("code") or "").strip().upper()
+            if len(code) == 2 and code not in out:
+                out[code] = row
+    except READ_ERRORS:
         return {}
     return out
 
@@ -71,14 +70,7 @@ def record_carriers(settings: Settings, offers) -> list[str]:
             )
         if not new_rows:
             return []
-        path = _discovered_path(settings)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        is_new = not path.exists()
-        with path.open("a", newline="", encoding="utf-8") as handle:
-            writer = csv.DictWriter(handle, fieldnames=DISCOVERED_FIELDS)
-            if is_new:
-                writer.writeheader()
-            writer.writerows(new_rows)
+        append_rows(_discovered_path(settings), DISCOVERED_FIELDS, new_rows)
         return [row["code"] for row in new_rows]
     except Exception:  # noqa: BLE001 - aprendizado nunca derruba a busca
         return []

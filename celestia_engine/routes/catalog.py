@@ -1,9 +1,9 @@
-"""Unified route catalogue across Copa, LATAM and Skyscanner coverage."""
+"""Unified route catalogue across Copa, LATAM, GOL, Azul and Skyscanner."""
 
 from __future__ import annotations
 
 from ..models import Route
-from . import copa, latam, skyscanner
+from . import azul, copa, gol, latam, skyscanner
 
 
 class RouteCatalog:
@@ -11,13 +11,22 @@ class RouteCatalog:
 
     @staticmethod
     def all_routes() -> list[Route]:
-        return copa.all_routes() + latam.all_routes() + skyscanner.all_routes()
+        return (
+            copa.all_routes()
+            + latam.all_routes()
+            + gol.all_routes()
+            + azul.all_routes()
+            + skyscanner.all_routes()
+        )
 
     @staticmethod
     def airline_routes_between(origin: str, destination: str) -> list[Route]:
-        """Scrapable airline options (CM + LA) for the pair."""
-        return copa.routes_between(origin, destination) + latam.routes_between(
-            origin, destination
+        """Scrapable airline options (CM + LA + G3 + AD) for the pair."""
+        return (
+            copa.routes_between(origin, destination)
+            + latam.routes_between(origin, destination)
+            + gol.routes_between(origin, destination)
+            + azul.routes_between(origin, destination)
         )
 
     @staticmethod
@@ -32,5 +41,7 @@ class RouteCatalog:
         return {
             "copa": len(copa.all_routes()),
             "latam": len(latam.all_routes()),
+            "gol": len(gol.all_routes()),
+            "azul": len(azul.all_routes()),
             "skyscanner": len(skyscanner.all_routes()),
         }

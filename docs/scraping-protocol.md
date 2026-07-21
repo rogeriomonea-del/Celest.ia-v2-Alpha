@@ -47,6 +47,8 @@ de self-improvement.
 |---|---|---|---|
 | `copa_direct` | offers | copaair.com | busca direto na Copa (dinheiro **e** ConnectMiles) |
 | `latam_direct` | offers | latamairlines.com | busca direto na LATAM (dinheiro **e** LATAM Pass) |
+| `gol_direct` | offers | voegol.com.br | busca direto na GOL (dinheiro **e** milhas Smiles) |
+| `azul_direct` | offers | voeazul.com.br | busca direto na Azul (dinheiro **e** pontos TudoAzul) |
 | `google_flights_search` | offers | google.com/travel/flights | metasearch: voos de **várias** companhias de uma vez |
 | `google_flights_calendar` | calendar | google.com/travel/flights | varre o calendário de preços p/ cortar datas caras |
 

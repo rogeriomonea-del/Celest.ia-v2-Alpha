@@ -39,14 +39,16 @@ def test_prefilter_shortlists_and_saves_scrapes():
     report = asyncio.run(orchestrator.search(_request()))
 
     stats = report.stats
-    # GRU-MIA: Copa via PTY + LATAM nonstop = 2 routes x 3 dates (flex 1) = 6
-    assert stats.candidates_total == 6
+    # GRU-MIA: Copa via PTY + LATAM nonstop + GOL nonstop = 3 rotas x 3 datas
+    assert stats.candidates_total == 9
     assert stats.candidates_scraped == 2  # prefilter_top_k
-    assert stats.scrapes_saved_by_prefilter == 4
+    assert stats.scrapes_saved_by_prefilter == 7
     # prefilter dedupes paid calls by (pair, date): 3 unique fetches + 2 scrapes
     assert stats.subagents_spawned == 5
-    # ...but every (carrier-route, date) candidate still gets its own quote
-    assert len(report.quotes) == 6
+    # o relatório traz UMA cotação por (par, data) — réplicas por rota são
+    # deduplicadas e, como o par tinha CM+LA+G3, viram metasearch ("*")
+    assert len(report.quotes) == 3
+    assert all(q.route.carrier == "*" for q in report.quotes)
     assert any("deduplicadas" in line for line in report.agent_log)
 
 
@@ -74,7 +76,7 @@ def test_no_prefilter_scrapes_everything():
     shortlist = orchestrator._shortlist(candidates, {}, report_stats := __import__(
         "celestia_engine.models", fromlist=["SearchStats"]
     ).SearchStats())
-    scrapable = [c for c in candidates if c[0].carrier in {"CM", "LA"}]
+    scrapable = [c for c in candidates if c[0].carrier in {"CM", "LA", "G3", "AD"}]
     assert shortlist == scrapable
     assert report_stats.candidates_scraped == len(scrapable)
 

@@ -40,17 +40,22 @@ class AgentContext:
 
         Every spawn is logged and counted; failures are captured and returned
         as the exception instance so the caller can degrade gracefully.
+        Cada subagente tem um teto próprio (SUBAGENT_TIMEOUT_S): um scraper
+        pendurado não pode consumir o timeout da busca inteira e transformar
+        resultados parciais num 504 sem nada.
         """
         self.subagents_spawned += 1
         self.log(agent, f"subagente iniciado → {label}")
-        async with self.semaphore():
-            try:
-                result = await coro_fn()
-                self.log(agent, f"subagente concluído ← {label}")
-                return result
-            except Exception as error:  # noqa: BLE001 - propagate as value
-                self.log(agent, f"subagente falhou ← {label}: {error}")
-                return error
+        timeout = self.settings.subagent_timeout_s or None
+        try:
+            async with self.semaphore():
+                result = await asyncio.wait_for(coro_fn(), timeout=timeout)
+            self.log(agent, f"subagente concluído ← {label}")
+            return result
+        except Exception as error:  # noqa: BLE001 - propagate as value
+            detail = str(error) or type(error).__name__
+            self.log(agent, f"subagente falhou ← {label}: {detail}")
+            return error
 
 
 class Agent:

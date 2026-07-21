@@ -11,7 +11,7 @@ from __future__ import annotations
 import asyncio
 import csv
 import os
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 from ..config import Settings
@@ -64,8 +64,9 @@ class RouteMeshAgent(Agent):
 def save_mesh_csv(routes: list[Route], path: Path) -> Path:
     """Atomic write: temp file + os.replace, so readers never see a half file."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    stamp = datetime.utcnow().isoformat(timespec="seconds")
-    tmp_path = path.with_suffix(".tmp")
+    stamp = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    # tmp único por processo: duas escritas concorrentes não se atropelam
+    tmp_path = path.with_name(f"{path.name}.{os.getpid()}.tmp")
     with tmp_path.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=MESH_FIELDS)
         writer.writeheader()
@@ -95,7 +96,8 @@ def load_live_routes(settings: Settings) -> list[Route]:
         return []
     routes: list[Route] = []
     try:
-        with path.open(newline="", encoding="utf-8") as handle:
+        # utf-8-sig: remove o BOM se alguém salvou o CSV pelo Excel
+        with path.open(newline="", encoding="utf-8-sig") as handle:
             for row in csv.DictReader(handle):
                 origin = row.get("origin")
                 destination = row.get("destination")

@@ -16,7 +16,7 @@ Pipeline de uma busca:
 from __future__ import annotations
 
 import time
-from datetime import timedelta
+from datetime import date, timedelta
 
 from ..config import Settings, load_settings
 from ..models import (
@@ -76,10 +76,14 @@ class Orchestrator(Agent):
         de preços e devolve só as mais baratas; senão, ±flex_days."""
         if request.flexibility and request.flexibility.enabled:
             return await self.flex_scout.cheapest_dates(request)
-        return [
+        dates = [
             request.depart + timedelta(days=offset)
             for offset in range(-request.flex_days, request.flex_days + 1)
         ]
+        # partir amanhã com flex 3 não pode cotar ontem: corta o passado
+        # (mesma regra do _window_fallback do flex-scout)
+        today = date.today()
+        return [d for d in dates if d >= today] or [request.depart]
 
     async def plan_candidates(self, request: SearchRequest) -> list[Candidate]:
         routes = self._routes_for(request)
@@ -141,7 +145,7 @@ class Orchestrator(Agent):
         )
         report = SearchReport(
             request=request,
-            quotes=sorted(best_quotes.values(), key=lambda q: q.price_brl),
+            quotes=self._unique_quotes(best_quotes),
             offers=offers,
             options=options,
             stats=stats,
@@ -154,6 +158,35 @@ class Orchestrator(Agent):
         return report
 
     # ------------------------------------------------------------- internals
+    @staticmethod
+    def _unique_quotes(best_quotes: dict) -> list[FareQuote]:
+        """As cotações do pré-filtro são por PAR e replicadas por rota
+        candidata. No relatório, uma por (par, data) basta — e quando o par
+        tinha rotas de companhias diferentes, a cotação vira ``*``
+        (metasearch): o preço é do par, não daquela companhia."""
+        unique: dict[tuple, FareQuote] = {}
+        carriers: dict[tuple, set[str]] = {}
+        for quote in best_quotes.values():
+            key = (quote.route.origin, quote.route.destination, quote.depart)
+            carriers.setdefault(key, set()).add(quote.route.carrier)
+            if key not in unique or quote.price_brl < unique[key].price_brl:
+                unique[key] = quote
+        out: list[FareQuote] = []
+        for key, quote in unique.items():
+            if len(carriers[key]) > 1 and quote.route.carrier != "*":
+                quote = FareQuote(
+                    route=Route(
+                        quote.route.origin, quote.route.destination, "*", direct=True
+                    ),
+                    depart=quote.depart,
+                    cabin=quote.cabin,
+                    price_brl=quote.price_brl,
+                    source=quote.source,
+                    fetched_at=quote.fetched_at,
+                )
+            out.append(quote)
+        return sorted(out, key=lambda q: q.price_brl)
+
     def _shortlist(
         self,
         candidates: list[Candidate],
@@ -201,13 +234,16 @@ class Orchestrator(Agent):
                     offer.raw.setdefault("route_via", route.via or "")
             return result
 
+        # return_exceptions: um cancelamento/bug num scrape_one não pode
+        # derrubar os demais scrapes que já estavam em andamento
         results = await asyncio.gather(
-            *(scrape_one(route, depart) for route, depart in shortlist)
+            *(scrape_one(route, depart) for route, depart in shortlist),
+            return_exceptions=True,
         )
         offers: list[FlightOffer] = []
         failures = 0
         for result in results:
-            if isinstance(result, Exception):
+            if isinstance(result, BaseException):
                 failures += 1
                 continue
             offers.extend(result)
@@ -220,6 +256,15 @@ class Orchestrator(Agent):
         clean: list[FlightOffer] = []
         for offer in offers:
             key = f"{offer.itinerary_key()}:{offer.cabin.value}"
+            numbers = "/".join(offer.flight_numbers)
+            if not numbers or "?" in numbers:
+                # sem número de voo real o itinerary_key é um placeholder
+                # idêntico para voos distintos: discrimina por horário+preço
+                raw = offer.raw or {}
+                key += (
+                    f":{raw.get('departure_time') or ''}"
+                    f":{offer.price_cash_brl or ''}:{offer.price_miles or ''}"
+                )
             if key in seen:
                 continue
             cash_ok = offer.price_cash_brl is None or offer.price_cash_brl > 0

@@ -41,9 +41,15 @@ def mock_quote(route: Route, depart: date, cabin: Cabin) -> list[FareQuote]:
     ]
 
 
-#: companhias que o metasearch mock devolve (rotativo, determinístico)
+#: companhias que o metasearch mock devolve (rotativo, determinístico).
+#: HA e S4 NÃO estão no registro curado de propósito: exercitam o fluxo de
+#: descoberta (airlines_discovered.csv) nas rodadas offline.
 _META_CARRIERS = [("G3", "GOL"), ("AD", "Azul"), ("TP", "TAP Air Portugal"),
-                  ("AA", "American Airlines"), ("AF", "Air France")]
+                  ("AA", "American Airlines"), ("AF", "Air France"),
+                  ("CM", "Copa Airlines"), ("IB", "Iberia"),
+                  ("UA", "United Airlines"), ("EK", "Emirates"),
+                  ("TK", "Turkish Airlines"), ("HA", "Hawaiian Airlines"),
+                  ("S4", "Azores Airlines")]
 
 
 def mock_metasearch_offers(
@@ -91,7 +97,12 @@ def mock_offers(
         base *= 0.82
     seed = _seed(carrier, route.origin, route.destination, depart.isoformat())
     flight_number = f"{carrier} {200 + seed % 700}"
-    source = Source.COPA if carrier == "CM" else Source.LATAM
+    source = {
+        "CM": Source.COPA,
+        "LA": Source.LATAM,
+        "G3": Source.GOL,
+        "AD": Source.AZUL,
+    }.get(carrier, Source.MOCK)
 
     economy_cash = round(base, 2)
     business_cash = round(base * _CABIN_MULTIPLIER[Cabin.BUSINESS], 2)

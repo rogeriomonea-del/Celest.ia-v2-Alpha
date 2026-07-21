@@ -16,12 +16,16 @@ melhorar sozinho a cada rodada.
 
 from __future__ import annotations
 
-import csv
-from collections import defaultdict
+from collections import defaultdict, deque
 from datetime import datetime, timezone
 from pathlib import Path
 
 from ..config import Settings
+from .csvio import READ_ERRORS, append_rows, read_rows
+
+#: janela de recência por site: só as últimas N tentativas contam no score —
+#: um histórico vitalício não pode ancorar o ranking em desempenho antigo.
+_SCORE_TAIL_ROWS = 1000
 
 STRATEGY_FIELDS = [
     "timestamp_utc",
@@ -48,13 +52,10 @@ def record_attempt(
     """Append best-effort — nunca deixa a busca quebrar por causa de I/O."""
     path = Path(settings.strategy_csv)
     try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        is_new = not path.exists()
-        with path.open("a", newline="", encoding="utf-8") as handle:
-            writer = csv.DictWriter(handle, fieldnames=STRATEGY_FIELDS)
-            if is_new:
-                writer.writeheader()
-            writer.writerow(
+        append_rows(
+            path,
+            STRATEGY_FIELDS,
+            [
                 {
                     "timestamp_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
                     "site": site,
@@ -63,7 +64,8 @@ def record_attempt(
                     "offers_found": offers_found,
                     "duration_s": round(duration_s, 2),
                 }
-            )
+            ],
+        )
     except OSError:
         return
 
@@ -76,18 +78,21 @@ def _load_scores(settings: Settings, site: str) -> dict[str, float]:
     successes: dict[str, int] = defaultdict(int)
     totals: dict[str, int] = defaultdict(int)
     try:
-        with path.open(newline="", encoding="utf-8") as handle:
-            for row in csv.DictReader(handle):
-                if row.get("site") != site:
-                    continue
-                strategy = row.get("strategy") or ""
-                if not strategy:
-                    continue
-                totals[strategy] += 1
-                if row.get("outcome") == "success":
-                    successes[strategy] += 1
-    except (OSError, csv.Error, UnicodeDecodeError):
+        # filtra por site DURANTE o streaming e guarda só a cauda recente:
+        # memória limitada e o score reflete o desempenho atual do site
+        recent = deque(
+            (row for row in read_rows(path) if row.get("site") == site),
+            maxlen=_SCORE_TAIL_ROWS,
+        )
+    except READ_ERRORS:
         return {}
+    for row in recent:
+        strategy = row.get("strategy") or ""
+        if not strategy:
+            continue
+        totals[strategy] += 1
+        if row.get("outcome") == "success":
+            successes[strategy] += 1
     return {
         strategy: (successes[strategy] + 1) / (totals[strategy] + 2)
         for strategy in totals
@@ -115,10 +120,9 @@ def performance_summary(settings: Settings) -> dict[str, dict[str, float]]:
         return {}
     sites: set[str] = set()
     try:
-        with path.open(newline="", encoding="utf-8") as handle:
-            for row in csv.DictReader(handle):
-                if row.get("site"):
-                    sites.add(row["site"])
-    except (OSError, csv.Error, UnicodeDecodeError):
+        for row in read_rows(path):
+            if row.get("site"):
+                sites.add(row["site"])
+    except READ_ERRORS:
         return {}
     return {site: _load_scores(settings, site) for site in sorted(sites)}

@@ -42,7 +42,7 @@ def _request(miles_balance=1_000_000):
     )
 
 
-def test_four_strategies_and_effective_costs():
+def test_five_strategies_and_effective_costs():
     economy, business = _offers()
     options = PurchaseCalculator(30.0).evaluate(economy, business, _request())
 
@@ -52,8 +52,10 @@ def test_four_strategies_and_effective_costs():
         Strategy.ECONOMY_MILES_UPGRADE,
         Strategy.FULL_MILES,
         Strategy.ECONOMY_CASH_UPGRADE,
+        Strategy.ECONOMY_CASH,
     }
 
+    assert by_strategy[Strategy.ECONOMY_CASH].effective_total_brl == 3000.0
     assert by_strategy[Strategy.BUSINESS_CASH].effective_total_brl == 9000.0
     # 3000 cash + 40k miles * R$30/1000 = 3000 + 1200
     assert by_strategy[Strategy.ECONOMY_MILES_UPGRADE].effective_total_brl == 4200.0
@@ -61,13 +63,26 @@ def test_four_strategies_and_effective_costs():
     assert by_strategy[Strategy.FULL_MILES].effective_total_brl == 6800.0
     assert by_strategy[Strategy.ECONOMY_CASH_UPGRADE].effective_total_brl == 5000.0
 
-    # ranked ascending by effective cost
+    # ranked ascending by effective cost — a linha de base (econômica em
+    # dinheiro) vem primeiro por ser a mais barata
     assert [o.strategy for o in options] == [
+        Strategy.ECONOMY_CASH,
         Strategy.ECONOMY_MILES_UPGRADE,
         Strategy.ECONOMY_CASH_UPGRADE,
         Strategy.FULL_MILES,
         Strategy.BUSINESS_CASH,
     ]
+
+
+def test_cash_only_metasearch_offer_still_gets_an_option():
+    # oferta só-metasearch: econômica em dinheiro, sem milhas nem upgrades —
+    # o usuário nunca fica com 0 opções de compra
+    economy, _ = _offers()
+    economy.upgrade_miles = None
+    economy.upgrade_cash_brl = None
+    options = PurchaseCalculator(30.0).evaluate(economy, None, _request())
+    assert [o.strategy for o in options] == [Strategy.ECONOMY_CASH]
+    assert options[0].effective_total_brl == 3000.0
 
 
 def test_breakeven_milheiro():

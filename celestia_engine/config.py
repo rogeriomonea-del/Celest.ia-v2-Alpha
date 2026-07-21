@@ -103,6 +103,8 @@ class Settings:
     # Páginas iniciais onde o Interact preenche o formulário de busca:
     copa_interact_url: str = "https://www.copaair.com/pt-br/"
     latam_interact_url: str = "https://www.latamairlines.com/br/pt"
+    gol_interact_url: str = "https://www.voegol.com.br/"
+    azul_interact_url: str = "https://www.voeazul.com.br/"
     # Google Flights para o flex-date scout (calendário de preços):
     google_flights_interact_url: str = "https://www.google.com/travel/flights?hl=pt-BR&curr=BRL"
     usd_brl_rate: float = 5.40     # conversão quando o site cota em USD (USD_BRL_RATE)
@@ -144,8 +146,22 @@ class Settings:
         "&destination={destination}&inbound=null&adt={adults}&chd=0&inf=0"
         "&trip=OW&cabin={cabin}&redemption=false&sort=RECOMMENDED"
     )
+    gol_booking_url: str = (
+        "https://b2c.voegol.com.br/compra/busca-parceiros?pv=BR&tipo=DF"
+        "&origem={origin}&destino={destination}&ida={date}"
+        "&ADT={adults}&CHD=0&INF=0"
+    )
+    azul_booking_url: str = (
+        "https://www.voeazul.com.br/br/pt/home?c%5B0%5D.ds={origin}"
+        "&c%5B0%5D.std={date}&c%5B0%5D.as={destination}"
+        "&p%5B0%5D.t=ADT&p%5B0%5D.c={adults}"
+    )
     scraper_headless: bool = True
     scraper_timeout_ms: int = 45_000
+    #: teto por subagente (s). Menor que API_SEARCH_TIMEOUT_S de propósito:
+    #: um scraper travado morre sozinho e a busca entrega o que os outros
+    #: acharam. 0 = sem teto.
+    subagent_timeout_s: int = 240
 
     # --- Orchestrator knobs ---
     prefilter_top_k: int = 8       # candidates that survive the price pre-filter
@@ -213,6 +229,8 @@ def load_settings() -> Settings:
         firecrawl_interact_enabled=_env("FIRECRAWL_INTERACT", "1") not in {"0", "false", "no"},
         copa_interact_url=_env("COPA_INTERACT_URL", Settings.copa_interact_url),
         latam_interact_url=_env("LATAM_INTERACT_URL", Settings.latam_interact_url),
+        gol_interact_url=_env("GOL_INTERACT_URL", Settings.gol_interact_url),
+        azul_interact_url=_env("AZUL_INTERACT_URL", Settings.azul_interact_url),
         google_flights_interact_url=_env(
             "GOOGLE_FLIGHTS_INTERACT_URL", Settings.google_flights_interact_url
         ),
@@ -220,8 +238,11 @@ def load_settings() -> Settings:
         scrape_strategies=_env("SCRAPE_STRATEGIES", Settings.scrape_strategies),
         copa_booking_url=_env("COPA_BOOKING_URL", Settings.copa_booking_url),
         latam_offers_url=_env("LATAM_OFFERS_URL", Settings.latam_offers_url),
+        gol_booking_url=_env("GOL_BOOKING_URL", Settings.gol_booking_url),
+        azul_booking_url=_env("AZUL_BOOKING_URL", Settings.azul_booking_url),
         scraper_headless=_env("SCRAPER_HEADLESS", "1") not in {"0", "false", "no"},
         scraper_timeout_ms=_env_int("SCRAPER_TIMEOUT_MS", 45_000),
+        subagent_timeout_s=_env_int("SUBAGENT_TIMEOUT_S", Settings.subagent_timeout_s),
         prefilter_top_k=_env_int("PREFILTER_TOP_K", 8),
         max_subagents=_env_int("MAX_SUBAGENTS", 8),
         metasearch_top_n=_env_int("METASEARCH_TOP_N", 8),

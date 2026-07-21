@@ -57,9 +57,12 @@ EXTRACTION_PROMPT = (
     "fidelidade (se houver) e assentos restantes (se houver)."
 )
 
+#: site → (carrier, programa, Source, atributo de Settings com o URL template)
 _SITE_META = {
-    "copa": ("CM", "connectmiles", Source.COPA),
-    "latam": ("LA", "latampass", Source.LATAM),
+    "copa": ("CM", "connectmiles", Source.COPA, "copa_booking_url"),
+    "latam": ("LA", "latampass", Source.LATAM, "latam_offers_url"),
+    "gol": ("G3", "smiles", Source.GOL, "gol_booking_url"),
+    "azul": ("AD", "azul", Source.AZUL, "azul_booking_url"),
 }
 
 
@@ -74,8 +77,8 @@ async def scrape(
     if not settings.has_firecrawl():
         raise ProviderNotConfigured("FIRECRAWL_API_KEY ausente — Firecrawl desativado")
 
-    carrier, program, source = _SITE_META[site]
-    template = settings.copa_booking_url if site == "copa" else settings.latam_offers_url
+    carrier, program, source, url_attr = _SITE_META[site]
+    template = getattr(settings, url_attr)
     target = template.format(
         origin=route.origin,
         destination=route.destination,
@@ -127,18 +130,25 @@ def parse_firecrawl_payload(
     if payload.get("success") is False:
         raise ProviderError(f"firecrawl retornou erro: {payload.get('error', 'desconhecido')}")
 
+    from .firecrawl_interact import _to_positive_int, money_number
+
     extracted = (payload.get("data") or {}).get("json") or {}
     offers: list[FlightOffer] = []
     for item in extracted.get("offers") or []:
         if not isinstance(item, dict):
             continue
-        cash = item.get("price_cash_brl")
-        miles = item.get("price_miles")
+        # o LLM às vezes devolve strings formatadas ("R$ 1.226,00", "60.000");
+        # conversão tolerante — um item ruim não derruba os demais
+        cash = money_number(item.get("price_cash_brl"))
+        miles = _to_positive_int(item.get("price_miles"))
         if not cash and not miles:
             continue
+        raw_numbers = item.get("flight_numbers") or []
+        if isinstance(raw_numbers, str):
+            raw_numbers = [raw_numbers]
         numbers = tuple(
             number if str(number).upper().startswith(carrier) else f"{carrier} {number}"
-            for number in (item.get("flight_numbers") or [])
+            for number in raw_numbers
             if str(number).strip()
         )
         offers.append(
@@ -149,11 +159,11 @@ def parse_firecrawl_payload(
                 destination=route.destination,
                 depart=depart,
                 cabin=cabin,
-                price_cash_brl=float(cash) if cash else None,
-                taxes_brl=float(item.get("taxes_brl") or 0.0),
-                price_miles=int(miles) if miles else None,
+                price_cash_brl=cash if cash and cash > 0 else None,
+                taxes_brl=money_number(item.get("taxes_brl")) or 0.0,
+                price_miles=miles,
                 miles_program=program if miles else None,
-                seats_left=int(item["seats_left"]) if item.get("seats_left") else None,
+                seats_left=_to_positive_int(item.get("seats_left")),
                 source=source,
                 raw={"via": "firecrawl"},
             )

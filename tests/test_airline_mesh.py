@@ -31,12 +31,40 @@ def _offer(carrier="XX", label="Xanadu Air"):
 
 # ------------------------------------------------------------------- registry
 def test_registry_is_extensive_and_resolves_labels():
-    assert len(AIRLINE_REGISTRY) >= 25
+    assert len(AIRLINE_REGISTRY) >= 50
     assert resolve_carrier_label("Copa Airlines") == "CM"
     assert resolve_carrier_label("Azul Linhas Aéreas") == "AD"
     assert resolve_carrier_label("Qatar Airways") == "QR"
     assert resolve_carrier_label("la") == "LA"          # código IATA direto
     assert resolve_carrier_label("Cia Desconhecida") == "*"
+
+
+def test_new_carrier_labels_resolve():
+    assert resolve_carrier_label("Singapore Airlines") == "SQ"
+    assert resolve_carrier_label("Korean Air") == "KE"
+    assert resolve_carrier_label("Etihad Airways") == "EY"
+    assert resolve_carrier_label("LOT Polish Airlines") == "LO"
+    assert resolve_carrier_label("Alaska Airlines") == "AS"
+    assert resolve_carrier_label("Voepass") == "2Z"
+    # rótulos curtos ambíguos exigem igualdade exata…
+    assert resolve_carrier_label("ANA") == "NH"
+    assert resolve_carrier_label("JAL") == "JL"
+    # …e NÃO vazam por substring ("ana" dentro de "Boliviana")
+    assert resolve_carrier_label("Boliviana de Aviación") == "OB"
+
+
+def test_gol_azul_meshes_and_scraper_agents():
+    from celestia_engine.agents.scrapers import SCRAPERS_BY_CARRIER
+    from celestia_engine.routes import RouteCatalog
+
+    assert set(SCRAPERS_BY_CARRIER) == {"CM", "LA", "G3", "AD"}
+    carriers = {r.carrier for r in RouteCatalog.airline_routes_between("GRU", "MIA")}
+    assert "G3" in carriers                    # GOL voa GRU-MIA nonstop
+    vcp = RouteCatalog.airline_routes_between("VCP", "MCO")
+    assert any(r.carrier == "AD" and r.direct for r in vcp)
+    # conexão via hub: CGH-MCO via BSB pela GOL
+    cgh = RouteCatalog.airline_routes_between("CGH", "MCO")
+    assert any(r.carrier == "G3" and r.via == "BSB" for r in cgh)
 
 
 def test_booking_url_priority_settings_registry_google():
@@ -97,3 +125,25 @@ def test_failure_memory_never_breaks_on_corrupt_csv(tmp_path):
     failures.write_text("garbage\x00,,,\nnot,a,csv")
     order = ["a", "b"]
     assert demote_failing_strategies(settings, "copa", "GRU-MCO", order) == order
+
+
+def test_label_boundary_angola_is_not_gol():
+    assert resolve_carrier_label("TAAG Angola Airlines") == "DT"
+    assert resolve_carrier_label("GOL Linhas Aéreas") == "G3"
+    assert resolve_carrier_label("g3") == "G3"    # IATA alfanumérico direto
+    assert resolve_carrier_label("2z") == "2Z"
+
+
+def test_gf2_derives_carrier_from_flight_number_for_discovery():
+    from celestia_engine.providers.google_flights2 import parse_metasearch_offers
+    from celestia_engine.models import Cabin, Route
+
+    payload = {"data": {"itineraries": {"topFlights": [{
+        "price": {"value": 3200},
+        "flights": [{"airline": "Companhia Inédita XY",
+                     "flight_number": "XY 123"}],
+    }]}}}
+    offers = parse_metasearch_offers(
+        payload, Route("GRU", "MCO", "*"), DEPART, Cabin.ECONOMY, top_n=3
+    )
+    assert offers and offers[0].carrier == "XY"   # não "*": entra no CSV de descobertas

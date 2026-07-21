@@ -31,7 +31,9 @@ class MilesMathAgent(Agent):
         options: list[PurchaseOption] = []
         for shelves in by_itinerary.values():
             economy = shelves.get(Cabin.ECONOMY)
-            business = shelves.get(Cabin.BUSINESS)
+            # premium conta como shelf superior quando não há executiva —
+            # buscas premium não podem terminar com 0 opções de compra
+            business = shelves.get(Cabin.BUSINESS) or shelves.get(Cabin.PREMIUM)
             options.extend(calculator.evaluate(economy, business, request))
 
         options.sort(key=lambda o: o.effective_total_brl)

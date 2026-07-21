@@ -25,6 +25,10 @@ NONSTOP_PAIRS: tuple[tuple[str, str], ...] = (
     ("GRU", "POA"), ("GRU", "CWB"), ("GRU", "FLN"), ("GRU", "SSA"),
     ("GRU", "REC"), ("GRU", "FOR"), ("GRU", "MAO"), ("GRU", "BEL"),
     ("GRU", "VIX"), ("GRU", "GYN"), ("GRU", "CGB"), ("GRU", "CGR"),
+    ("GRU", "IGU"), ("GRU", "NAT"), ("GRU", "MCZ"), ("GRU", "SLZ"),
+    # Congonhas — o maior mercado doméstico da LATAM
+    ("CGH", "SDU"), ("CGH", "BSB"), ("CGH", "CNF"), ("CGH", "POA"),
+    ("CGH", "CWB"), ("CGH", "SSA"), ("CGH", "REC"),
     ("GIG", "BSB"), ("GIG", "CNF"), ("GIG", "POA"), ("GIG", "SSA"),
     ("BSB", "REC"), ("BSB", "FOR"), ("BSB", "MAO"), ("BSB", "SSA"),
     # Hub SCL (rede LATAM Chile — recorte)

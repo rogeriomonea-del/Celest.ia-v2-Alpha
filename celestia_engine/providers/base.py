@@ -42,9 +42,19 @@ async def _request_json(
                 response = await client.request(
                     method, url, params=params, json=json_body, headers=merged_headers
                 )
-                if response.status_code == 429 and attempt < retries - 1:
-                    await asyncio.sleep(2**attempt)
-                    continue
+                if response.status_code == 429:
+                    if attempt < retries - 1:
+                        try:
+                            wait = float(response.headers.get("Retry-After", 2**attempt))
+                        except ValueError:
+                            wait = float(2**attempt)
+                        await asyncio.sleep(min(max(wait, 1.0), 30.0))
+                        continue
+                    body = response.text.strip()[:300] or "<corpo vazio>"
+                    raise ProviderError(
+                        f"{method} {_redact(url)} → HTTP 429 (rate limit). "
+                        f"Resposta do servidor: {_redact(body)}"
+                    )
                 if 400 <= response.status_code < 500 and response.status_code != 429:
                     # 401/403/404 são permanentes: retry só desperdiça tempo.
                     # O corpo carrega o diagnóstico real (ex.: RapidAPI diz

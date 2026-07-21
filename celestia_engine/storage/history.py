@@ -13,13 +13,13 @@ Uso downstream típico:
 
 from __future__ import annotations
 
-import csv
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
 from ..config import Settings
 from ..models import SearchReport
+from .csvio import append_rows
 
 #: Esquema fixo do dataset. NÃO reordene: acrescente colunas só no final.
 HISTORY_FIELDS = [
@@ -61,8 +61,6 @@ class SearchHistoryStore:
 
     def record(self, report: SearchReport) -> Path:
         """Append every quote/offer/option of the report as flat rows."""
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        is_new = not self.path.exists()
         search_id = uuid.uuid4().hex[:12]
         now = datetime.now(timezone.utc).isoformat(timespec="seconds")
         request = report.request
@@ -123,7 +121,9 @@ class SearchHistoryStore:
                     "strategy": option.strategy.value,
                     "cabin_final": option.cabin_final.value,
                     "price_cash_brl": f"{option.cash_brl:.2f}",
-                    "price_miles": option.miles or "",
+                    # miles é sempre conhecido numa option: 0 = estratégia sem
+                    # milhas (o dataset de ML distingue zero de desconhecido)
+                    "price_miles": option.miles,
                     "milheiro_brl": (
                         f"{option.milheiro_brl:.2f}" if option.milheiro_brl is not None else ""
                     ),
@@ -136,11 +136,7 @@ class SearchHistoryStore:
                 }
             )
 
-        with self.path.open("a", newline="", encoding="utf-8") as handle:
-            writer = csv.DictWriter(handle, fieldnames=HISTORY_FIELDS, restval="")
-            if is_new:
-                writer.writeheader()
-            writer.writerows(rows)
+        append_rows(self.path, HISTORY_FIELDS, rows)
         return self.path
 
 

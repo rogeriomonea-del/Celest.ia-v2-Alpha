@@ -98,3 +98,66 @@ def test_open_session_handles_null_metadata():
             asyncio.run(run({"data": {"metadata": None}}))
     finally:
         firecrawl_interact.post_json = real_post
+
+
+# ----------------------------------------------------- parsing tolerante (v17)
+def test_money_number_handles_all_llm_formats():
+    from celestia_engine.providers.firecrawl_interact import money_number
+
+    assert money_number(1226) == 1226.0
+    assert money_number("1226.5") == 1226.5
+    assert money_number("R$ 1.226,00") == 1226.0
+    assert money_number("US$1,226.00") == 1226.0
+    assert money_number("1.226") == 1226.0       # milhar BR, não R$ 1,23
+    assert money_number("1,226") == 1226.0       # milhar US
+    assert money_number("1226,50") == 1226.5     # decimal BR
+    assert money_number("abc") is None
+    assert money_number(None) is None
+
+
+def test_positive_int_handles_grouped_miles():
+    from celestia_engine.providers.firecrawl_interact import _to_positive_int
+
+    assert _to_positive_int("60.000") == 60000
+    assert _to_positive_int("60,000") == 60000
+    assert _to_positive_int(60000) == 60000
+    assert _to_positive_int("nada") is None
+    assert _to_positive_int(-5) is None
+
+
+def test_clean_url_rejects_placeholder_and_extracts_real():
+    from celestia_engine.providers.firecrawl_interact import _clean_url
+
+    assert _clean_url("https://...") is None
+    assert _clean_url("veja https://www.copaair.com/x?a=1 aqui") == (
+        "https://www.copaair.com/x?a=1"
+    )
+    assert _clean_url("https://site.com/checkout.") == "https://site.com/checkout"
+    assert _clean_url("texto solto") is None
+
+
+def test_cabin_of_understands_premium_economy_ptbr():
+    from celestia_engine.models import Cabin
+    from celestia_engine.providers.firecrawl_interact import _cabin_of
+
+    assert _cabin_of("Econômica premium") == Cabin.PREMIUM
+    assert _cabin_of("Executiva") == Cabin.BUSINESS
+    assert _cabin_of("economy") == Cabin.ECONOMY
+
+
+def test_resolve_carrier_accepts_alphanumeric_iata():
+    from celestia_engine.providers.firecrawl_interact import _resolve_carrier
+
+    assert _resolve_carrier("GOL", "G3", "*") == "G3"
+    assert _resolve_carrier("Voepass", "2Z", "*") == "2Z"
+    assert _resolve_carrier("x", "12", "*") == "*"   # dois dígitos não é IATA
+
+
+def test_calendar_parses_formatted_prices():
+    from celestia_engine.providers.firecrawl_interact import parse_calendar_output
+
+    out = parse_calendar_output(
+        '{"calendar":[{"date":"2026-09-20","price":"R$ 1.562","currency":"BRL"}]}',
+        usd_brl_rate=5.0,
+    )
+    assert len(out) == 1 and out[0].price_brl == 1562.0

@@ -140,12 +140,15 @@ def parse_payload(
 def _price_of(item: dict) -> float | None:
     price = item.get("price")
     if isinstance(price, dict):
-        price = price.get("value") or price.get("raw") or price.get("amount")
-    try:
-        value = float(price)
-    except (TypeError, ValueError):
-        return None
-    return value if value > 0 else None
+        price = (
+            price.get("value") or price.get("raw") or price.get("amount")
+            or price.get("text")
+        )
+    # tolera "R$ 1.562", "1,562.00" etc. — mesmo normalizador do Interact
+    from .firecrawl_interact import money_number
+
+    value = money_number(price)
+    return value if value is not None and value > 0 else None
 
 
 def _duration_min(value) -> int:
@@ -247,9 +250,17 @@ def parse_metasearch_offers(
             stops = item.get("stops")
             if not isinstance(stops, int):
                 stops = len(layovers) if layovers else max(0, len(segments) - 1)
+            carrier_code = resolve_carrier_label(label, "*")
+            if carrier_code == "*" and numbers:
+                # rótulo desconhecido: deriva o código do prefixo do número do
+                # voo ("DT 747" → DT) — sem isto a companhia nunca chega ao
+                # airlines_discovered.csv e o aprendizado da malha fica cego
+                match = re.match(r"([A-Z][A-Z0-9]|[0-9][A-Z])\s*\d", numbers[0].upper())
+                if match:
+                    carrier_code = match.group(1)
             offers.append(
                 FlightOffer(
-                    carrier=resolve_carrier_label(label, "*"),
+                    carrier=carrier_code,
                     flight_numbers=numbers or (f"{route.origin}-{route.destination}",),
                     origin=route.origin,
                     destination=route.destination,

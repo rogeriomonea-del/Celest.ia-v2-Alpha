@@ -1,4 +1,4 @@
-"""Agentes de scraping por companhia (Copa e LATAM) com estratégias aprendidas.
+"""Agentes de scraping por companhia (Copa, LATAM, GOL e Azul) com estratégias aprendidas.
 
 Cada companhia pode ser raspada por 3 estratégias, da mais promissora à mais
 robusta:
@@ -40,26 +40,42 @@ async def _strategy_firecrawl_interact(agent, route, depart):
     )
 
 
-async def _strategy_firecrawl_scrape(agent, route, depart):
+async def _per_cabin(agent, route, depart, fetch) -> list[FlightOffer]:
+    """Roda o fetch por cabine SEM perder o que já veio: se a executiva
+    falhar depois de a econômica responder, as ofertas da econômica ficam.
+    Só falha quando NENHUMA cabine trouxe nada."""
     offers: list[FlightOffer] = []
+    errors: list[str] = []
     for cabin in (Cabin.ECONOMY, Cabin.BUSINESS):
-        offers.extend(
-            await firecrawl.scrape(
-                agent.ctx.settings, site=agent.site, route=route, depart=depart, cabin=cabin
-            )
-        )
+        try:
+            offers.extend(await fetch(cabin))
+        except ProviderNotConfigured:
+            raise
+        except ProviderError as error:
+            errors.append(f"{cabin.value}: {error}")
+    if not offers:
+        raise ProviderError("; ".join(errors) or "nenhuma cabine retornou ofertas")
+    if errors:
+        agent.log(f"parcial ({agent.site}): {'; '.join(errors)}")
     return offers
+
+
+async def _strategy_firecrawl_scrape(agent, route, depart):
+    return await _per_cabin(
+        agent, route, depart,
+        lambda cabin: firecrawl.scrape(
+            agent.ctx.settings, site=agent.site, route=route, depart=depart, cabin=cabin
+        ),
+    )
 
 
 async def _strategy_playwright_local(agent, route, depart):
-    offers: list[FlightOffer] = []
-    for cabin in (Cabin.ECONOMY, Cabin.BUSINESS):
-        offers.extend(
-            await scrape_airline(
-                agent.ctx.settings, site=agent.site, route=route, depart=depart, cabin=cabin
-            )
-        )
-    return offers
+    return await _per_cabin(
+        agent, route, depart,
+        lambda cabin: scrape_airline(
+            agent.ctx.settings, site=agent.site, route=route, depart=depart, cabin=cabin
+        ),
+    )
 
 
 STRATEGY_FUNCS = {
@@ -131,6 +147,35 @@ class AirlineScraperAgent(Agent):
                 self.log(f"{strategy} falhou: {error}")
                 last_error = error
                 continue
+            except Exception as error:  # noqa: BLE001 - bug numa estratégia
+                # não pode abortar a cadeia: registra como falha e tenta a próxima
+                detail = f"{type(error).__name__}: {error}"
+                record_attempt(
+                    self.ctx.settings, site=self.site, strategy=strategy,
+                    success=False, offers_found=0, duration_s=time.monotonic() - started,
+                )
+                record_route_outcome(
+                    self.ctx.settings, site=self.site, strategy=strategy,
+                    route=route.key(), depart=depart.isoformat(),
+                    success=False, error=detail,
+                )
+                self.log(f"{strategy} erro inesperado: {detail}")
+                last_error = ProviderError(detail)
+                continue
+            if not offers:
+                # site respondeu mas sem ofertas: não conta como sucesso no
+                # aprendizado nem encerra a escada — a próxima pode achar
+                record_attempt(
+                    self.ctx.settings, site=self.site, strategy=strategy,
+                    success=False, offers_found=0, duration_s=time.monotonic() - started,
+                )
+                record_route_outcome(
+                    self.ctx.settings, site=self.site, strategy=strategy,
+                    route=route.key(), depart=depart.isoformat(),
+                    success=False, error="0 ofertas",
+                )
+                self.log(f"{strategy} sem ofertas — tentando a próxima")
+                continue
             record_attempt(
                 self.ctx.settings, site=self.site, strategy=strategy,
                 success=True, offers_found=len(offers), duration_s=time.monotonic() - started,
@@ -163,4 +208,23 @@ class LatamScraperAgent(AirlineScraperAgent):
     program = "latampass"
 
 
-SCRAPERS_BY_CARRIER = {"CM": CopaScraperAgent, "LA": LatamScraperAgent}
+class GolScraperAgent(AirlineScraperAgent):
+    name = "scraper-gol"
+    site = "gol"
+    carrier = "G3"
+    program = "smiles"
+
+
+class AzulScraperAgent(AirlineScraperAgent):
+    name = "scraper-azul"
+    site = "azul"
+    carrier = "AD"
+    program = "azul"
+
+
+SCRAPERS_BY_CARRIER = {
+    "CM": CopaScraperAgent,
+    "LA": LatamScraperAgent,
+    "G3": GolScraperAgent,
+    "AD": AzulScraperAgent,
+}

@@ -26,7 +26,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, field_validator
 
 from .agents.orchestrator import Orchestrator
-from .airlines import booking_url_for, google_flights_url
+from .airlines import airline_name, booking_url_for, google_flights_url
+from .storage import load_discovered
 from .config import Settings, load_settings
 from .models import (
     Cabin,
@@ -198,12 +199,28 @@ def _miles_equivalent(price_brl: float | None, milheiro: float) -> int | None:
     return int(round(price_brl / milheiro * 1000))
 
 
+def _airline_label(offer: FlightOffer, settings: Settings) -> str:
+    """Nome da companhia para o card: rótulo do metasearch, senão o registro
+    curado, senão o que o aprendizado gravou em airlines_discovered.csv —
+    fecha o ciclo: companhias descobertas em buscas passadas ganham nome."""
+    label = str((offer.raw or {}).get("airline_label") or "").strip()
+    if label:
+        return label
+    curated = airline_name(offer.carrier, fallback="\x00")
+    if curated != "\x00":
+        return curated
+    discovered = load_discovered(settings).get(offer.carrier)
+    if discovered:
+        return str(discovered.get("label") or "").strip()
+    return ""
+
+
 def _flight_json(offer: FlightOffer, settings: Settings, milheiro: float) -> dict:
     raw = offer.raw or {}
     return {
         "id": offer.itinerary_key() + f":{offer.cabin.value}",
         "carrier": offer.carrier,
-        "airlineLabel": str(raw.get("airline_label") or ""),
+        "airlineLabel": _airline_label(offer, settings),
         "flightNumbers": list(offer.flight_numbers),
         "origin": offer.origin,
         "destination": offer.destination,
@@ -260,7 +277,11 @@ def _indicative_flight_json(quote, settings: Settings, milheiro: float) -> dict:
     return {
         "id": f"quote:{route.slug()}:{quote.depart.isoformat()}:{quote.cabin.value}",
         "carrier": route.carrier,
-        "airlineLabel": quote.source.value,
+        # rota de companhia conhecida mostra o nome dela; par metasearch ("*")
+        # mostra a fonte da cotação
+        "airlineLabel": (
+            airline_name(route.carrier) if route.carrier != "*" else quote.source.value
+        ),
         "flightNumbers": [],
         "origin": route.origin,
         "destination": route.destination,

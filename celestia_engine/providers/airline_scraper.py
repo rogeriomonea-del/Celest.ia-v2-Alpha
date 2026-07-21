@@ -19,12 +19,22 @@ from typing import Any
 
 from ..config import Settings
 from ..models import Cabin, FlightOffer, Route, Source
-from .base import ProviderError
+from .base import ProviderError, ProviderNotConfigured
 
 #: substrings of XHR/fetch URLs that carry pricing payloads on each site.
 PRICING_URL_HINTS: dict[str, tuple[str, ...]] = {
     "copa": ("availability", "shopping", "offers", "flightsearch"),
     "latam": ("air-offers", "offers", "availability", "itineraries"),
+    "gol": ("availability", "flights", "search", "offers"),
+    "azul": ("availability", "flights", "search", "offers"),
+}
+
+#: site → (carrier, programa, Source, atributo de Settings com o URL template)
+_SITE_META: dict[str, tuple[str, str, Source, str]] = {
+    "copa": ("CM", "connectmiles", Source.COPA, "copa_booking_url"),
+    "latam": ("LA", "latampass", Source.LATAM, "latam_offers_url"),
+    "gol": ("G3", "smiles", Source.GOL, "gol_booking_url"),
+    "azul": ("AD", "azul", Source.AZUL, "azul_booking_url"),
 }
 
 
@@ -140,16 +150,16 @@ async def scrape_airline(
     try:
         from playwright.async_api import async_playwright
     except ImportError as error:  # pragma: no cover - env without playwright
-        raise ProviderError(
+        # dependência ausente é "não configurado" (skip), NÃO falha de
+        # desempenho — senão envenena o ranking de aprendizado do site
+        raise ProviderNotConfigured(
             "playwright não instalado — rode: pip install playwright && playwright install chromium"
         ) from error
 
-    if site == "copa":
-        carrier, program, source = "CM", "connectmiles", Source.COPA
-        url = settings.copa_booking_url
-    else:
-        carrier, program, source = "LA", "latampass", Source.LATAM
-        url = settings.latam_offers_url
+    if site not in _SITE_META:
+        raise ProviderError(f"site desconhecido para scraping local: {site!r}")
+    carrier, program, source, url_attr = _SITE_META[site]
+    url = getattr(settings, url_attr)
 
     target = url.format(
         origin=route.origin,

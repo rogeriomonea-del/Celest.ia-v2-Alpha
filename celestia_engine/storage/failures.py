@@ -11,12 +11,12 @@ primeiro no que acabou de falhar.
 
 from __future__ import annotations
 
-import csv
 from collections import deque
 from datetime import datetime, timezone
 from pathlib import Path
 
 from ..config import Settings
+from .csvio import READ_ERRORS, append_rows, read_rows
 
 FAILURE_FIELDS = [
     "timestamp_utc",
@@ -30,7 +30,7 @@ FAILURE_FIELDS = [
 
 #: falhas seguidas (sem sucesso no meio) que rebaixam a estratégia na rota
 FAILURE_DEMOTE_STREAK = 3
-#: quantas linhas recentes considerar (evita ler CSVs gigantes inteiros)
+#: quantas linhas recentes DESTA (site, rota) considerar
 _TAIL_ROWS = 500
 
 
@@ -51,13 +51,10 @@ def record_route_outcome(
     """Append best-effort — I/O nunca quebra a busca."""
     path = _failures_path(settings)
     try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        is_new = not path.exists()
-        with path.open("a", newline="", encoding="utf-8") as handle:
-            writer = csv.DictWriter(handle, fieldnames=FAILURE_FIELDS)
-            if is_new:
-                writer.writeheader()
-            writer.writerow(
+        append_rows(
+            path,
+            FAILURE_FIELDS,
+            [
                 {
                     "timestamp_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
                     "site": site,
@@ -67,7 +64,8 @@ def record_route_outcome(
                     "outcome": "success" if success else "fail",
                     "error": (error or "")[:200],
                 }
-            )
+            ],
+        )
     except OSError:
         return
 
@@ -79,14 +77,19 @@ def failure_streaks(settings: Settings, site: str, route: str) -> dict[str, int]
         return {}
     streaks: dict[str, int] = {}
     try:
-        with path.open(newline="", encoding="utf-8") as handle:
-            # deque(maxlen) mantém só a cauda sem materializar o CSV inteiro
-            rows = deque(csv.DictReader(handle), maxlen=_TAIL_ROWS)
-    except (OSError, csv.Error, UnicodeDecodeError):
+        # filtra por (site, rota) DURANTE o streaming e guarda só a cauda:
+        # a memória desta rota não expira porque outras rotas encheram o CSV
+        rows = deque(
+            (
+                row
+                for row in read_rows(path)
+                if row.get("site") == site and row.get("route") == route
+            ),
+            maxlen=_TAIL_ROWS,
+        )
+    except READ_ERRORS:
         return {}
     for row in rows:
-        if row.get("site") != site or row.get("route") != route:
-            continue
         strategy = row.get("strategy") or ""
         if not strategy:
             continue

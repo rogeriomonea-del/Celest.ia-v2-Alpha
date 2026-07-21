@@ -16,6 +16,7 @@ from ..providers import ProviderNotConfigured
 from ..providers import google_flights, google_flights2, skyscanner
 from ..providers.base import ProviderError
 from ..providers.mock import mock_metasearch_offers, mock_quote
+from ..storage import record_route_outcome
 from .base import Agent
 
 Candidate = tuple[Route, date]
@@ -65,18 +66,27 @@ class PriceScoutAgent(Agent):
                 fetch_group(key, members[0][0], members[0][1], source_name, fetch)
                 for key, members in groups.items()
                 for source_name, fetch in sources
-            )
+            ),
+            return_exceptions=True,
         )
 
         cheapest: dict[tuple[str, str, str], FareQuote] = {}
-        for key, source_name, result in results:
+        for item in results:
+            if isinstance(item, BaseException):
+                continue
+            key, source_name, result = item
             if isinstance(result, ProviderNotConfigured):
                 continue
             if isinstance(result, ProviderError):
                 self.log(f"{source_name} indisponível para {key[0]}-{key[1]}: {result}")
+                self._record_outcome(key, source_name, error=str(result))
                 continue
             if isinstance(result, Exception):
+                self._record_outcome(
+                    key, source_name, error=str(result) or type(result).__name__
+                )
                 continue
+            self._record_outcome(key, source_name)
             for quote in result:
                 if key not in cheapest or quote.price_brl < cheapest[key].price_brl:
                     cheapest[key] = quote
@@ -101,6 +111,23 @@ class PriceScoutAgent(Agent):
             f"({saved} chamadas deduplicadas)"
         )
         return best
+
+    def _record_outcome(
+        self, key: tuple[str, str, str], source_name: str, error: str = ""
+    ) -> None:
+        """O CSV de fails também cobre o metasearch: cada fonte × par × data
+        registra sucesso/falha — o aprendizado não fica cego fora dos scrapers."""
+        if source_name == "mock":
+            return
+        record_route_outcome(
+            self.ctx.settings,
+            site=source_name,
+            strategy="metasearch",
+            route=f"{key[0]}-{key[1]}",
+            depart=key[2],
+            success=not error,
+            error=error,
+        )
 
     def _sources(self):
         settings = self.ctx.settings

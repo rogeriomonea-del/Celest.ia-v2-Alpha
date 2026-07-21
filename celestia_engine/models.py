@@ -19,16 +19,21 @@ class Source(str, Enum):
     SKYSCANNER = "skyscanner"
     COPA = "copa"
     LATAM = "latam"
+    GOL = "gol"
+    AZUL = "azul"
     MOCK = "mock"
 
 
 class Strategy(str, Enum):
-    """The four purchase strategies compared by the MilesMathAgent."""
+    """The purchase strategies compared by the MilesMathAgent."""
 
     BUSINESS_CASH = "business_cash"
     ECONOMY_MILES_UPGRADE = "economy_miles_upgrade"
     FULL_MILES = "full_miles"
     ECONOMY_CASH_UPGRADE = "economy_cash_upgrade"
+    #: linha de base: a passagem anunciada, em dinheiro — garante que TODA
+    #: oferta com preço gere ao menos uma opção de compra
+    ECONOMY_CASH = "economy_cash"
 
 
 STRATEGY_LABELS: dict[Strategy, str] = {
@@ -36,6 +41,7 @@ STRATEGY_LABELS: dict[Strategy, str] = {
     Strategy.ECONOMY_MILES_UPGRADE: "Econômica + upgrade com milhas",
     Strategy.FULL_MILES: "Emissão em milhas (award)",
     Strategy.ECONOMY_CASH_UPGRADE: "Econômica + upgrade em dinheiro",
+    Strategy.ECONOMY_CASH: "Passagem direto (dinheiro)",
 }
 
 

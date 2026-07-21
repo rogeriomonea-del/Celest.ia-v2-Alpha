@@ -16,7 +16,7 @@ HUB = "PTY"
 #: Destinations served nonstop from PTY (curated seed — edit freely).
 PTY_DESTINATIONS: tuple[str, ...] = (
     # Brasil
-    "GRU", "GIG", "BSB", "CNF", "MAO", "POA", "REC", "FOR",
+    "GRU", "GIG", "BSB", "CNF", "MAO", "POA", "REC", "FOR", "FLN",
     # América do Sul
     "EZE", "COR", "MDZ", "ROS", "SCL", "LIM", "CUZ", "BOG", "MDE", "CLO",
     "CTG", "BAQ", "UIO", "GYE", "CCS", "MVD", "ASU", "VVI", "GEO", "PBM",

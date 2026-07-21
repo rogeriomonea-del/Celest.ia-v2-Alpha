@@ -33,7 +33,8 @@ def test_health_and_status():
 def test_scripts_endpoint_lists_playbooks():
     names = {s["name"] for s in _client().get("/api/scripts").json()["scripts"]}
     assert names == {
-        "copa_direct", "latam_direct", "google_flights_search", "google_flights_calendar",
+        "copa_direct", "latam_direct", "gol_direct", "azul_direct",
+        "google_flights_search", "google_flights_calendar",
     }
 
 
@@ -132,9 +133,10 @@ def test_every_flight_has_a_booking_url():
 
 
 def test_route_outside_cm_la_mesh_returns_indicative_metasearch():
-    # CGH-MCO não tem rota Copa/LATAM: nada raspável, mas o metasearch rico
-    # devolve voos indicativos multi-companhia (premium) — nunca 0 resultados.
-    response = _client().post("/api/search", json={**BODY, "origin": "CGH", "destination": "MCO"})
+    # SSA-NRT não tem rota em NENHUMA malha raspável (CM/LA/G3/AD): nada
+    # raspável, mas o metasearch rico devolve voos indicativos
+    # multi-companhia (premium) — nunca 0 resultados.
+    response = _client().post("/api/search", json={**BODY, "origin": "SSA", "destination": "NRT"})
     assert response.status_code == 200
     data = response.json()
     assert data["flights"], "voos do metasearch devem aparecer"

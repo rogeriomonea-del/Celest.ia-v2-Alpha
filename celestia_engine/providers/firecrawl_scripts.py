@@ -12,6 +12,8 @@ Scripts disponíveis:
 |--------------------------|----------|---------------------------|-----------|
 | ``copa_direct``          | offers   | copaair.com               | busca direto na Copa (ConnectMiles): dinheiro **e** milhas |
 | ``latam_direct``         | offers   | latamairlines.com         | busca direto na LATAM (LATAM Pass): dinheiro **e** milhas |
+| ``gol_direct``           | offers   | voegol.com.br             | busca direto na GOL (Smiles): dinheiro **e** milhas |
+| ``azul_direct``          | offers   | voeazul.com.br            | busca direto na Azul (TudoAzul): dinheiro **e** pontos |
 | ``google_flights_search``| offers   | google.com/travel/flights | metasearch: extrai voos de **várias** companhias de uma vez |
 | ``google_flights_calendar``| calendar| google.com/travel/flights | varre o calendário de preços p/ cortar datas caras |
 
@@ -50,7 +52,7 @@ OFFER_SCHEMA_HINT = (
     '"duration_minutes":680,"stops":1,'
     '"layovers":[{"airport":"PTY","minutes":95}],'
     '"aircraft":"Boeing 737-800","baggage":{"carry_on":true,"checked":1},'
-    '"seats_left":5,"booking_url":"https://..."}]}.\n'
+    '"seats_left":5,"booking_url":"https://exemplo.com/checkout/voo"}]}.\n'
     "Regras: extraia TODAS as opções visíveis (todas as companhias e todas as "
     "cabines). cabin deve ser 'economy', 'premium' ou 'business'. currency é o "
     "código ISO (USD/BRL). price_miles só quando o site mostrar emissão em "
@@ -77,15 +79,49 @@ def _copa_steps(*, route: Route, depart, cabin: Cabin = Cabin.ECONOMY, **_) -> l
 
 
 def _latam_steps(*, route: Route, depart, cabin: Cabin = Cabin.ECONOMY, **_) -> list[str]:
-    depart_iso = depart.isoformat()
+    # site pt-BR: data ditada em DD/MM/AAAA como nos demais scripts nacionais
+    depart_br = f"{depart.day:02d}/{depart.month:02d}/{depart.year}"
     return [
         f"1. No campo de origem digite {route.origin}. "
         f"2. No campo de destino digite {route.destination}. "
         "Selecione a primeira sugestão de cada campo.",
-        f"Escolha somente ida, data {depart_iso}, 1 adulto, e pesquise. "
-        "Se aparecer a opção de ver preços em pontos LATAM Pass, ative-a.",
+        f"Escolha somente ida, data {depart_br} (dia/mês/ano), 1 adulto, "
+        "e pesquise. Se aparecer a opção de ver preços em pontos LATAM Pass, "
+        "ative-a.",
         "Aguarde a lista de voos carregar por completo, com horários, conexões, "
         "preços em dinheiro e em pontos. " + OFFER_SCHEMA_HINT,
+    ]
+
+
+def _gol_steps(*, route: Route, depart, cabin: Cabin = Cabin.ECONOMY, **_) -> list[str]:
+    depart_br = f"{depart.day:02d}/{depart.month:02d}/{depart.year}"
+    return [
+        "Se aparecer banner de cookies, aceite. "
+        f"1. No campo de origem digite {route.origin}. "
+        f"2. No campo de destino digite {route.destination}. "
+        "Selecione a primeira sugestão de cada campo.",
+        f"Escolha somente ida com data de partida {depart_br}, 1 adulto, "
+        "e pesquise os voos. Se o site oferecer ver preços em milhas Smiles, "
+        "ative essa visão também.",
+        "Aguarde a lista de voos carregar por completo — horários, conexões, "
+        "preços em dinheiro e em milhas Smiles quando exibidos. "
+        + OFFER_SCHEMA_HINT,
+    ]
+
+
+def _azul_steps(*, route: Route, depart, cabin: Cabin = Cabin.ECONOMY, **_) -> list[str]:
+    depart_br = f"{depart.day:02d}/{depart.month:02d}/{depart.year}"
+    return [
+        "Se aparecer banner de cookies, aceite. "
+        f"1. No campo de origem digite {route.origin}. "
+        f"2. No campo de destino digite {route.destination}. "
+        "Selecione a primeira sugestão de cada campo.",
+        f"Escolha somente ida com data de partida {depart_br}, 1 adulto, "
+        "e pesquise os voos. Se houver a opção de ver preços em pontos "
+        "TudoAzul, ative-a.",
+        "Aguarde a lista de voos carregar por completo — horários, conexões, "
+        "preços em dinheiro e em pontos TudoAzul quando exibidos. "
+        + OFFER_SCHEMA_HINT,
     ]
 
 
@@ -141,6 +177,14 @@ SCRIPTS: dict[str, FirecrawlScript] = {
         "latam_direct", "Busca direto na LATAM (dinheiro e LATAM Pass)",
         "offers", "latam_interact_url", _latam_steps,
     ),
+    "gol_direct": FirecrawlScript(
+        "gol_direct", "Busca direto na GOL (dinheiro e milhas Smiles)",
+        "offers", "gol_interact_url", _gol_steps,
+    ),
+    "azul_direct": FirecrawlScript(
+        "azul_direct", "Busca direto na Azul (dinheiro e pontos TudoAzul)",
+        "offers", "azul_interact_url", _azul_steps,
+    ),
     "google_flights_search": FirecrawlScript(
         "google_flights_search",
         "Metasearch no Google Flights: voos e preços de várias companhias",
@@ -154,7 +198,12 @@ SCRIPTS: dict[str, FirecrawlScript] = {
 }
 
 #: site da companhia → script de busca direta.
-SITE_SCRIPT: dict[str, str] = {"copa": "copa_direct", "latam": "latam_direct"}
+SITE_SCRIPT: dict[str, str] = {
+    "copa": "copa_direct",
+    "latam": "latam_direct",
+    "gol": "gol_direct",
+    "azul": "azul_direct",
+}
 
 
 # --------------------------------------------------------------------- executor

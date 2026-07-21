@@ -78,7 +78,8 @@ class PurchaseCalculator:
             business,
             cash=business.price_cash_brl,
             miles=0,
-            cabin_final=Cabin.BUSINESS,
+            # a cabine anunciada (executiva OU premium — o shelf superior)
+            cabin_final=business.cabin,
             notes=[],
         )
 
@@ -108,6 +109,21 @@ class PurchaseCalculator:
             ],
         )
 
+    def economy_cash(self, economy: FlightOffer) -> PurchaseOption | None:
+        """Linha de base premium: comprar a passagem anunciada em dinheiro.
+        É o que garante opção de compra mesmo em ofertas só-metasearch
+        (sem milhas, sem upgrade, sem shelf executiva)."""
+        if economy.price_cash_brl is None:
+            return None
+        return self._option(
+            Strategy.ECONOMY_CASH,
+            economy,
+            cash=economy.price_cash_brl,
+            miles=0,
+            cabin_final=economy.cabin,
+            notes=[],
+        )
+
     def economy_cash_upgrade(self, economy: FlightOffer) -> PurchaseOption | None:
         if economy.price_cash_brl is None or economy.upgrade_cash_brl is None:
             return None
@@ -135,16 +151,28 @@ class PurchaseCalculator:
                     options.append(option)
         if economy is not None:
             for option in (
+                self.economy_cash(economy),
+                # award em econômica também é emissão em milhas — sem isto,
+                # ofertas award-only de econômica nunca viravam opção
+                self.full_miles(economy),
                 self.economy_miles_upgrade(economy),
                 self.economy_cash_upgrade(economy),
             ):
                 if option:
                     options.append(option)
 
-        cash_only = [o for o in options if o.miles == 0]
-        best_cash = min((o.effective_total_brl for o in cash_only), default=None)
+        # baseline de dinheiro POR CABINE FINAL: award de executiva compara
+        # com executiva em dinheiro, não com a econômica (maçã com maçã)
+        cash_by_cabin: dict[Cabin, float] = {}
+        for option in options:
+            if option.miles == 0:
+                current = cash_by_cabin.get(option.cabin_final)
+                if current is None or option.effective_total_brl < current:
+                    cash_by_cabin[option.cabin_final] = option.effective_total_brl
+        best_cash_any = min(cash_by_cabin.values(), default=None)
         for option in options:
             if option.miles > 0:
+                best_cash = cash_by_cabin.get(option.cabin_final, best_cash_any)
                 if best_cash is not None:
                     # milheiro at which this option's effective cost == best cash
                     option.breakeven_milheiro_brl = round(

@@ -28,6 +28,8 @@ from .base import ProviderError, post_json
 _SITE_META = {
     "copa": ("CM", "connectmiles", Source.COPA),
     "latam": ("LA", "latampass", Source.LATAM),
+    "gol": ("G3", "smiles", Source.GOL),
+    "azul": ("AD", "azul", Source.AZUL),
 }
 
 #: rótulo de cabine em pt-BR usado nos prompts (Copa/LATAM/Google Flights).
@@ -64,7 +66,11 @@ async def interact(settings: Settings, scrape_id: str, prompt: str) -> str:
         timeout_s=max(settings.http_timeout_s, 150),
         retries=1,
     )
-    data = payload.get("data") or payload
+    data = payload.get("data")
+    if isinstance(data, str):
+        return data
+    if not isinstance(data, dict):
+        data = payload
     return str(data.get("output") or data.get("result") or "")
 
 
@@ -162,14 +168,10 @@ def parse_calendar_output(text: str, *, usd_brl_rate: float) -> list[DatePrice]:
         parsed = _parse_cal_date(str(item.get("date") or ""))
         if parsed is None:
             continue
-        try:
-            price = float(item.get("price"))
-        except (TypeError, ValueError):
-            continue
-        if price <= 0:
-            continue
         currency = str(item.get("currency") or "BRL").upper()
-        price_brl = round(price * usd_brl_rate, 2) if currency == "USD" else round(price, 2)
+        price_brl = _money_to_brl(item.get("price"), currency, usd_brl_rate)
+        if price_brl is None:
+            continue
         out.append(DatePrice(date=parsed, price_brl=price_brl, source=Source.GOOGLE_FLIGHTS))
     return out
 
@@ -212,23 +214,68 @@ def _parse_duration(value) -> int:
         match = re.search(r"(\d+)\s*h(?:\s*(\d+))?", value)
         if match:
             return int(match.group(1)) * 60 + int(match.group(2) or 0)
+        # "680" ou "95 min" (sem componente de horas)
+        match = re.search(r"(\d+)\s*(?:min|m\b)", value)
+        if match:
+            return int(match.group(1))
+        stripped = value.strip()
+        if stripped.isdigit():
+            return int(stripped)
     return 0
+
+
+def money_number(value) -> float | None:
+    """Número de um valor monetário em QUALQUER formato que o LLM devolva:
+    1226, "1226.5", "R$ 1.226,00", "US$1,226.00", "1.226" (milhar BR).
+    None quando não é um valor."""
+    if isinstance(value, (int, float)):
+        return float(value)
+    if not isinstance(value, str):
+        return None
+    text = value.strip().replace("\xa0", " ")
+    text = re.sub(r"(?i)(r\$|us\$|\$|brl|usd|reais|milhas)", "", text).strip()
+    text = text.replace(" ", "")
+    if not text:
+        return None
+    if "," in text and "." in text:
+        # o separador que aparece POR ÚLTIMO é o decimal
+        if text.rfind(",") > text.rfind("."):
+            text = text.replace(".", "").replace(",", ".")     # 1.226,00
+        else:
+            text = text.replace(",", "")                        # 1,226.00
+    elif "," in text:
+        head, _, tail = text.rpartition(",")
+        # vírgula com 3 dígitos é milhar ("1,226"); com 1-2, decimal ("1226,5")
+        text = head.replace(",", "") + tail if len(tail) == 3 and head else f"{head}.{tail}"
+    elif "." in text:
+        head, _, tail = text.rpartition(".")
+        # ponto com 3 dígitos é milhar BR ("1.226"); senão decimal ("1226.50")
+        if len(tail) == 3 and head:
+            text = head.replace(".", "") + tail
+    try:
+        return float(text)
+    except ValueError:
+        return None
 
 
 def _money_to_brl(value, currency: str, usd_brl_rate: float) -> float | None:
     """Converte um valor monetário para BRL (USD→BRL pela taxa). None se inválido."""
-    try:
-        amount = float(value)
-    except (TypeError, ValueError):
+    amount = money_number(value)
+    if amount is None or amount <= 0:
         return None
-    if amount <= 0:
-        return None
+    if currency != "USD" and isinstance(value, str) and re.search(r"(?i)us\$|usd", value):
+        currency = "USD"  # a moeda declarada no próprio valor vence
     return round(amount * usd_brl_rate, 2) if currency == "USD" else round(amount, 2)
 
 
 def _to_positive_int(value) -> int | None:
+    if isinstance(value, str):
+        digits = re.sub(r"[^0-9]", "", value)   # "60.000"/"60,000" → 60000
+        if not digits:
+            return None
+        value = digits
     try:
-        number = int(value)
+        number = int(float(value))
     except (TypeError, ValueError):
         return None
     return number if number > 0 else None
@@ -236,9 +283,9 @@ def _to_positive_int(value) -> int | None:
 
 def _cabin_of(value) -> Cabin:
     text = str(value or "").lower()
-    if text.startswith(("business", "exec")):
+    if "business" in text or "exec" in text or "first" in text or "primeira" in text:
         return Cabin.BUSINESS
-    if text.startswith(("premium", "prem")):
+    if "premium" in text or "prem" in text:
         return Cabin.PREMIUM
     return Cabin.ECONOMY
 
@@ -268,7 +315,8 @@ def _clean_layovers(value) -> list[dict]:
 
 def _resolve_carrier(airline: str, iata: str, default: str) -> str:
     iata = iata.strip().upper()
-    if len(iata) == 2 and iata.isalpha():
+    # códigos IATA são alfanuméricos com ao menos uma letra (G3, 2Z, U2…)
+    if len(iata) == 2 and iata.isalnum() and not iata.isdigit():
         return iata
     if default and airline.upper().startswith(default):
         return default
@@ -315,7 +363,7 @@ def parse_interact_output(
                 price_cash_brl=price_brl,
                 taxes_brl=_money_to_brl(item.get("taxes"), currency, usd_brl_rate) or 0.0,
                 price_miles=price_miles,
-                miles_program=program or None,
+                miles_program=(program or None) if price_miles else None,
                 seats_left=_to_positive_int(item.get("seats_left")),
                 source=source,
                 raw={
@@ -339,9 +387,18 @@ def parse_interact_output(
 
 
 def _clean_url(value) -> str | None:
-    """Só aceita URL http(s) completa — o LLM às vezes devolve texto solto."""
-    url = str(value or "").strip()
-    return url if url.startswith(("http://", "https://")) else None
+    """Só aceita URL http(s) completa — o LLM às vezes devolve texto solto,
+    o placeholder "https://..." do schema, ou a URL com prosa colada."""
+    text = str(value or "").strip()
+    match = re.search(r"https?://[^\s\"'<>\)\]]+", text)
+    if not match:
+        return None
+    url = match.group(0).rstrip(".,;")
+    host = url.split("//", 1)[-1].split("/", 1)[0]
+    # host real tem um ponto entre caracteres alfanuméricos ("https://..." não)
+    if not re.search(r"[a-z0-9]\.[a-z0-9]", host, re.IGNORECASE):
+        return None
+    return url
 
 
 def _carrier_of(label: str, default: str) -> str:

@@ -23,11 +23,25 @@ def _parse(text, carrier="CM", program="connectmiles", source=Source.COPA):
 # --------------------------------------------------------------- registry/steps
 def test_registry_has_expected_scripts():
     assert set(fs.SCRIPTS) == {
-        "copa_direct", "latam_direct", "google_flights_search", "google_flights_calendar",
+        "copa_direct", "latam_direct", "gol_direct", "azul_direct",
+        "google_flights_search", "google_flights_calendar",
     }
     assert fs.SCRIPTS["copa_direct"].kind == "offers"
     assert fs.SCRIPTS["google_flights_calendar"].kind == "calendar"
-    assert fs.SITE_SCRIPT == {"copa": "copa_direct", "latam": "latam_direct"}
+    assert fs.SITE_SCRIPT == {
+        "copa": "copa_direct", "latam": "latam_direct",
+        "gol": "gol_direct", "azul": "azul_direct",
+    }
+
+
+def test_gol_and_azul_steps_mention_route_date_and_points():
+    for name, points_word in (("gol_direct", "smiles"), ("azul_direct", "tudoazul")):
+        steps = fs.SCRIPTS[name].build_steps(
+            route=ROUTE, depart=DEPART, cabin=Cabin.ECONOMY)
+        joined = " ".join(steps)
+        assert "GRU" in joined and "MCO" in joined
+        assert "28/11/2026" in joined            # data no formato BR
+        assert points_word in joined.lower()     # pede dinheiro E milhas/pontos
 
 
 def test_copa_steps_mention_route_date_and_ask_for_miles():
