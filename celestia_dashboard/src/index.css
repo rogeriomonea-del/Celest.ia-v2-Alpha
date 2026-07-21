@@ -6,10 +6,23 @@
   html {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
   }
 
   body {
-    @apply bg-slate-50 font-sans text-slate-900;
+    @apply bg-ink-50 font-sans text-ink-900;
+  }
+
+  /* Números tabulares alinham preços e horários em colunas. */
+  .tnum {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum' 1;
+  }
+
+  /* Serifa de exibição com peso óptico calibrado para o premium. */
+  .font-serif {
+    font-optical-sizing: auto;
+    letter-spacing: -0.01em;
   }
 }
 
@@ -23,6 +36,18 @@
   }
 
   .thin-scrollbar::-webkit-scrollbar-thumb {
-    @apply rounded-full bg-slate-300;
+    @apply rounded-full bg-ink-300;
+  }
+
+  /* Fio dourado fino no topo de superfícies premium. */
+  .hairline-gold {
+    background-image: linear-gradient(
+      to right,
+      transparent,
+      theme('colors.gold.300'),
+      theme('colors.gold.500'),
+      theme('colors.gold.300'),
+      transparent
+    );
   }
 }

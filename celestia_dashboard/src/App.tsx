@@ -190,18 +190,26 @@ export default function App() {
 
       <main className="flex-1">
         {/* Hero + search */}
-        <section className="relative bg-gradient-to-br from-indigo-700 via-indigo-600 to-violet-600 pb-16 pt-12 sm:pt-16">
+        <section className="relative bg-gradient-to-b from-ink-950 via-ink-900 to-ink-900 pb-20 pt-14 sm:pt-20">
           <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
-            <div className="absolute -left-24 -top-24 h-96 w-96 rounded-full bg-white/10 blur-3xl" />
-            <div className="absolute -bottom-32 right-0 h-96 w-96 rounded-full bg-violet-400/20 blur-3xl" />
+            <div className="absolute -left-32 -top-40 h-[28rem] w-[28rem] rounded-full bg-gold-500/10 blur-3xl" />
+            <div className="absolute -bottom-40 right-0 h-96 w-96 rounded-full bg-pine-500/10 blur-3xl" />
+            <div className="absolute inset-x-0 bottom-0 h-px hairline-gold opacity-40" />
           </div>
           <div className="relative mx-auto max-w-6xl px-4 sm:px-6">
-            <div className="mb-8 text-center">
-              <h1 className="text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
-                Para onde você quer voar?
+            <div className="mb-9 text-center">
+              <span className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3.5 py-1.5 text-[11px] font-medium uppercase tracking-[0.18em] text-gold-300">
+                <span className="h-1 w-1 rounded-full bg-gold-400" aria-hidden="true" />
+                Busca inteligente de voos e milhas
+              </span>
+              <h1 className="font-serif text-4xl font-medium leading-[1.05] tracking-tight text-white sm:text-5xl">
+                Sua próxima viagem,
+                <br className="hidden sm:block" />{' '}
+                <span className="italic text-gold-300">com inteligência.</span>
               </h1>
-              <p className="mt-2 text-sm text-indigo-100 sm:text-base">
-                Compare tarifas de dezenas de companhias e reserve com confiança.
+              <p className="mx-auto mt-4 max-w-xl text-sm leading-relaxed text-ink-300 sm:text-base">
+                Comparamos dinheiro, milhas e upgrade em dezenas de companhias — e
+                calculamos a estratégia de compra mais vantajosa para você.
               </p>
             </div>
             <SearchBar initialParams={params} loading={loading} onSearch={handleUserSearch} />
@@ -209,15 +217,15 @@ export default function App() {
         </section>
 
         {/* Results */}
-        <section className="mx-auto max-w-7xl px-4 pt-14 sm:px-6">
-          <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+        <section className="mx-auto max-w-7xl px-4 pt-12 sm:px-6">
+          <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
             <div>
-              <h2 className="flex items-center gap-2 text-lg font-bold text-slate-900">
+              <h2 className="flex items-center gap-2.5 font-serif text-2xl font-medium tracking-tight text-ink-900">
                 {params.origin.city}
-                <ArrowRight className="h-4 w-4 text-slate-400" aria-hidden="true" />
+                <ArrowRight className="h-5 w-5 text-gold-500" aria-hidden="true" />
                 {params.destination.city}
               </h2>
-              <p role="status" aria-live="polite" className="text-sm text-slate-500">
+              <p role="status" aria-live="polite" className="mt-1 text-sm text-ink-500">
                 {dateSummary} ·{' '}
                 {idle
                   ? 'pronto para buscar'
@@ -230,7 +238,7 @@ export default function App() {
               type="button"
               onClick={() => setShowMobileFilters((current) => !current)}
               aria-expanded={showMobileFilters}
-              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:border-slate-300 lg:hidden"
+              className="inline-flex items-center gap-2 rounded-xl border border-ink-200 bg-white px-4 py-2 text-sm font-semibold text-ink-700 shadow-card transition-colors hover:border-gold-300 lg:hidden"
             >
               <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
               Filtros
@@ -238,8 +246,8 @@ export default function App() {
           </div>
 
           {!loading && !idle && searchError !== null && (
-            <div className="mb-5 flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-              <SearchX className="h-4 w-4 shrink-0" aria-hidden="true" />
+            <div className="mb-5 flex items-start gap-2.5 rounded-2xl border border-red-200 bg-red-50/80 px-4 py-3 text-sm text-red-800">
+              <SearchX className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
               <p>
                 <strong className="font-semibold">A busca real falhou</strong> — {searchError}.
                 Veja o terminal da API para o detalhe e tente novamente.
@@ -248,19 +256,19 @@ export default function App() {
           )}
 
           {!loading && !idle && searchError === null && engine === null && (
-            <div className="mb-5 flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-              <FlaskConical className="h-4 w-4 shrink-0" aria-hidden="true" />
+            <div className="mb-5 flex items-start gap-2.5 rounded-2xl border border-amber-200 bg-amber-50/80 px-4 py-3 text-sm text-amber-800">
+              <FlaskConical className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
               <p>
                 <strong className="font-semibold">Modo demonstração</strong> — estes voos são
-                fictícios. Suba a API do motor (<code>python -m celestia_engine serve</code>)
+                fictícios. Suba a API do motor (<code className="rounded bg-amber-100 px-1 py-0.5 text-[12px] font-semibold">python -m celestia_engine serve</code>)
                 para buscar tarifas de verdade.
               </p>
             </div>
           )}
 
           {!loading && engine !== null && (
-            <div className="mb-5 flex items-center gap-2 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
-              <Cpu className="h-4 w-4 shrink-0" aria-hidden="true" />
+            <div className="mb-5 flex items-start gap-2.5 rounded-2xl border border-pine-200 bg-pine-50/80 px-4 py-3 text-sm text-pine-800">
+              <Cpu className="mt-0.5 h-4 w-4 shrink-0 text-pine-600" aria-hidden="true" />
               <p>
                 <strong className="font-semibold">
                   {engine.mode === 'real'
@@ -286,17 +294,17 @@ export default function App() {
           )}
 
           {idle ? (
-            <div className="flex flex-col items-center rounded-2xl border border-slate-200 bg-white px-6 py-16 text-center shadow-sm">
-              <span className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-indigo-50">
-                <Cpu className="h-7 w-7 text-indigo-600" aria-hidden="true" />
+            <div className="flex flex-col items-center rounded-2xl border border-ink-200 bg-white px-6 py-16 text-center shadow-card">
+              <span className="mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-gold-50 ring-1 ring-inset ring-gold-200">
+                <Cpu className="h-7 w-7 text-gold-600" aria-hidden="true" />
               </span>
-              <h3 className="text-base font-bold text-slate-900">
-                Motor real conectado — pronto para buscar
+              <h3 className="font-serif text-xl font-medium text-ink-900">
+                Motor conectado — pronto para buscar
               </h3>
-              <p className="mt-1 max-w-md text-sm text-slate-500">
+              <p className="mt-2 max-w-md text-sm leading-relaxed text-ink-500">
                 A busca real raspa as companhias e o metasearch de verdade, o que
                 leva alguns minutos e consome créditos — por isso ela só roda
-                quando você clicar em <strong>Buscar voos</strong> ali em cima.
+                quando você clicar em <strong className="font-semibold text-ink-700">Buscar voos</strong> ali em cima.
               </p>
             </div>
           ) : (
@@ -321,8 +329,8 @@ export default function App() {
             <div className="space-y-4">
               {loading ? (
                 <>
-                  <div className="flex items-center gap-2 text-sm font-medium text-slate-500">
-                    <Plane className="h-4 w-4 animate-pulse text-indigo-600" aria-hidden="true" />
+                  <div className="flex items-center gap-2 text-sm font-medium text-ink-500">
+                    <Plane className="h-4 w-4 animate-pulse text-gold-600" aria-hidden="true" />
                     {apiMode === 'real'
                       ? 'Busca real em andamento — o motor está raspando as companhias. Pode levar alguns minutos; acompanhe o progresso no terminal da API.'
                       : 'Buscando as melhores tarifas em mais de 30 parceiros…'}
@@ -336,16 +344,16 @@ export default function App() {
                 <>
                   <SortTabs topByKey={topByKey} active={sortKey} onChange={setSortKey} />
                   {sortedFlights.length === 0 ? (
-                    <div className="flex flex-col items-center rounded-2xl border border-slate-200 bg-white px-6 py-16 text-center shadow-sm">
-                      <span className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-slate-100">
-                        <SearchX className="h-7 w-7 text-slate-400" aria-hidden="true" />
+                    <div className="flex flex-col items-center rounded-2xl border border-ink-200 bg-white px-6 py-16 text-center shadow-card">
+                      <span className="mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-ink-100">
+                        <SearchX className="h-7 w-7 text-ink-400" aria-hidden="true" />
                       </span>
                       {engine !== null && results.length === 0 ? (
                         <>
-                          <h3 className="text-base font-bold text-slate-900">
+                          <h3 className="font-serif text-xl font-medium text-ink-900">
                             Nenhuma fonte respondeu com preço desta vez
                           </h3>
-                          <p className="mt-1 max-w-md text-sm text-slate-500">
+                          <p className="mt-2 max-w-md text-sm leading-relaxed text-ink-500">
                             Você não sai de mãos vazias: abra a busca já montada no
                             Google Flights, ou tente com origem internacional (GRU),
                             flexibilidade de datas, e veja o terminal da API.
@@ -355,7 +363,7 @@ export default function App() {
                               href={engine.lastResort.bookingUrl}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="mt-5 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition-colors hover:bg-indigo-700"
+                              className="mt-6 rounded-full bg-ink-900 px-6 py-3 text-sm font-semibold text-white shadow-lift transition-colors hover:bg-ink-800"
                             >
                               Abrir busca pronta no Google Flights
                             </a>
@@ -363,17 +371,17 @@ export default function App() {
                         </>
                       ) : (
                         <>
-                          <h3 className="text-base font-bold text-slate-900">
+                          <h3 className="font-serif text-xl font-medium text-ink-900">
                             Nenhum voo corresponde aos filtros
                           </h3>
-                          <p className="mt-1 max-w-sm text-sm text-slate-500">
+                          <p className="mt-2 max-w-sm text-sm leading-relaxed text-ink-500">
                             Tente ampliar o preço máximo ou incluir mais companhias e horários.
                           </p>
                           {filters && (
                             <button
                               type="button"
                               onClick={() => setFilters(buildDefaultFilters(results))}
-                              className="mt-5 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition-colors hover:bg-indigo-700"
+                              className="mt-6 rounded-full bg-ink-900 px-6 py-3 text-sm font-semibold text-white shadow-lift transition-colors hover:bg-ink-800"
                             >
                               Limpar filtros
                             </button>

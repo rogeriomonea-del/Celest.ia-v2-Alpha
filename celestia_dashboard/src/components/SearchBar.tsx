@@ -44,7 +44,8 @@ export function SearchBar({ initialParams, loading, onSearch }: SearchBarProps) 
   }
 
   return (
-    <div className="relative rounded-2xl border border-slate-200 bg-white p-4 pb-9 shadow-lg shadow-slate-900/10 sm:p-6 sm:pb-10">
+    <div className="relative rounded-2xl border border-ink-200/80 bg-white p-4 pb-9 shadow-lift sm:p-6 sm:pb-10">
+      <div aria-hidden="true" className="absolute inset-x-8 top-0 h-px rounded-full hairline-gold" />
       <div className="mb-4 flex flex-wrap gap-2">
         {(Object.keys(TRIP_TYPE_LABELS) as TripType[]).map((tripType) => (
           <button
@@ -54,8 +55,8 @@ export function SearchBar({ initialParams, loading, onSearch }: SearchBarProps) 
             onClick={() => setTripType(tripType)}
             className={`rounded-full px-4 py-1.5 text-sm font-semibold transition-colors ${
               draft.tripType === tripType
-                ? 'bg-indigo-600 text-white shadow-sm'
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                ? 'bg-ink-900 text-white shadow-card'
+                : 'bg-ink-100 text-ink-600 hover:bg-ink-200'
             }`}
           >
             {TRIP_TYPE_LABELS[tripType]}
@@ -128,9 +129,9 @@ export function SearchBar({ initialParams, loading, onSearch }: SearchBarProps) 
           type="button"
           disabled={disabled}
           onClick={() => onSearch(draft)}
-          className="inline-flex items-center gap-2 rounded-full bg-indigo-600 px-8 py-3 text-sm font-bold text-white shadow-lg shadow-indigo-600/30 transition-all hover:bg-indigo-700 hover:shadow-indigo-600/40 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none"
+          className="group inline-flex items-center gap-2 rounded-full bg-ink-900 px-8 py-3.5 text-sm font-semibold tracking-wide text-white shadow-lift ring-1 ring-inset ring-white/10 transition-all hover:bg-ink-800 disabled:cursor-not-allowed disabled:bg-ink-300 disabled:shadow-none disabled:ring-0"
         >
-          <Search className="h-4 w-4" aria-hidden="true" />
+          <Search className="h-4 w-4 text-gold-400 transition-transform group-hover:scale-110" aria-hidden="true" />
           {loading ? 'Buscando…' : 'Buscar voos'}
         </button>
       </div>

@@ -1,15 +1,19 @@
 import type { LucideIcon } from 'lucide-react'
 import type { ReactNode } from 'react'
 
-type BadgeTone = 'green' | 'red' | 'indigo' | 'amber' | 'slate' | 'emerald'
+type BadgeTone = 'gold' | 'pine' | 'red' | 'amber' | 'ink' | 'green' | 'indigo' | 'emerald' | 'slate'
 
 const TONE_CLASSES: Record<BadgeTone, string> = {
-  green: 'bg-green-50 text-green-700 ring-green-600/20',
+  gold: 'bg-gold-50 text-gold-700 ring-gold-600/25',
+  pine: 'bg-pine-50 text-pine-700 ring-pine-600/20',
   red: 'bg-red-50 text-red-700 ring-red-600/20',
-  indigo: 'bg-indigo-50 text-indigo-700 ring-indigo-600/20',
-  amber: 'bg-amber-50 text-amber-700 ring-amber-600/20',
-  slate: 'bg-slate-100 text-slate-600 ring-slate-500/20',
-  emerald: 'bg-emerald-50 text-emerald-700 ring-emerald-600/20',
+  amber: 'bg-amber-50 text-amber-700 ring-amber-600/25',
+  ink: 'bg-ink-100 text-ink-600 ring-ink-500/20',
+  // aliases mantidos por compatibilidade (cores remapeadas no tema)
+  green: 'bg-pine-50 text-pine-700 ring-pine-600/20',
+  indigo: 'bg-gold-50 text-gold-700 ring-gold-600/25',
+  emerald: 'bg-pine-50 text-pine-700 ring-pine-600/20',
+  slate: 'bg-ink-100 text-ink-600 ring-ink-500/20',
 }
 
 interface BadgeProps {

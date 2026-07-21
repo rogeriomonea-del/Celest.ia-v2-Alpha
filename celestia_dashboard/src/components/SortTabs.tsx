@@ -21,7 +21,7 @@ export function SortTabs({ topByKey, active, onChange }: SortTabsProps) {
     <div
       role="tablist"
       aria-label="Ordenar resultados"
-      className="grid grid-cols-3 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"
+      className="grid grid-cols-3 overflow-hidden rounded-xl border border-ink-200 bg-white shadow-card"
     >
       {TAB_ORDER.map((key) => {
         const isActive = key === active
@@ -35,18 +35,18 @@ export function SortTabs({ topByKey, active, onChange }: SortTabsProps) {
             onClick={() => onChange(key)}
             className={`border-b-2 px-3 py-3 text-left transition-colors sm:px-5 ${
               isActive
-                ? 'border-indigo-600 bg-indigo-50/50'
-                : 'border-transparent hover:bg-slate-50'
+                ? 'border-gold-500 bg-gold-50/60'
+                : 'border-transparent hover:bg-ink-50'
             }`}
           >
             <span
               className={`block text-sm font-bold ${
-                isActive ? 'text-indigo-700' : 'text-slate-700'
+                isActive ? 'text-ink-900' : 'text-ink-600'
               }`}
             >
               {TAB_LABELS[key]}
             </span>
-            <span className="mt-0.5 block truncate text-xs text-slate-500">
+            <span className="tnum mt-0.5 block truncate text-xs text-ink-500">
               {top ? `${formatBRL(top.price)} · ${formatDuration(top.durationMin)}` : '—'}
             </span>
           </button>

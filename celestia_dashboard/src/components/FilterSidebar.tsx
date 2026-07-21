@@ -79,14 +79,14 @@ export function FilterSidebar({ flights, filters, priceBounds, onChange }: Filte
     })
 
   return (
-    <aside className="space-y-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+    <aside className="space-y-6 rounded-2xl border border-ink-200 bg-white p-5 shadow-card">
       <div className="flex items-center justify-between">
-        <h2 className="text-base font-bold text-slate-900">Filtros</h2>
+        <h2 className="font-serif text-lg font-medium text-ink-900">Filtros</h2>
         {hasActiveFilters && (
           <button
             type="button"
             onClick={reset}
-            className="text-xs font-semibold text-indigo-600 transition-colors hover:text-indigo-800"
+            className="text-xs font-semibold text-gold-700 transition-colors hover:text-gold-800"
           >
             Limpar tudo
           </button>
