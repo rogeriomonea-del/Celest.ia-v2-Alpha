@@ -140,7 +140,16 @@ export async function searchFlights(params: SearchParams): Promise<EngineSearchR
       signal: controller.signal,
     })
     if (!response.ok) {
-      throw new Error(`API respondeu ${response.status}`)
+      // o motor manda o diagnóstico real no detail (ex.: "busca excedeu
+      // 300s — aumente API_SEARCH_TIMEOUT_S"); um 502/504 do proxy vem em
+      // HTML e cai no catch
+      let detail = ''
+      try {
+        detail = String(((await response.json()) as { detail?: unknown })?.detail ?? '')
+      } catch {
+        detail = ''
+      }
+      throw new Error(detail || `API respondeu ${response.status}`)
     }
     return (await response.json()) as EngineSearchResponse
   } finally {

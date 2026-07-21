@@ -117,3 +117,50 @@ def test_agent_log_records_subagent_lifecycle():
     assert "subagente iniciado" in log_text
     assert "subagente concluído" in log_text
     assert "pré-filtro" in log_text
+
+
+def _cm_offer(**kw):
+    from celestia_engine.models import FlightOffer, Source
+
+    base = dict(
+        carrier="CM", flight_numbers=("CM 702",), origin="GRU",
+        destination="PTY", depart=date(2026, 9, 10), cabin=Cabin.ECONOMY,
+        source=Source.COPA, raw={},
+    )
+    base.update(kw)
+    return FlightOffer(**base)
+
+
+def test_audit_merges_cash_and_miles_versions_of_same_flight():
+    # linha em dinheiro + linha em milhas do MESMO voo: mescla, não descarta —
+    # sem isto a estratégia FULL_MILES sumia do itinerário
+    orchestrator = Orchestrator(_settings())
+    cash = _cm_offer(price_cash_brl=1500.0, raw={"via": "scrape"})
+    miles = _cm_offer(price_miles=60000, miles_program="connectmiles",
+                      taxes_brl=180.0, raw={"via": "interact"})
+    clean = orchestrator._audit([cash, miles])
+    assert len(clean) == 1
+    merged = clean[0]
+    assert merged.price_cash_brl == 1500.0
+    assert merged.price_miles == 60000 and merged.miles_program == "connectmiles"
+    assert merged.raw["via"] == "scrape"          # a primeira vence no raw
+
+
+def test_audit_keeps_distinct_metasearch_flights_with_pair_placeholder():
+    # fallback "GRU-PTY" do gf2 (sem "?"): voos distintos não podem colapsar
+    orchestrator = Orchestrator(_settings())
+    a = _cm_offer(flight_numbers=("GRU-PTY",), price_cash_brl=1800.0,
+                  raw={"departure_time": "08:10", "indicative": True})
+    b = _cm_offer(flight_numbers=("GRU-PTY",), price_cash_brl=2100.0,
+                  raw={"departure_time": "22:40", "indicative": True})
+    clean = orchestrator._audit([a, b])
+    assert len(clean) == 2
+
+
+def test_sequential_searches_do_not_accumulate_stats_or_log():
+    orchestrator = Orchestrator(_settings())
+    first = asyncio.run(orchestrator.search(_request(flex_days=0)))
+    second = asyncio.run(orchestrator.search(_request(flex_days=0)))
+    assert second.stats.subagents_spawned == first.stats.subagents_spawned
+    # o log do segundo relatório não repete as linhas do primeiro
+    assert len(second.agent_log) <= len(first.agent_log) + 5

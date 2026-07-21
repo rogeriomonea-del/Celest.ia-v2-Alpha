@@ -97,6 +97,10 @@ class Orchestrator(Agent):
     # ---------------------------------------------------------------- search
     async def search(self, request: SearchRequest) -> SearchReport:
         started = time.monotonic()
+        # marcos por busca: reusar o mesmo Orchestrator para buscas seguidas
+        # não pode inflar stats nem repetir o log das anteriores no relatório
+        log_start = len(self.ctx.log_lines)
+        spawn_start = self.ctx.subagents_spawned
         stats = SearchStats()
         self.log(
             f"busca {request.origin}→{request.destination} {request.depart} "
@@ -137,7 +141,7 @@ class Orchestrator(Agent):
         if new_carriers:
             self.log(f"malha: companhia(s) nova(s) descoberta(s): {', '.join(new_carriers)}")
 
-        stats.subagents_spawned = self.ctx.subagents_spawned
+        stats.subagents_spawned = self.ctx.subagents_spawned - spawn_start
         stats.duration_seconds = round(time.monotonic() - started, 2)
         self.log(
             f"concluído em {stats.duration_seconds}s — {len(offers)} ofertas, "
@@ -149,12 +153,12 @@ class Orchestrator(Agent):
             offers=offers,
             options=options,
             stats=stats,
-            agent_log=list(self.ctx.log_lines),
+            agent_log=list(self.ctx.log_lines[log_start:]),
         )
         history_path = record_report(self.ctx.settings, report)
         if history_path:
             self.log(f"histórico gravado em {history_path}")
-            report.agent_log = list(self.ctx.log_lines)
+            report.agent_log = list(self.ctx.log_lines[log_start:])
         return report
 
     # ------------------------------------------------------------- internals
@@ -251,29 +255,59 @@ class Orchestrator(Agent):
             self.log(f"{failures} scrape(s) falharam — degradando para o pré-filtro")
         return offers
 
+    @staticmethod
+    def _merge_offer(kept: FlightOffer, dup: FlightOffer) -> None:
+        """Mesma chave de auditoria: a duplicata COMPLETA os campos ausentes
+        da mantida (ex.: linha em dinheiro + linha em milhas do mesmo voo,
+        ou scraped + metasearch) — informação obtida na busca não é jogada
+        fora. A primeira da lista (scraped) continua vencendo nos campos
+        já preenchidos."""
+        if kept.price_cash_brl is None and dup.price_cash_brl is not None:
+            kept.price_cash_brl = dup.price_cash_brl
+            kept.taxes_brl = kept.taxes_brl or dup.taxes_brl
+        if kept.price_miles is None and dup.price_miles is not None:
+            kept.price_miles = dup.price_miles
+            kept.miles_program = kept.miles_program or dup.miles_program
+        if kept.upgrade_miles is None:
+            kept.upgrade_miles = dup.upgrade_miles
+        if kept.upgrade_cash_brl is None:
+            kept.upgrade_cash_brl = dup.upgrade_cash_brl
+        if kept.seats_left is None:
+            kept.seats_left = dup.seats_left
+        for field, value in (dup.raw or {}).items():
+            kept.raw.setdefault(field, value)
+
     def _audit(self, offers: list[FlightOffer]) -> list[FlightOffer]:
-        seen: set[str] = set()
-        clean: list[FlightOffer] = []
+        seen: dict[str, FlightOffer] = {}
+        order: list[str] = []
+        dropped = 0
         for offer in offers:
             key = f"{offer.itinerary_key()}:{offer.cabin.value}"
             numbers = "/".join(offer.flight_numbers)
-            if not numbers or "?" in numbers:
+            pair = f"{offer.origin}-{offer.destination}"
+            if not numbers or "?" in numbers or numbers == pair:
                 # sem número de voo real o itinerary_key é um placeholder
-                # idêntico para voos distintos: discrimina por horário+preço
+                # idêntico para voos distintos ("CM ?" ou o fallback "GRU-MCO"
+                # do metasearch): discrimina por horário+preço
                 raw = offer.raw or {}
                 key += (
                     f":{raw.get('departure_time') or ''}"
                     f":{offer.price_cash_brl or ''}:{offer.price_miles or ''}"
                 )
-            if key in seen:
-                continue
             cash_ok = offer.price_cash_brl is None or offer.price_cash_brl > 0
             miles_ok = offer.price_miles is None or offer.price_miles > 0
             if not (cash_ok and miles_ok):
+                dropped += 1
                 continue
-            seen.add(key)
-            clean.append(offer)
+            kept = seen.get(key)
+            if kept is not None:
+                self._merge_offer(kept, offer)
+                dropped += 1
+                continue
+            seen[key] = offer
+            order.append(key)
+        clean = [seen[key] for key in order]
         clean.sort(key=lambda o: (o.price_cash_brl if o.price_cash_brl is not None else 9e12))
-        if len(clean) != len(offers):
-            self.log(f"auditoria: {len(offers) - len(clean)} oferta(s) removida(s)")
+        if dropped:
+            self.log(f"auditoria: {dropped} oferta(s) mesclada(s)/removida(s)")
         return clean

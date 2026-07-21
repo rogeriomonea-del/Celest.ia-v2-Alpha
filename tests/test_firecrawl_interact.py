@@ -161,3 +161,34 @@ def test_calendar_parses_formatted_prices():
         usd_brl_rate=5.0,
     )
     assert len(out) == 1 and out[0].price_brl == 1562.0
+
+
+def test_truncated_json_salvages_complete_offers():
+    # saída cortada pelo limite de tokens: o objeto externo nunca fecha,
+    # mas as ofertas completas internas são recuperadas
+    from celestia_engine.models import Route
+    from celestia_engine.providers.firecrawl_interact import parse_interact_output
+
+    text = (
+        '{"offers":[{"airline":"COPA","airline_iata":"CM","flight_numbers":["CM 702"],'
+        '"cabin":"economy","price":1226,"currency":"USD"},'
+        '{"airline":"COPA","airline_iata":"CM","flight_numbers":["CM 480"],'
+        '"cabin":"business","price":3400,"currency":"USD"},'
+        '{"airline":"COPA","flight_numbers":["CM 9'
+    )
+    offers = parse_interact_output(
+        text, carrier="CM", program="connectmiles",
+        route=Route("GRU", "PTY", "CM"), depart=DEPART,
+        source=Source.COPA, usd_brl_rate=5.0,
+    )
+    assert len(offers) == 2
+    assert {o.flight_numbers[0] for o in offers} == {"CM 702", "CM 480"}
+
+
+def test_truncated_calendar_salvages_complete_dates():
+    from celestia_engine.providers.firecrawl_interact import parse_calendar_output
+
+    text = ('{"calendar":[{"date":"2026-09-20","price":1562},'
+            '{"date":"2026-09-21","price":1710},{"date":"2026-09-2')
+    out = parse_calendar_output(text, usd_brl_rate=5.0)
+    assert [str(p.date) for p in out] == ["2026-09-20", "2026-09-21"]

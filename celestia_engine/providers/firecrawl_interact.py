@@ -160,7 +160,10 @@ def _parse_cal_date(raw: str):
 def parse_calendar_output(text: str, *, usd_brl_rate: float) -> list[DatePrice]:
     obj = _find_json(text, key="calendar")
     if not obj:
-        return []
+        salvaged = _salvage_items(text, "calendar")
+        if not salvaged:
+            return []
+        obj = {"calendar": salvaged}
     out: list[DatePrice] = []
     for item in obj.get("calendar") or []:
         if not isinstance(item, dict):
@@ -176,15 +179,11 @@ def parse_calendar_output(text: str, *, usd_brl_rate: float) -> list[DatePrice]:
     return out
 
 
-def _find_json(text: str, key: str = "offers") -> dict | None:
-    """Extrai o primeiro objeto JSON que contém `key` (tolera cercas ```)."""
-    fenced = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.DOTALL)
-    candidates = []
-    if fenced:
-        candidates.append(fenced.group(1))
-    # primeiro { ... } balanceado por varredura
+def _balanced_objects(text: str, limit: int = 40):
+    """Gera cada trecho ``{...}`` balanceado do texto (inclusive aninhados)."""
     start = text.find("{")
-    while start != -1:
+    found = 0
+    while start != -1 and found < limit:
         depth = 0
         for i in range(start, len(text)):
             if text[i] == "{":
@@ -192,11 +191,19 @@ def _find_json(text: str, key: str = "offers") -> dict | None:
             elif text[i] == "}":
                 depth -= 1
                 if depth == 0:
-                    candidates.append(text[start : i + 1])
+                    yield text[start : i + 1]
+                    found += 1
                     break
         start = text.find("{", start + 1)
-        if len(candidates) > 6:
-            break
+
+
+def _find_json(text: str, key: str = "offers") -> dict | None:
+    """Extrai o primeiro objeto JSON que contém `key` (tolera cercas ```)."""
+    fenced = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.DOTALL)
+    candidates = []
+    if fenced:
+        candidates.append(fenced.group(1))
+    candidates.extend(_balanced_objects(text, limit=7))
     for candidate in candidates:
         try:
             obj = json.loads(candidate)
@@ -205,6 +212,26 @@ def _find_json(text: str, key: str = "offers") -> dict | None:
         except (ValueError, TypeError):
             continue
     return None
+
+
+def _salvage_items(text: str, kind: str) -> list[dict]:
+    """JSON cortado no meio (limite de tokens): o objeto externo nunca fecha,
+    mas os itens COMPLETOS internos são recuperáveis — sem isto a estratégia
+    seria punida como falha mesmo tendo entregado dados."""
+    items: list[dict] = []
+    for candidate in _balanced_objects(text):
+        try:
+            obj = json.loads(candidate)
+        except (ValueError, TypeError):
+            continue
+        if not isinstance(obj, dict) or kind in obj:
+            continue
+        if kind == "offers":
+            if "price" in obj or "price_miles" in obj or "airline" in obj:
+                items.append(obj)
+        elif "date" in obj and "price" in obj:
+            items.append(obj)
+    return items
 
 
 def _parse_duration(value) -> int:
@@ -341,7 +368,10 @@ def parse_interact_output(
     """
     obj = _find_json(text)
     if not obj:
-        return []
+        salvaged = _salvage_items(text, "offers")
+        if not salvaged:
+            return []
+        obj = {"offers": salvaged}
     offers: list[FlightOffer] = []
     for item in obj.get("offers") or []:
         if not isinstance(item, dict):

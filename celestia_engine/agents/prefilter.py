@@ -40,8 +40,12 @@ class PriceScoutAgent(Agent):
         companhia. Por isso as chamadas pagas são deduplicadas por par e o
         resultado é replicado para cada rota candidata daquele par.
         """
-        self.metasearch_offers = []
-        sources = self._sources()
+        # lista LOCAL capturada pelos closures das fontes: buscas concorrentes
+        # no mesmo agente não se contaminam (o atributo é só o snapshot da
+        # última chamada, lido pelo orquestrador logo após o prefilter)
+        collected: list[FlightOffer] = []
+        self.metasearch_offers = collected
+        sources = self._sources(collected)
         if not sources:
             self.log("nenhuma fonte de pré-filtro configurada — sem shortlist")
             return {}
@@ -129,12 +133,12 @@ class PriceScoutAgent(Agent):
             error=error,
         )
 
-    def _sources(self):
+    def _sources(self, collected: list[FlightOffer]):
         settings = self.ctx.settings
         sources = []
         if settings.mock_mode:
             async def mock_fetch(route: Route, depart: date, cabin: Cabin):
-                self.metasearch_offers.extend(
+                collected.extend(
                     mock_metasearch_offers(route, depart, cabin,
                                            n=min(3, settings.metasearch_top_n))
                 )
@@ -151,7 +155,7 @@ class PriceScoutAgent(Agent):
                 quotes, offers = await google_flights2.quote_rich(
                     settings, route, depart, cabin, top_n=settings.metasearch_top_n
                 )
-                self.metasearch_offers.extend(offers)
+                collected.extend(offers)
                 return quotes
 
             sources.append(("google_flights2", gf2_fetch))

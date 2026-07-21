@@ -19,6 +19,7 @@ O front em dev (``npm run dev``) já tem proxy de ``/api`` para a porta 8000.
 from __future__ import annotations
 
 import hashlib
+import re
 from datetime import date
 
 from fastapi import FastAPI, HTTPException
@@ -122,38 +123,65 @@ def _to_request(body: SearchIn) -> SearchRequest:
 
 
 # --------------------------------------------------------------- serialization
+def _parse_clock(value) -> tuple[int, int] | None:
+    """"8:05 PM"/"20:05"/"08:05" → (hora, minuto) em 24h; None se não for
+    horário. Os scrapers gravam o que o site exibe — a Copa mostra 12h AM/PM."""
+    match = re.search(r"(\d{1,2}):(\d{2})(?:\s*(AM|PM))?", str(value or ""), re.IGNORECASE)
+    if not match:
+        return None
+    hour, minute = int(match.group(1)), int(match.group(2))
+    meridian = (match.group(3) or "").upper()
+    if meridian == "PM" and hour < 12:
+        hour += 12
+    if meridian == "AM" and hour == 12:
+        hour = 0
+    if hour > 23 or minute > 59:
+        return None
+    return hour, minute
+
+
 def _schedule_of(offer: FlightOffer) -> dict:
-    """Horários reais quando o scraper os capturou; senão, estimativa
-    determinística (marcada como ``estimated``) só para a UI ter o que exibir."""
+    """Horários reais quando o scraper os capturou (normalizados para 24h);
+    senão, estimativa determinística marcada como ``estimated``."""
     raw = offer.raw or {}
-    departure = str(raw.get("departure_time") or "").strip()
+    dep = _parse_clock(raw.get("departure_time"))
+    arr = _parse_clock(raw.get("arrival_time"))
     duration = int(raw.get("duration_min") or 0)
+    day_offset = raw.get("arrival_day_offset")
     estimated = False
 
     seed = int(hashlib.sha256(offer.itinerary_key().encode()).hexdigest()[:6], 16)
-    if not departure or ":" not in departure:
-        departure = f"{5 + seed % 17:02d}:{(seed % 4) * 15:02d}"
+    dep_real = dep is not None
+    if dep is None:
+        dep = (5 + seed % 17, (seed % 4) * 15)
         estimated = True
+    dep_min = dep[0] * 60 + dep[1]
+
+    if duration <= 0 and dep_real and arr is not None:
+        # partida e chegada reais permitem calcular a duração de verdade
+        arr_min = arr[0] * 60 + arr[1]
+        offset = int(day_offset or 0)
+        if offset <= 0 and arr_min <= dep_min:
+            offset = 1  # overnight sem offset declarado
+        duration = arr_min - dep_min + offset * 1440
+        day_offset = offset
     if duration <= 0:
         duration = 150 + seed % 480  # 2h30–10h30
         if raw.get("route_via"):
             duration += 95  # conexão planejada soma a parada
         estimated = True
 
-    try:
-        dep_h, dep_m = (int(part) for part in departure.split(":")[:2])
-    except ValueError:
-        dep_h, dep_m = 8, 0
-        estimated = True
-    total = dep_h * 60 + dep_m + duration
-    arrival = str(raw.get("arrival_time") or "").strip()
-    day_offset = raw.get("arrival_day_offset")
-    if not arrival or ":" not in arrival:
-        arrival = f"{(total // 60) % 24:02d}:{total % 60:02d}"
-        day_offset = total // (24 * 60)
+    total = dep_min + duration
+    if arr is None:
+        arr = ((total // 60) % 24, total % 60)
+        day_offset = total // 1440
+    elif day_offset is None:
+        # chegada real sem offset declarado: deriva da duração exibida no
+        # próprio card — voo noturno não pode chegar "no mesmo dia"
+        day_offset = total // 1440
     return {
-        "departureTime": f"{dep_h:02d}:{dep_m:02d}",
-        "arrivalTime": arrival,
+        "departureTime": f"{dep[0]:02d}:{dep[1]:02d}",
+        "arrivalTime": f"{arr[0]:02d}:{arr[1]:02d}",
         "arrivalDayOffset": int(day_offset or 0),
         "durationMin": duration,
         "scheduleEstimated": estimated,
@@ -329,14 +357,19 @@ def _report_json(report: SearchReport, settings: Settings) -> dict:
     request = report.request
     milheiro = settings.milheiro_for(request.program)
     flights = [_flight_json(offer, settings, milheiro) for offer in report.offers]
-    if not flights and report.quotes:
-        # scraping vazio mas o pré-filtro cotou: mostra as tarifas indicativas
-        flights = [
+
+    def _has_cash(cards: list[dict]) -> bool:
+        return any((card.get("priceBrl") or 0) > 0 for card in cards)
+
+    # a escada olha "existe voo com preço em dinheiro EXIBÍVEL", não só a
+    # presença de ofertas: um resultado 100% só-milhas não pode zerar a tela
+    if not _has_cash(flights) and report.quotes:
+        flights = flights + [
             _indicative_flight_json(quote, settings, milheiro)
             for quote in report.quotes[:12]
         ]
     last_resort = None
-    if not flights:
+    if not _has_cash(flights):
         last_resort = {
             "bookingUrl": google_flights_url(
                 request.origin, request.destination, request.depart
