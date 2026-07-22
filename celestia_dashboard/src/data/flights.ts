@@ -1,5 +1,5 @@
 import { findAirport } from './airports'
-import type { Airline, Flight, FlightStop, FlightTag } from '../types'
+import type { Airline, CabinClass, Flight, FlightStop, FlightTag } from '../types'
 
 export const AIRLINES: Record<string, Airline> = {
   LA: { code: 'LA', name: 'LATAM Airlines', logoGradient: 'from-rose-600 to-red-800' },
@@ -306,24 +306,52 @@ function resolveStops(
  * search API would return: the same inventory templates re-keyed to the
  * searched origin/destination pair.
  */
-export function buildFlights(originCode: string, destinationCode: string): Flight[] {
-  return TEMPLATES.map((template, index) => ({
-    id: `${template.airline}-${template.flightNumber.replace(/\s/g, '')}-${index}`,
-    airline: AIRLINES[template.airline],
-    flightNumber: template.flightNumber,
-    departure: { time: template.departureTime, airportCode: originCode },
-    arrival: {
-      time: template.arrivalTime,
-      airportCode: destinationCode,
-      dayOffset: template.arrivalDayOffset,
-    },
-    durationMin: template.durationMin,
-    stops: resolveStops(template.stops, originCode, destinationCode),
-    price: template.price,
-    currency: 'BRL',
-    seatsLeft: template.seatsLeft,
-    tags: template.tags,
-    baggage: template.baggage,
-    emissions: template.emissions,
-  }))
+export function buildFlights(
+  originCode: string,
+  destinationCode: string,
+  cabin: CabinClass = 'economy',
+): Flight[] {
+  const cabinMultiplier: Record<CabinClass, number> = {
+    economy: 1,
+    premium: 1.55,
+    business: 2.8,
+  }
+
+  return TEMPLATES.map((template, index) => {
+    const price = Math.round(template.price * cabinMultiplier[cabin])
+    return {
+      id: `${template.airline}-${template.flightNumber.replace(/\s/g, '')}-${index}`,
+      airline: AIRLINES[template.airline],
+      flightNumber: template.flightNumber,
+      cabin,
+      travelDate: '',
+      departure: { time: template.departureTime, airportCode: originCode },
+      arrival: {
+        time: template.arrivalTime,
+        airportCode: destinationCode,
+        dayOffset: template.arrivalDayOffset,
+      },
+      durationMin: template.durationMin,
+      stops: resolveStops(template.stops, originCode, destinationCode),
+      price,
+      currency: 'BRL' as const,
+      taxesBrl: 0,
+      priceMiles: null,
+      milesProgram: null,
+      seatsLeft: template.seatsLeft,
+      tags: template.tags,
+      baggage: template.baggage,
+      emissions: template.emissions,
+      strategy: null,
+      fareBrand: null,
+      aircraft: null,
+      scheduleEstimated: false,
+      indicative: false,
+      sourceCode: 'mock',
+      sourceLabel: 'Demonstração',
+      bookingUrl: null,
+      // Referência de demonstração: R$ 25 por milheiro.
+      milesEquivalent: price * 40,
+    }
+  })
 }

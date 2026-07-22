@@ -1,52 +1,54 @@
-# celest.ia · Busca de Voos
+# celest.ia · Travel Intelligence
 
-Plataforma de busca de voos de nível de produção (estilo Kayak / Skyscanner /
-Google Flights), construída com **React + TypeScript**, **Tailwind CSS** e
-**Lucide React**.
+Frontend de produção da plataforma celest.ia, construído com React 18,
+TypeScript estrito, Tailwind CSS e Vite. A experiência visual segue a direção
+**Nebula Cartography**: cartografia orbital, tipografia editorial e superfícies
+de concierge premium.
 
-## Destaques
+## Comportamento da API
 
-- **Hero de busca** com gradiente, typeahead de aeroportos (códigos IATA),
-  `DateRangePicker` customizado com dois meses e seleção de intervalo, e
-  popover de passageiros (adultos / crianças / bebês + classe de cabine).
-- **Listagem profissional**: abas de ordenação "Melhor · Mais barato · Mais
-  rápido" com resumo de preço/duração, cartões de voo em grid de 3 colunas
-  (companhia + horários · duração + linha de escalas · preço + CTA), badges de
-  urgência ("Voo direto", "Poucos lugares") e detalhes expansíveis.
-- **Sidebar de filtros funcional**: escalas, preço máximo, horário de partida
-  e companhias — com contagens e menor preço por opção.
-- **Estados realistas**: skeleton loaders pulsantes durante a busca, estado
-  vazio com reset de filtros e dados mock em BRL.
+- `GET /api/status` define o modo `real`, `mock` ou `off` no carregamento.
+- Em modo real, nenhuma busca é iniciada automaticamente.
+- `POST /api/search` só é disparado após a confirmação do usuário no modo real.
+- Em modo `off`, o frontend usa demonstração local sem aguardar o timeout longo
+  da busca e sem misturar fixtures a falhas do motor real.
+- `src/api.ts` é a única camada que conhece os tipos `Engine*`; componentes usam
+  somente os modelos de apresentação de `src/types.ts`.
+- `VITE_API_URL` define a base do motor. Vazio usa a mesma origem; em
+  desenvolvimento, o Vite encaminha `/api/*` para `127.0.0.1:8000`.
 
 ## Como rodar
 
 ```bash
-npm install
-npm run dev        # servidor de desenvolvimento (Vite)
-npm run build      # typecheck + build de produção
-npm run preview    # serve o build de produção
+npm ci
+npm run dev
+npm run build
+npm run preview
 ```
+
+`npm run build` executa o TypeScript estrito antes de gerar `dist/`.
+
+## Recursos principais
+
+- autocomplete IATA com navegação por teclado;
+- calendário ida/volta e janela flexível por presets ou período personalizado;
+- passageiros, cabine e busca responsiva;
+- ordenação por melhor, menor preço e menor duração;
+- filtros de escalas, preço, horário e companhia, com drawer móvel;
+- estratégias de dinheiro, milhas e upgrade com custo efetivo e notas;
+- tarifas indicativas e horários estimados rotulados explicitamente;
+- estados idle, loading, demo, erro real, vazio, filtros vazios e último recurso;
+- fontes Fraunces e Inter self-hosted via `@fontsource`, sem CDN em runtime.
 
 ## Estrutura
 
 ```text
 src/
-├── App.tsx                    # composição da página + estado de busca/filtros
-├── components/
-│   ├── SearchBar.tsx          # hero search (origem/destino/datas/passageiros)
-│   ├── AirportInput.tsx       # typeahead com códigos IATA e navegação por teclado
-│   ├── DateRangePicker.tsx    # calendário duplo com seleção de intervalo
-│   ├── PassengerSelector.tsx  # popover com steppers e classe de cabine
-│   ├── SortTabs.tsx           # Melhor / Mais barato / Mais rápido
-│   ├── FlightCard.tsx         # cartão de voo com badges e detalhes expansíveis
-│   ├── FilterSidebar.tsx      # filtros de escalas, preço, horário e companhias
-│   ├── Skeletons.tsx          # loaders de percepção de velocidade
-│   ├── AirlineLogo.tsx        # logo placeholder com gradiente por companhia
-│   ├── Badge.tsx              # etiquetas (verde/vermelho/índigo/âmbar)
-│   ├── Header.tsx / Footer.tsx
-├── data/
-│   ├── airports.ts            # base de aeroportos (IATA)
-│   └── flights.ts             # inventário mock realista (preços em BRL)
-├── hooks/useClickOutside.ts
-└── utils/                     # formatação BRL/datas, filtros e ordenação
+├── api.ts                 # contrato Engine* + POST/sonda + mapeadores de UI
+├── types.ts               # modelos usados pelos componentes
+├── App.tsx                # fluxo de estado e composição da experiência
+├── components/            # busca, cartografia, cards, filtros e estratégias
+├── data/                  # aeroportos e demonstração local
+├── hooks/                 # comportamento compartilhado de popovers
+└── utils/                 # datas, formatação, filtros e ordenação
 ```

@@ -40,13 +40,13 @@ export function MonthGrid({
   const previewEnd = endDate ?? (startDate && hoverDate && hoverDate > startDate ? hoverDate : null)
 
   return (
-    <div className="w-full sm:w-64">
-      <p className="mb-2 text-center text-sm font-semibold text-slate-900">
+    <div className="min-w-0 w-full sm:w-64">
+      <p className="mb-2 text-center text-sm font-semibold text-ink-900">
         {formatMonthYear(viewDate)}
       </p>
-      <div className="grid grid-cols-7 gap-y-1 text-center">
+      <div className="grid grid-cols-7 gap-0.5 text-center">
         {WEEKDAYS.map((weekday, index) => (
-          <span key={index} className="pb-1 text-xs font-medium text-slate-500">
+          <span key={index} className="pb-1 text-xs font-semibold text-ink-500">
             <span aria-hidden="true">{weekday.short}</span>
             <span className="sr-only">{weekday.full}</span>
           </span>
@@ -70,16 +70,16 @@ export function MonthGrid({
               onClick={() => onSelect(date)}
               onMouseEnter={() => onHover(date)}
               onMouseLeave={() => onHover(null)}
-              className={`mx-auto flex h-9 w-9 items-center justify-center rounded-full text-sm transition-colors ${
+              className={`mx-auto flex h-10 w-full max-w-10 items-center justify-center rounded-full text-sm transition-colors ${
                 disabled
-                  ? 'cursor-not-allowed text-slate-300'
+                  ? 'cursor-not-allowed text-ink-300'
                   : isStart || isEnd
-                    ? 'bg-indigo-600 font-bold text-white shadow-sm'
+                    ? 'bg-space-900 font-bold text-white shadow-sm'
                     : isPreviewEnd
-                      ? 'bg-indigo-100 font-semibold text-indigo-700'
+                      ? 'bg-aqua-100 font-semibold text-aqua-800'
                       : inRange
-                        ? 'rounded-none bg-indigo-50 text-indigo-700'
-                        : 'text-slate-700 hover:bg-slate-100'
+                        ? 'rounded-none bg-aqua-50 text-aqua-800'
+                        : 'text-ink-700 hover:bg-ink-100'
               }`}
             >
               {date.getDate()}

@@ -163,6 +163,23 @@ class Settings:
     #: acharam. 0 = sem teto.
     subagent_timeout_s: int = 240
 
+    # --- Multidestinos (jornadas de 2..N trechos independentes) -----------
+    #: máximo de trechos por jornada (o contrato aceita 2..multicity_max_legs)
+    multicity_max_legs: int = 6
+    #: trechos pesquisados em paralelo (o semáforo de subagentes é GLOBAL)
+    multicity_max_concurrent_legs: int = 2
+    #: orçamento GLOBAL de scrapes da jornada, distribuído entre os trechos
+    multicity_max_scrapes: int = 24
+    #: escolhas (opções de compra) retidas por trecho para o beam search
+    multicity_top_choices_per_leg: int = 5
+    #: combinações de jornada retornadas no máximo
+    multicity_max_itineraries: int = 20
+    #: teto GLOBAL da jornada (s); cada trecho ainda respeita api_search_timeout_s
+    multicity_search_timeout_s: float = 600.0
+    #: teto duro de candidatos raspados numa busca (0 = sem teto). Usado pelo
+    #: multidestinos para o caminho SEM pré-filtro também respeitar o orçamento.
+    scrape_hard_cap: int = 0
+
     # --- Orchestrator knobs ---
     prefilter_top_k: int = 8       # candidates that survive the price pre-filter
     max_subagents: int = 8         # concurrent scraper subagents
@@ -243,6 +260,20 @@ def load_settings() -> Settings:
         scraper_headless=_env("SCRAPER_HEADLESS", "1") not in {"0", "false", "no"},
         scraper_timeout_ms=_env_int("SCRAPER_TIMEOUT_MS", 45_000),
         subagent_timeout_s=_env_int("SUBAGENT_TIMEOUT_S", Settings.subagent_timeout_s),
+        multicity_max_legs=_env_int("MULTICITY_MAX_LEGS", Settings.multicity_max_legs),
+        multicity_max_concurrent_legs=_env_int(
+            "MULTICITY_MAX_CONCURRENT_LEGS", Settings.multicity_max_concurrent_legs
+        ),
+        multicity_max_scrapes=_env_int("MULTICITY_MAX_SCRAPES", Settings.multicity_max_scrapes),
+        multicity_top_choices_per_leg=_env_int(
+            "MULTICITY_TOP_CHOICES_PER_LEG", Settings.multicity_top_choices_per_leg
+        ),
+        multicity_max_itineraries=_env_int(
+            "MULTICITY_MAX_ITINERARIES", Settings.multicity_max_itineraries
+        ),
+        multicity_search_timeout_s=_env_float(
+            "MULTICITY_SEARCH_TIMEOUT_S", Settings.multicity_search_timeout_s
+        ),
         prefilter_top_k=_env_int("PREFILTER_TOP_K", 8),
         max_subagents=_env_int("MAX_SUBAGENTS", 8),
         metasearch_top_n=_env_int("METASEARCH_TOP_N", 8),

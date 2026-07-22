@@ -22,7 +22,7 @@ import hashlib
 import re
 from datetime import date
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, field_validator
 
@@ -78,7 +78,7 @@ class SearchIn(BaseModel):
     @classmethod
     def _iata(cls, value: str) -> str:
         code = value.strip().upper()
-        if len(code) != 3 or not code.isalpha():
+        if len(code) != 3 or not (code.isascii() and code.isalpha()):
             raise ValueError("informe um código IATA de 3 letras (ex.: GRU)")
         return code
 
@@ -88,6 +88,141 @@ class SearchIn(BaseModel):
         if value not in {c.value for c in Cabin}:
             raise ValueError("cabin deve ser economy, premium ou business")
         return value
+
+
+class MultiCityLegIn(BaseModel):
+    """Um trecho da jornada multidestinos. Campos desconhecidos são rejeitados."""
+
+    origin: str
+    destination: str
+    depart: str  # YYYY-MM-DD
+    flexibility: FlexibilityIn | None = None
+
+    model_config = {"populate_by_name": True, "extra": "forbid"}
+
+
+class MultiCitySearchIn(BaseModel):
+    """Requisição de POST /api/search/multi-city (estrita: extra=forbid).
+
+    Não aceita ``returnDate``: cada data pertence explicitamente a um trecho."""
+
+    legs: list[MultiCityLegIn]
+    cabin: str = "economy"
+    passengers: int = Field(default=1, ge=1, le=9)
+    miles_balance: int = Field(default=0, alias="milesBalance", ge=0)
+    program: str = "connectmiles"
+    flex_max_dates: int = Field(default=3, alias="flexMaxDates", ge=1, le=5)
+
+    model_config = {"populate_by_name": True, "extra": "forbid"}
+
+    @field_validator("cabin")
+    @classmethod
+    def _cabin_known(cls, value: str) -> str:
+        if value not in {c.value for c in Cabin}:
+            raise ValueError("cabin deve ser economy, premium ou business")
+        return value
+
+
+def _multicity_error(code: str, message: str) -> HTTPException:
+    """422 com código estável e mensagem sanitizada (sem stack/URLs cruas)."""
+    return HTTPException(422, detail={"code": code, "message": message})
+
+
+def _validate_multi_city(
+    body: MultiCitySearchIn, settings: Settings
+) -> list[SearchRequest]:
+    max_legs = max(2, settings.multicity_max_legs)
+    if not (2 <= len(body.legs) <= max_legs):
+        raise _multicity_error(
+            "INVALID_LEG_COUNT",
+            f"a jornada deve ter entre 2 e {max_legs} trechos "
+            f"(recebeu {len(body.legs)})",
+        )
+
+    requests: list[SearchRequest] = []
+    seen: set[tuple[str, str, str]] = set()
+    previous_depart: date | None = None
+    for index, leg in enumerate(body.legs, start=1):
+        origin = leg.origin.strip().upper()
+        destination = leg.destination.strip().upper()
+        for code in (origin, destination):
+            if len(code) != 3 or not (code.isascii() and code.isalpha()):
+                raise _multicity_error(
+                    "INVALID_IATA",
+                    f"trecho {index}: código IATA inválido ({code!r}) — "
+                    "use 3 letras (ex.: GRU)",
+                )
+        if origin == destination:
+            raise _multicity_error(
+                "SAME_AIRPORT",
+                f"trecho {index}: origem e destino não podem ser iguais "
+                f"({origin})",
+            )
+        try:
+            depart = date.fromisoformat(leg.depart)
+        except ValueError:
+            raise _multicity_error(
+                "DATES_OUT_OF_ORDER",
+                f"trecho {index}: data inválida ({leg.depart!r}) — use YYYY-MM-DD",
+            ) from None
+        if previous_depart is not None and depart <= previous_depart:
+            raise _multicity_error(
+                "DATES_OUT_OF_ORDER",
+                f"trecho {index}: as datas devem ser estritamente crescentes "
+                f"({depart.isoformat()} ≤ {previous_depart.isoformat()})",
+            )
+        previous_depart = depart
+
+        key = (origin, destination, depart.isoformat())
+        if key in seen:
+            raise _multicity_error(
+                "DUPLICATE_LEG",
+                f"trecho {index}: {origin}→{destination} em {depart.isoformat()} "
+                "está duplicado na jornada",
+            )
+        seen.add(key)
+
+        flexibility = None
+        if leg.flexibility and leg.flexibility.enabled:
+            flex = leg.flexibility
+            if flex.preset == "custom" and not (flex.window_start and flex.window_end):
+                raise _multicity_error(
+                    "DATES_OUT_OF_ORDER",
+                    f"trecho {index}: flexibilidade custom exige windowStart e "
+                    "windowEnd completos",
+                )
+            window_start = (
+                _parse_iso(flex.window_start, "windowStart") if flex.window_start else None
+            )
+            window_end = (
+                _parse_iso(flex.window_end, "windowEnd") if flex.window_end else None
+            )
+            if window_start and window_end and window_start > window_end:
+                raise _multicity_error(
+                    "DATES_OUT_OF_ORDER",
+                    f"trecho {index}: windowStart deve ser ≤ windowEnd",
+                )
+            flexibility = Flexibility(
+                enabled=True,
+                preset=flex.preset,
+                window_start=window_start,
+                window_end=window_end,
+            )
+
+        requests.append(
+            SearchRequest(
+                origin=origin,
+                destination=destination,
+                depart=depart,
+                cabin_target=Cabin(body.cabin),
+                passengers=body.passengers,
+                flexibility=flexibility,
+                flex_max_dates=body.flex_max_dates,
+                miles_balance=body.miles_balance,
+                program=body.program.lower().strip() or "connectmiles",
+            )
+        )
+    return requests
 
 
 def _parse_iso(value: str, field: str) -> date:
@@ -203,7 +338,7 @@ def _stops_of(offer: FlightOffer) -> list[dict]:
     return []
 
 
-def _booking_url(offer: FlightOffer, settings: Settings) -> str:
+def _booking_url(offer: FlightOffer, settings: Settings, adults: int = 1) -> str:
     """Link do botão "Ver oferta": o capturado pelo scraper, senão o deep-link
     da companhia (registro da malha), senão a busca no Google Flights."""
     raw_url = str((offer.raw or {}).get("booking_url") or "").strip()
@@ -216,6 +351,7 @@ def _booking_url(offer: FlightOffer, settings: Settings) -> str:
         destination=offer.destination,
         depart=offer.depart,
         cabin=offer.cabin.value,
+        adults=max(1, adults),
     )
 
 
@@ -243,7 +379,7 @@ def _airline_label(offer: FlightOffer, settings: Settings) -> str:
     return ""
 
 
-def _flight_json(offer: FlightOffer, settings: Settings, milheiro: float) -> dict:
+def _flight_json(offer: FlightOffer, settings: Settings, milheiro: float, adults: int = 1) -> dict:
     raw = offer.raw or {}
     return {
         "id": offer.itinerary_key() + f":{offer.cabin.value}",
@@ -266,7 +402,7 @@ def _flight_json(offer: FlightOffer, settings: Settings, milheiro: float) -> dic
         "stops": _stops_of(offer),
         **_schedule_of(offer),
         "indicative": bool(raw.get("indicative")),
-        "bookingUrl": _booking_url(offer, settings),
+        "bookingUrl": _booking_url(offer, settings, adults),
         "milesEquivalent": _miles_equivalent(offer.price_cash_brl, milheiro),
     }
 
@@ -356,7 +492,8 @@ def _report_json(report: SearchReport, settings: Settings) -> dict:
     stats = report.stats
     request = report.request
     milheiro = settings.milheiro_for(request.program)
-    flights = [_flight_json(offer, settings, milheiro) for offer in report.offers]
+    adults = max(1, getattr(request, 'passengers', 1))
+    flights = [_flight_json(offer, settings, milheiro, adults) for offer in report.offers]
 
     def _has_cash(cards: list[dict]) -> bool:
         return any((card.get("priceBrl") or 0) > 0 for card in cards)
@@ -401,6 +538,130 @@ def _report_json(report: SearchReport, settings: Settings) -> dict:
     }
 
 
+# ------------------------------------------------- multidestinos: serialização
+def _empty_leg_payload(settings: Settings, outcome) -> dict:
+    """Trecho sem relatório (falha/timeout): resposta no MESMO shape do
+    EngineSearchResponse, com a escada garantindo o lastResort do trecho."""
+    request = outcome.request
+    return {
+        "mode": "mock" if settings.mock_mode else "real",
+        "flights": [],
+        "lastResort": {
+            "bookingUrl": google_flights_url(
+                request.origin, request.destination, request.depart
+            ),
+            "reason": outcome.error_message or "o trecho não retornou ofertas",
+        },
+        "options": [],
+        "quotes": [],
+        "stats": {
+            "candidatesTotal": 0,
+            "candidatesScraped": 0,
+            "scrapesSavedByPrefilter": 0,
+            "subagentsSpawned": 0,
+            "durationSeconds": 0.0,
+        },
+        "agentLog": [],
+    }
+
+
+def _leg_json(outcome, settings: Settings) -> dict:
+    request = outcome.request
+    if outcome.report is not None:
+        payload = _report_json(outcome.report, settings)
+    else:
+        payload = _empty_leg_payload(settings, outcome)
+    payload.update(
+        {
+            "legIndex": outcome.index,
+            "origin": request.origin,
+            "destination": request.destination,
+            "requestedDepart": request.depart.isoformat(),
+            "status": outcome.status,
+            "error": (
+                {
+                    "code": outcome.error_code,
+                    "message": outcome.error_message,
+                    "retriable": outcome.retriable,
+                }
+                if outcome.error_code
+                else None
+            ),
+        }
+    )
+    return payload
+
+
+def _selection_json(choice, settings: Settings, adults: int) -> dict:
+    offer = choice.offer
+    return {
+        "legIndex": choice.leg_index,
+        # associação explícita: o id do voo serializado é itinerary_key:cabine
+        "flightId": f"{offer.itinerary_key()}:{offer.cabin.value}",
+        "optionKey": choice.option_key,
+        "strategy": choice.strategy,
+        "bookingUrl": _booking_url(offer, settings, adults),
+    }
+
+
+def _itinerary_json(itinerary, rank: int, settings: Settings, adults: int) -> dict:
+    return {
+        "id": itinerary.id,
+        "rank": rank,
+        "priceBasis": "perPassenger",
+        "selections": [
+            _selection_json(choice, settings, adults)
+            for choice in itinerary.selections
+        ],
+        "cashBrl": itinerary.cash_brl,
+        "miles": itinerary.miles,
+        "effectiveTotalBrl": itinerary.effective_total_brl,
+        "milesShortfall": itinerary.miles_shortfall,
+        "notes": list(itinerary.notes),
+    }
+
+
+def _multicity_json(result, settings: Settings, adults: int) -> dict:
+    legs = [_leg_json(outcome, settings) for outcome in result.legs]
+    stats_totals = {
+        "candidatesTotal": 0,
+        "candidatesScraped": 0,
+        "scrapesSavedByPrefilter": 0,
+        "subagentsSpawned": 0,
+    }
+    for outcome in result.legs:
+        if outcome.report is None:
+            continue
+        stats = outcome.report.stats
+        stats_totals["candidatesTotal"] += stats.candidates_total
+        stats_totals["candidatesScraped"] += stats.candidates_scraped
+        stats_totals["scrapesSavedByPrefilter"] += stats.scrapes_saved_by_prefilter
+        stats_totals["subagentsSpawned"] += stats.subagents_spawned
+    return {
+        "mode": "mock" if settings.mock_mode else "real",
+        "searchType": "multiCity",
+        "pricingScope": "independentLegs",
+        "partial": result.partial,
+        "legs": legs,
+        "itineraries": [
+            _itinerary_json(itinerary, rank, settings, adults)
+            for rank, itinerary in enumerate(result.itineraries, start=1)
+        ],
+        "stats": {
+            **stats_totals,
+            # duração global é tempo de PAREDE, não soma das durações
+            "durationSeconds": result.wall_seconds,
+            "legsTotal": len(result.legs),
+            "legsSucceeded": sum(1 for o in result.legs if o.status == "ok"),
+            "legsEmpty": sum(1 for o in result.legs if o.status == "empty"),
+            "legsFailed": sum(
+                1 for o in result.legs if o.status in ("failed", "timeout")
+            ),
+        },
+        "agentLog": list(result.agent_log),
+    }
+
+
 # ------------------------------------------------------------------------ app
 def create_app(settings: Settings | None = None) -> FastAPI:
     app = FastAPI(title="celest.ia API", version="1.0")
@@ -430,6 +691,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "lyovMesh": s.has_lyov(),
             "strategies": [x.strip() for x in s.scrape_strategies.split(",") if x.strip()],
             "prefilterTopK": s.prefilter_top_k,
+            "capabilities": {
+                "multiCity": True,
+                "maxMultiCityLegs": s.multicity_max_legs,
+                "multiCityPricingScope": "independentLegs",
+            },
         }
 
     @app.get("/api/scripts")
@@ -469,6 +735,59 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         except Exception as error:  # noqa: BLE001 - erro do motor vira 502 legível
             raise HTTPException(502, f"busca falhou: {error}") from error
         return _report_json(report, s)
+
+    @app.post("/api/search/multi-city")
+    async def search_multi_city(body: MultiCitySearchIn, response: Response) -> dict:
+        from .agents.multicity import MULTICITY_TIMEOUT, MultiCityOrchestrator
+
+        s: Settings = app.state.settings
+        requests = _validate_multi_city(body, s)
+        orchestrator = MultiCityOrchestrator(s)
+        result = await orchestrator.search(requests)
+
+        with_report = [o for o in result.legs if o.report is not None]
+        if not with_report:
+            # nenhum trecho concluiu: diagnóstico estruturado + fallback por trecho
+            all_timeout = all(
+                o.status == "timeout" for o in result.legs
+            )
+            detail = {
+                "code": MULTICITY_TIMEOUT if all_timeout else "LEG_SEARCH_FAILED",
+                "message": (
+                    "a jornada expirou antes de concluir qualquer trecho"
+                    if all_timeout
+                    else "nenhum trecho retornou resposta das fontes"
+                ),
+                "legs": [
+                    {
+                        "legIndex": o.index,
+                        "origin": o.request.origin,
+                        "destination": o.request.destination,
+                        "requestedDepart": o.request.depart.isoformat(),
+                        "status": o.status,
+                        "error": {
+                            "code": o.error_code,
+                            "message": o.error_message,
+                            "retriable": o.retriable,
+                        },
+                        "lastResort": {
+                            "bookingUrl": google_flights_url(
+                                o.request.origin,
+                                o.request.destination,
+                                o.request.depart,
+                            ),
+                            "reason": o.error_message or "trecho sem resposta",
+                        },
+                    }
+                    for o in result.legs
+                ],
+            }
+            raise HTTPException(504 if all_timeout else 502, detail=detail)
+
+        payload = _multicity_json(result, s, adults=body.passengers)
+        if result.partial:
+            response.status_code = 200  # parcial ainda é 200, sinalizado no corpo
+        return payload
 
     return app
 

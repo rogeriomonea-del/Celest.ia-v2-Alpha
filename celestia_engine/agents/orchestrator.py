@@ -198,9 +198,19 @@ class Orchestrator(Agent):
         stats: SearchStats,
     ) -> list[Candidate]:
         scrapable = [c for c in candidates if c[0].carrier in SCRAPERS_BY_CARRIER]
+        # teto DURO (multidestinos): vale inclusive no caminho sem pré-filtro,
+        # para o orçamento global de scraping da jornada nunca ser estourado.
+        hard_cap = int(getattr(self.ctx.settings, "scrape_hard_cap", 0) or 0)
         if not best_quotes:
+            if hard_cap > 0 and len(scrapable) > hard_cap:
+                self.log(
+                    f"sem pré-filtro: teto de scraping aplicado "
+                    f"({hard_cap} de {len(scrapable)} candidatos)"
+                )
+                scrapable = scrapable[:hard_cap]
+            else:
+                self.log("sem pré-filtro: todos os candidatos serão raspados")
             stats.candidates_scraped = len(scrapable)
-            self.log("sem pré-filtro: todos os candidatos serão raspados")
             return scrapable
 
         def price_of(candidate: Candidate) -> float:
@@ -210,6 +220,8 @@ class Orchestrator(Agent):
 
         ranked = sorted(scrapable, key=price_of)
         top_k = self.ctx.settings.prefilter_top_k
+        if hard_cap > 0:
+            top_k = min(top_k, hard_cap)
         shortlist = ranked[:top_k]
         stats.candidates_scraped = len(shortlist)
         stats.scrapes_saved_by_prefilter = max(0, len(scrapable) - len(shortlist))

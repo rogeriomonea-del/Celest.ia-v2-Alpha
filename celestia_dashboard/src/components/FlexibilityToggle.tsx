@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useId, useRef, useState } from 'react'
 import { CalendarRange, Check, ChevronLeft, ChevronRight, Sparkles } from 'lucide-react'
 import { useClickOutside } from '../hooks/useClickOutside'
 import { addDays, addMonths } from '../utils/dates'
@@ -53,6 +53,7 @@ export function FlexibilityToggle({ value, departDate, onChange }: FlexibilityTo
   )
   const [hoverDate, setHoverDate] = useState<Date | null>(null)
   const customRef = useRef<HTMLDivElement>(null)
+  const dialogId = useId()
 
   useClickOutside(customRef, () => setCustomOpen(false), customOpen)
 
@@ -66,7 +67,13 @@ export function FlexibilityToggle({ value, departDate, onChange }: FlexibilityTo
   }
 
   const selectPreset = (preset: FlexPreset) => {
-    onChange({ ...value, enabled: true, preset })
+    onChange({
+      ...value,
+      enabled: true,
+      preset,
+      windowStart: preset === 'custom' ? value.windowStart : null,
+      windowEnd: preset === 'custom' ? value.windowEnd : null,
+    })
     setCustomOpen(preset === 'custom')
   }
 
@@ -96,17 +103,18 @@ export function FlexibilityToggle({ value, departDate, onChange }: FlexibilityTo
     <div className="mt-4">
       <button
         type="button"
-        aria-pressed={value.enabled}
+        role="switch"
+        aria-checked={value.enabled}
         onClick={toggleEnabled}
-        className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition-colors ${
+        className={`inline-flex min-h-11 items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition-colors ${
           value.enabled
-            ? 'border-indigo-600 bg-indigo-50 text-indigo-700'
-            : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+            ? 'border-aqua-600 bg-aqua-50 text-aqua-900'
+            : 'border-ink-200 bg-white text-ink-700 hover:border-ink-300'
         }`}
       >
         <span
           className={`flex h-5 w-9 items-center rounded-full p-0.5 transition-colors ${
-            value.enabled ? 'bg-indigo-600' : 'bg-slate-300'
+            value.enabled ? 'bg-aqua-600' : 'bg-ink-300'
           }`}
           aria-hidden="true"
         >
@@ -121,7 +129,7 @@ export function FlexibilityToggle({ value, departDate, onChange }: FlexibilityTo
       </button>
 
       {value.enabled && (
-        <div className="mt-3 rounded-xl border border-indigo-100 bg-indigo-50/40 p-3.5">
+        <div className="mt-3 rounded-xl border border-aqua-100 bg-aqua-50/45 p-3.5">
           <div className="flex flex-wrap gap-2">
             {PRESET_OPTIONS.map((option) => {
               const active = value.preset === option.preset
@@ -133,8 +141,8 @@ export function FlexibilityToggle({ value, departDate, onChange }: FlexibilityTo
                   onClick={() => selectPreset(option.preset)}
                   className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-semibold transition-colors ${
                     active
-                      ? 'bg-indigo-600 text-white shadow-sm'
-                      : 'bg-white text-slate-600 ring-1 ring-inset ring-slate-200 hover:ring-indigo-300'
+                      ? 'bg-space-900 text-white shadow-sm'
+                      : 'bg-white text-ink-700 ring-1 ring-inset ring-ink-200 hover:ring-aqua-400'
                   }`}
                 >
                   {active && <Check className="h-3.5 w-3.5" aria-hidden="true" />}
@@ -144,7 +152,7 @@ export function FlexibilityToggle({ value, departDate, onChange }: FlexibilityTo
             })}
           </div>
 
-          <p className="mt-3 flex items-start gap-1.5 text-xs text-indigo-700/90">
+          <p className="mt-3 flex items-start gap-1.5 text-xs text-aqua-900">
             <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
             <span>{windowLabel}</span>
           </p>
@@ -162,10 +170,13 @@ export function FlexibilityToggle({ value, departDate, onChange }: FlexibilityTo
             >
               <button
                 type="button"
+                aria-expanded={customOpen}
+                aria-haspopup="dialog"
+                aria-controls={dialogId}
                 onClick={() => setCustomOpen((current) => !current)}
-                className="mt-2 inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition-colors hover:border-indigo-300"
+                className="mt-2 inline-flex min-h-11 items-center gap-2 rounded-lg border border-ink-200 bg-white px-3 py-2 text-sm font-semibold text-ink-700 transition-colors hover:border-aqua-400"
               >
-                <CalendarRange className="h-4 w-4 text-indigo-600" aria-hidden="true" />
+                <CalendarRange className="h-4 w-4 text-aqua-700" aria-hidden="true" />
                 {value.windowStart && value.windowEnd
                   ? `${formatShortDate(value.windowStart)} – ${formatShortDate(value.windowEnd)}`
                   : value.windowStart
@@ -174,18 +185,23 @@ export function FlexibilityToggle({ value, departDate, onChange }: FlexibilityTo
               </button>
 
               {customOpen && (
-                <div className="absolute left-0 top-full z-30 mt-2 w-[min(36rem,calc(100vw-4.5rem))] animate-pop rounded-2xl border border-slate-200 bg-white p-4 shadow-xl shadow-slate-900/10 sm:p-5">
+                <div
+                  id={dialogId}
+                  role="dialog"
+                  aria-label="Selecionar período flexível"
+                  className="mobile-sheet popover-surface absolute left-0 top-full mt-2 w-[min(36rem,calc(100vw-2rem))] animate-pop p-4 sm:p-5"
+                >
                   <div className="mb-3 flex items-center justify-between">
                     <button
                       type="button"
                       aria-label="Mês anterior"
                       disabled={!canGoBack}
                       onClick={() => setViewDate((current) => addMonths(current, -1))}
-                      className="flex h-8 w-8 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-30"
+                      className="flex h-9 w-9 items-center justify-center rounded-full text-ink-600 transition-colors hover:bg-ink-100 disabled:cursor-not-allowed disabled:opacity-30"
                     >
                       <ChevronLeft className="h-5 w-5" />
                     </button>
-                    <p className="text-xs font-medium text-slate-500">
+                    <p className="text-xs font-semibold text-ink-600">
                       {!value.windowStart || value.windowEnd
                         ? 'Selecione o início do período'
                         : 'Agora selecione o fim do período'}
@@ -194,7 +210,7 @@ export function FlexibilityToggle({ value, departDate, onChange }: FlexibilityTo
                       type="button"
                       aria-label="Próximo mês"
                       onClick={() => setViewDate((current) => addMonths(current, 1))}
-                      className="flex h-8 w-8 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100"
+                      className="flex h-9 w-9 items-center justify-center rounded-full text-ink-600 transition-colors hover:bg-ink-100"
                     >
                       <ChevronRight className="h-5 w-5" />
                     </button>
@@ -221,20 +237,20 @@ export function FlexibilityToggle({ value, departDate, onChange }: FlexibilityTo
                     </div>
                   </div>
 
-                  <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3">
+                  <div className="mt-4 flex items-center justify-between border-t border-ink-100 pt-3">
                     <button
                       type="button"
                       onClick={() =>
                         onChange({ ...value, windowStart: null, windowEnd: null })
                       }
-                      className="text-sm font-medium text-slate-500 transition-colors hover:text-slate-700"
+                      className="min-h-11 px-2 text-sm font-semibold text-ink-600 transition-colors hover:text-ink-900"
                     >
                       Limpar
                     </button>
                     <button
                       type="button"
                       onClick={() => setCustomOpen(false)}
-                      className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-700"
+                      className="primary-button px-5 py-2"
                     >
                       Concluir
                     </button>

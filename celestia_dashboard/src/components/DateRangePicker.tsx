@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useId, useRef, useState } from 'react'
 import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useClickOutside } from '../hooks/useClickOutside'
 import { addMonths } from '../utils/dates'
@@ -11,9 +11,15 @@ interface DateRangePickerProps {
   returnDate: Date | null
   tripType: TripType
   onChange: (departDate: Date | null, returnDate: Date | null) => void
+  compact?: boolean
 }
 
-export function DateRangePicker({ departDate, returnDate, tripType, onChange }: DateRangePickerProps) {
+function compactDate(date: Date): string {
+  const month = date.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '')
+  return `${String(date.getDate()).padStart(2, '0')} ${month}`
+}
+
+export function DateRangePicker({ departDate, returnDate, tripType, onChange, compact = false }: DateRangePickerProps) {
   const [open, setOpen] = useState(false)
   const [viewDate, setViewDate] = useState(() => {
     const base = departDate ?? new Date()
@@ -22,6 +28,7 @@ export function DateRangePicker({ departDate, returnDate, tripType, onChange }: 
   const [hoverDate, setHoverDate] = useState<Date | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
+  const dialogId = useId()
 
   useClickOutside(containerRef, () => setOpen(false), open)
 
@@ -69,23 +76,35 @@ export function DateRangePicker({ departDate, returnDate, tripType, onChange }: 
         type="button"
         aria-label={triggerLabel}
         aria-expanded={open}
+        aria-haspopup="dialog"
+        aria-controls={dialogId}
         onClick={() => setOpen((current) => !current)}
-        className={`flex h-full w-full items-center gap-3 rounded-xl border bg-white px-3.5 py-2.5 text-left transition-colors hover:border-slate-300 ${
-          open ? 'border-indigo-600 ring-2 ring-indigo-600/20' : 'border-slate-200'
-        }`}
+        className={`field-shell ${open ? 'border-aqua-600 shadow-[0_0_0_3px_rgba(22,177,184,.12)]' : ''}`}
       >
         <Calendar
-          className={`h-5 w-5 shrink-0 ${open ? 'text-indigo-600' : 'text-slate-400'}`}
+          className={`h-5 w-5 shrink-0 ${open ? 'text-aqua-700' : 'text-ink-500'}`}
           aria-hidden="true"
         />
+        {compact ? (
+          <span className="min-w-0 flex-1 text-left">
+            <span className="block text-[10px] font-bold uppercase tracking-[0.14em] text-ink-500">
+              Datas
+            </span>
+            <span className={`block truncate text-sm font-semibold ${departDate ? 'text-ink-900' : 'text-ink-500'}`}>
+              {departDate
+                ? `${compactDate(departDate)}${tripType === 'roundtrip' && returnDate ? ` — ${compactDate(returnDate)}` : ''}`
+                : 'Escolher datas'}
+            </span>
+          </span>
+        ) : (
         <span className="flex min-w-0 flex-1 items-center">
           <span className="min-w-0 flex-1">
-            <span className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+            <span className="block text-[10px] font-bold uppercase tracking-[0.14em] text-ink-500">
               Ida
             </span>
             <span
               className={`block truncate text-sm font-semibold ${
-                departDate ? 'text-slate-900' : 'text-slate-500'
+                departDate ? 'text-ink-900' : 'text-ink-500'
               }`}
             >
               {departDate ? formatShortDate(departDate) : 'Escolher data'}
@@ -93,14 +112,14 @@ export function DateRangePicker({ departDate, returnDate, tripType, onChange }: 
           </span>
           {tripType === 'roundtrip' && (
             <>
-              <span className="mx-2.5 h-8 w-px shrink-0 bg-slate-200" aria-hidden="true" />
+              <span className="mx-2.5 h-8 w-px shrink-0 bg-ink-200" aria-hidden="true" />
               <span className="min-w-0 flex-1">
-                <span className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                <span className="block text-[10px] font-bold uppercase tracking-[0.14em] text-ink-500">
                   Volta
                 </span>
                 <span
                   className={`block truncate text-sm font-semibold ${
-                    returnDate ? 'text-slate-900' : 'text-slate-500'
+                    returnDate ? 'text-ink-900' : 'text-ink-500'
                   }`}
                 >
                   {returnDate ? formatShortDate(returnDate) : 'Escolher data'}
@@ -109,21 +128,27 @@ export function DateRangePicker({ departDate, returnDate, tripType, onChange }: 
             </>
           )}
         </span>
+        )}
       </button>
 
       {open && (
-        <div className="absolute left-0 top-full z-30 mt-2 w-[min(36rem,calc(100vw-4.5rem))] animate-pop rounded-2xl border border-slate-200 bg-white p-4 shadow-xl shadow-slate-900/10 sm:p-5">
+        <div
+          id={dialogId}
+          role="dialog"
+          aria-label="Selecionar datas da viagem"
+          className="mobile-sheet popover-surface absolute left-0 top-full mt-2 w-[min(36rem,calc(100vw-2rem))] animate-pop p-4 sm:p-5"
+        >
           <div className="mb-3 flex items-center justify-between">
             <button
               type="button"
               aria-label="Mês anterior"
               disabled={!canGoBack}
               onClick={() => setViewDate((current) => addMonths(current, -1))}
-              className="flex h-8 w-8 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-30"
+              className="flex h-9 w-9 items-center justify-center rounded-full text-ink-600 transition-colors hover:bg-ink-100 disabled:cursor-not-allowed disabled:opacity-30"
             >
               <ChevronLeft className="h-5 w-5" />
             </button>
-            <p className="text-xs font-medium text-slate-500">
+            <p className="text-xs font-semibold text-ink-600">
               {tripType === 'roundtrip'
                 ? !departDate || returnDate
                   ? 'Selecione a data de ida'
@@ -134,7 +159,7 @@ export function DateRangePicker({ departDate, returnDate, tripType, onChange }: 
               type="button"
               aria-label="Próximo mês"
               onClick={() => setViewDate((current) => addMonths(current, 1))}
-              className="flex h-8 w-8 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100"
+              className="flex h-9 w-9 items-center justify-center rounded-full text-ink-600 transition-colors hover:bg-ink-100"
             >
               <ChevronRight className="h-5 w-5" />
             </button>
@@ -161,18 +186,18 @@ export function DateRangePicker({ departDate, returnDate, tripType, onChange }: 
             </div>
           </div>
 
-          <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3">
+          <div className="mt-4 flex items-center justify-between border-t border-ink-100 pt-3">
             <button
               type="button"
               onClick={() => onChange(null, null)}
-              className="text-sm font-medium text-slate-500 transition-colors hover:text-slate-700"
+              className="min-h-11 px-2 text-sm font-semibold text-ink-600 transition-colors hover:text-ink-900"
             >
               Limpar
             </button>
             <button
               type="button"
               onClick={close}
-              className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-700"
+              className="primary-button px-5 py-2"
             >
               Concluir
             </button>

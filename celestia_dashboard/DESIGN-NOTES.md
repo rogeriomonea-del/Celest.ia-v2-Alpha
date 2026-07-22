@@ -1,69 +1,52 @@
-# celest.ia — Sistema de Design (premium / concierge)
+# celest.ia — Nebula Cartography
 
-Notas para revisão de layout. Stack: **React 18 + TypeScript + Tailwind CSS + Vite**,
-ícones `lucide-react`. Sem UI kit externo — componentes próprios em `src/components/`.
+Sistema visual do frontend final. A direção combina a sobriedade de um
+concierge de viagens com uma cartografia orbital discreta: espacial, editorial
+e confiável — sem aparência de um comparador convencional.
 
-## Direção visual
-Grafite quente + dourado sóbrio + esmeralda profunda. Sensação de concierge de
-viagens (confiança, exclusividade), muito respiro, serifa de exibição nos títulos
-e preços.
+## Linguagem
 
-## Tokens de cor — `tailwind.config.js`
-Para virar a identidade inteira sem reescrever cada `className`, os nomes de cor do
-Tailwind foram **remapeados** para a paleta premium:
+- **Hero:** espaço profundo, grade cartográfica, rota orbital e telemetria CSS.
+- **Busca:** “console de trajetória” marfim, em duas linhas, sobreposto ao hero.
+- **Resultados:** continuidade do espaço profundo, com grade cartográfica sutil,
+  painéis de vidro navy e hierarquia financeira em marfim, aqua e dourado.
+- **Estratégias:** a melhor decisão recebe um painel orbital destacado; as
+  alternativas continuam no mesmo console escuro, sem ocultar opções ou notas.
+- **Movimento:** somente feedback curto, brilho e deslocamento sutil; toda
+  animação respeita `prefers-reduced-motion`.
 
-| Nome Tailwind        | Vira      | Uso |
-|----------------------|-----------|-----|
-| `slate`/`gray`/`neutral` | **ink**  | grafite quente: fundo, texto, bordas |
-| `indigo`/`violet`    | **gold**  | dourado: destaques, milhas, "melhor opção" |
-| `emerald`/`green`    | **pine**  | esmeralda: voo direto, sucesso, sustentável |
+## Paleta
 
-Também existem os nomes diretos `ink-*`, `gold-*`, `pine-*`. Os **CTAs** são em
-grafite (`bg-ink-900`) aplicados explicitamente. `amber` e `red` seguem os padrões
-do Tailwind (avisos e erros).
+| Família | Papel |
+| --- | --- |
+| `space-*` | azul-noite do hero, header e superfícies de inteligência |
+| `ink-*` | compatibilidade de tokens e superfícies auxiliares internas |
+| `aqua-*` | rota, status, foco e sinais do motor |
+| `gold-*` | milhas, recomendação e calor premium |
+| `pine-*` | sucesso, voo direto e estados positivos |
 
-Escalas em `tailwind.config.js` (50→950). `boxShadow`: `card`, `lift`, `gold`
-(elevação quente, não o cinza-azulado padrão).
+Texto de interface usa `space-100/200` sobre superfícies `space-900/950`.
+Dourado luminoso `gold-200/300` identifica milhas e decisões; aqua marca rota,
+estado e foco. Painéis nunca retornam ao branco editorial após o hero.
 
 ## Tipografia
-- **Fraunces Variable** (serifa de exibição, self-hosted via `@fontsource-variable/fraunces`)
-  → `font-serif`. Usada em headline do hero, títulos de seção e **preços/totais**.
-- **Inter Variable** (corpo) → `font-sans` (padrão).
-- Importadas em `src/main.tsx`. Números com `.tnum` (tabular) para alinhar colunas.
-- `src/index.css` calibra `font-optical-sizing` e `letter-spacing` da serifa, e traz
-  o utilitário `.hairline-gold` (fio dourado no topo de superfícies premium).
 
-## Onde mora cada peça
-- **Hero + estados + banners**: `src/App.tsx` (gradiente grafite, headline serifada
-  dourada, selo, escada de resultados, banners real/demo/erro, cards idle e vazio).
-- **Header**: `src/components/Header.tsx` (wordmark serifado `celest` + `.ia` dourado).
-- **Busca**: `SearchBar.tsx` (fio dourado, pílulas grafite, CTA flutuante grafite) +
-  `AirportInput.tsx`, `DateRangePicker.tsx`/`MonthGrid.tsx`, `PassengerSelector.tsx`,
-  `FlexibilityToggle.tsx`.
-- **Resultados**: `FlightCard.tsx` (preço serifado, milhas douradas, "Ver oferta"
-  grafite, badges), `SortTabs.tsx`, `FilterSidebar.tsx`, `StrategyPanel.tsx`
-  (destaque dourado na melhor opção), `Badge.tsx` (tons gold/pine/amber/red/ink),
-  `AirlineLogo.tsx` (mantém as cores de marca das companhias).
-- **Rodapé**: `Footer.tsx`.
+- **Fraunces Variable:** headlines, títulos editoriais e valores financeiros.
+- **Inter Variable:** interface, corpo, rótulos e controles.
+- Ambas são self-hosted por `@fontsource`; não existe importação de CDN.
+- `.tnum` ativa numerais tabulares em horários, preços e milhas.
 
-## Contrato com o motor (NÃO alterar no redesign)
-O front consome a API do motor Python via `src/api.ts` (tipos `EngineSearchResponse`,
-`EngineFlight`, `EngineOption`) e mapeia para os tipos de UI em `src/types.ts`. O
-redesign é **só de aparência** — nenhuma mudança de dados, props ou lógica.
+## Acessibilidade e responsividade
 
-## Como rodar
-```bash
-npm install
-npm run dev      # http://localhost:5173  (modo demo sem a API)
-npm run build    # dist/  (typecheck estrito + bundle)
-```
-Sem a API do motor no ar, o app roda em **modo demonstração** com dados fictícios
-(sinalizado em banner). Com a API em `:8000`, entra em modo real.
+- foco visível global, skip link e landmarks semânticos;
+- busca como formulário, status com `aria-live` e falhas reais com `role=alert`;
+- autocomplete com combobox/listbox e controles com nomes acessíveis;
+- popovers viram bottom sheets no mobile; filtros usam drawer com Escape;
+- CTAs têm alvo mínimo de 44 px e ficam full-width nos cards mobile;
+- tarifas indicativas e horários estimados nunca dependem apenas de cor.
 
-## Pontos que valem uma segunda opinião do revisor
-- Peso/《presença》do dourado (hoje sóbrio: bordas, milhas, "melhor opção").
-- Densidade dos `FlightCard` (respiro vs. compacto).
-- Headline do hero ("Sua próxima viagem, com inteligência.").
-- Escala tipográfica e uso da serifa em preços.
-- Acessibilidade de contraste (ink-500 em branco, gold-600/700 em branco).
-- Responsivo mobile (grid do `SearchBar` e da lista).
+## Fronteira do motor
+
+`src/api.ts` conserva integralmente as interfaces `Engine*`, envia o JSON do
+motor e mapeia a resposta. A UI consome exclusivamente os tipos de apresentação
+de `src/types.ts`. O redesign não altera nenhum endpoint ou campo HTTP.

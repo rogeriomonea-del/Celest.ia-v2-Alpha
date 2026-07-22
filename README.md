@@ -94,10 +94,25 @@ O dev server já faz proxy de `/api` para a porta 8000. Ao buscar no site:
 - **API fora do ar** (ex.: site estático na Vercel) → o site degrada para o
   modo demonstração com dados fictícios e avisa no banner âmbar.
 
-Endpoints: `POST /api/search`, `GET /api/scripts`, `GET /api/status`,
-`GET /api/health`. Em produção, sirva o `dist/` e proxie `/api` para o
-uvicorn no mesmo domínio (nginx), ou builde o site com `VITE_API_URL`
-apontando para a API em outro domínio.
+Endpoints: `POST /api/search`, `POST /api/search/multi-city`,
+`GET /api/scripts`, `GET /api/status`, `GET /api/health`. Em produção, sirva
+o `dist/` e proxie `/api` para o uvicorn no mesmo domínio (nginx), ou builde
+o site com `VITE_API_URL` apontando para a API em outro domínio.
+
+### Multidestinos (jornadas de 2–6 trechos)
+
+O site tem o modo **Multidestinos** (2 a 6 trechos sequenciais, open-jaw
+permitido) e o **ida-e-volta pesquisa os dois sentidos de verdade** — vira
+uma jornada de 2 trechos na mesma infraestrutura. O motor pesquisa os
+trechos com concorrência limitada (semáforo global compartilhado), agrega
+tudo numa resposta só e calcula as melhores **combinações** de compra por
+beam search. Contrato completo, códigos de erro e semântica parcial/falha em
+[`docs/multicity-contract.md`](docs/multicity-contract.md); ajustes finos via
+`MULTICITY_*` no `.env` (ver `.env.example`).
+
+> Os valores multidestinos são combinações de trechos independentes. Não
+> representam necessariamente uma tarifa única, PNR único ou conexões
+> protegidas.
 
 ### Hospedagem
 
