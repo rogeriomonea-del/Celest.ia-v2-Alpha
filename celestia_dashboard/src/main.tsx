@@ -1,5 +1,9 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
+// Fontes premium self-hosted (sem requisição externa): Fraunces (serifa de
+// exibição) para títulos/preços e Inter para o corpo.
+import '@fontsource-variable/fraunces'
+import '@fontsource-variable/inter'
 import App from './App'
 import './index.css'
 

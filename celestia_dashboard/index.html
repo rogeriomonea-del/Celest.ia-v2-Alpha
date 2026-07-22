@@ -3,17 +3,71 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- SEO básico -->
+    <title>celest.ia · Busca Inteligente de Voos e Milhas</title>
     <meta
       name="description"
-      content="celest.ia — compare voos de dezenas de companhias e encontre a melhor oferta em segundos."
+      content="Compare preço em dinheiro, emissão em milhas e upgrade — o celest.ia calcula a estratégia de compra com o menor custo efetivo para você."
     />
-    <title>celest.ia · Busca de Voos</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
-      rel="stylesheet"
+    <meta name="robots" content="index, follow" />
+    <meta name="author" content="celest.ia" />
+    <meta name="theme-color" content="#141210" />
+    <link rel="canonical" href="https://celest-ia.vercel.app/" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="celest.ia" />
+    <meta property="og:title" content="celest.ia · Busca Inteligente de Voos e Milhas" />
+    <meta
+      property="og:description"
+      content="Compare dinheiro × milhas × upgrade em uma busca só. O celest.ia encontra a melhor estratégia de compra do seu voo."
     />
+    <meta property="og:url" content="https://celest-ia.vercel.app/" />
+    <meta property="og:image" content="https://celest-ia.vercel.app/og.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:locale" content="pt_BR" />
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="celest.ia · Busca Inteligente de Voos e Milhas" />
+    <meta
+      name="twitter:description"
+      content="Compare dinheiro × milhas × upgrade em uma busca só. O celest.ia encontra a melhor estratégia de compra do seu voo."
+    />
+    <meta name="twitter:image" content="https://celest-ia.vercel.app/og.png" />
+
+    <!-- Dados estruturados -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "Organization",
+            "@id": "https://celest-ia.vercel.app/#org",
+            "name": "celest.ia",
+            "url": "https://celest-ia.vercel.app/",
+            "logo": "https://celest-ia.vercel.app/logo.png",
+            "description": "Plataforma inteligente de busca de voos e otimização de milhas."
+          },
+          {
+            "@type": "WebApplication",
+            "name": "celest.ia",
+            "url": "https://celest-ia.vercel.app/",
+            "applicationCategory": "TravelApplication",
+            "operatingSystem": "Web",
+            "inLanguage": "pt-BR",
+            "publisher": { "@id": "https://celest-ia.vercel.app/#org" },
+            "offers": { "@type": "Offer", "price": "0", "priceCurrency": "BRL" },
+            "description": "Compare voos em dinheiro, milhas e upgrades — com cálculo do milheiro e da melhor estratégia de compra."
+          }
+        ]
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>

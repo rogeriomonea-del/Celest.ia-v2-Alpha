@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useId, useMemo, useRef, useState } from 'react'
 import { Plane, type LucideIcon } from 'lucide-react'
 import { AIRPORTS } from '../data/airports'
 import { useClickOutside } from '../hooks/useClickOutside'
@@ -22,6 +22,7 @@ export function AirportInput({ label, icon: Icon, value, onChange, excludeCode }
   const [highlighted, setHighlighted] = useState(0)
   const containerRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const generatedId = useId()
 
   useClickOutside(containerRef, () => setOpen(false), open)
 
@@ -86,24 +87,34 @@ export function AirportInput({ label, icon: Icon, value, onChange, excludeCode }
     }
   }
 
-  const listboxId = `airport-listbox-${label}`
+  const listboxId = `airport-listbox-${generatedId}`
   const optionId = (index: number) => `${listboxId}-opt-${index}`
 
   return (
-    <div ref={containerRef} className="relative">
+    <div
+      ref={containerRef}
+      className="relative"
+      onBlur={(event) => {
+        const nextFocused = event.relatedTarget
+        if (!(nextFocused instanceof Node) || !event.currentTarget.contains(nextFocused)) {
+          setOpen(false)
+        }
+      }}
+    >
       <div
-        className="group flex h-full cursor-text items-center gap-3 rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 transition-colors hover:border-slate-300 focus-within:border-indigo-600 focus-within:ring-2 focus-within:ring-indigo-600/20"
+        className="group field-shell cursor-text"
         onClick={() => inputRef.current?.focus()}
       >
-        <Icon className="h-5 w-5 shrink-0 text-slate-400 transition-colors group-focus-within:text-indigo-600" aria-hidden="true" />
+        <Icon className="h-5 w-5 shrink-0 text-ink-500 transition-colors group-focus-within:text-aqua-700" aria-hidden="true" />
         <div className="min-w-0 flex-1">
-          <span className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+          <span className="block text-[10px] font-bold uppercase tracking-[0.14em] text-ink-500">
             {label}
           </span>
           <input
             ref={inputRef}
             type="text"
             role="combobox"
+            aria-haspopup="listbox"
             aria-expanded={open}
             aria-controls={listboxId}
             aria-autocomplete="list"
@@ -111,7 +122,7 @@ export function AirportInput({ label, icon: Icon, value, onChange, excludeCode }
               open && activeIndex >= 0 ? optionId(activeIndex) : undefined
             }
             aria-label={label}
-            className="w-full truncate border-none bg-transparent p-0 text-sm font-semibold text-slate-900 placeholder:font-normal placeholder:text-slate-400 focus:outline-none focus:ring-0"
+            className="w-full truncate border-none bg-transparent p-0 text-base font-semibold text-ink-900 placeholder:font-normal placeholder:text-ink-500 focus:outline-none focus:ring-0"
             placeholder="Cidade ou aeroporto"
             value={open ? query : `${value.city} (${value.code})`}
             onFocus={() => {
@@ -132,11 +143,12 @@ export function AirportInput({ label, icon: Icon, value, onChange, excludeCode }
         <ul
           id={listboxId}
           role="listbox"
+          tabIndex={-1}
           aria-label={`Sugestões de ${label.toLowerCase()}`}
-          className="thin-scrollbar absolute left-0 top-full z-30 mt-2 max-h-80 w-full min-w-[18rem] animate-pop overflow-y-auto rounded-2xl border border-slate-200 bg-white py-2 shadow-xl shadow-slate-900/10"
+          className="mobile-sheet popover-surface thin-scrollbar absolute left-0 top-full mt-2 max-h-80 w-full min-w-[18rem] animate-pop overflow-y-auto py-2"
         >
           {suggestions.length === 0 && (
-            <li className="px-4 py-3 text-sm text-slate-500">Nenhum aeroporto encontrado.</li>
+            <li className="px-4 py-3 text-sm text-ink-500">Nenhum aeroporto encontrado.</li>
           )}
           {suggestions.map((airport, index) => {
             const isExcluded = airport.code === excludeCode
@@ -158,21 +170,21 @@ export function AirportInput({ label, icon: Icon, value, onChange, excludeCode }
                   isExcluded
                     ? 'cursor-not-allowed opacity-40'
                     : index === activeIndex
-                      ? 'cursor-pointer bg-indigo-50'
-                      : 'cursor-pointer hover:bg-slate-50'
+                      ? 'cursor-pointer bg-aqua-50'
+                      : 'cursor-pointer hover:bg-ink-50'
                 }`}
               >
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-space-50 text-space-700">
                   <Plane className="h-4 w-4" aria-hidden="true" />
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-semibold text-slate-900">
+                  <span className="block truncate text-sm font-semibold text-ink-900">
                     {airport.city}
-                    <span className="ml-1.5 font-normal text-slate-400">· {airport.country}</span>
+                    <span className="ml-1.5 font-normal text-ink-500">· {airport.country}</span>
                   </span>
-                  <span className="block truncate text-xs text-slate-500">{airport.name}</span>
+                  <span className="block truncate text-xs text-ink-500">{airport.name}</span>
                 </span>
-                <span className="shrink-0 rounded-md bg-slate-100 px-2 py-1 text-xs font-bold tracking-wide text-slate-600">
+                <span className="shrink-0 rounded-md bg-space-50 px-2 py-1 text-xs font-bold tracking-wide text-space-700">
                   {airport.code}
                 </span>
               </li>

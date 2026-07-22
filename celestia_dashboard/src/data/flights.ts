@@ -1,5 +1,5 @@
 import { findAirport } from './airports'
-import type { Airline, Flight, FlightStop, FlightTag } from '../types'
+import type { Airline, CabinClass, Flight, FlightStop, FlightTag } from '../types'
 
 export const AIRLINES: Record<string, Airline> = {
   LA: { code: 'LA', name: 'LATAM Airlines', logoGradient: 'from-rose-600 to-red-800' },
@@ -11,6 +11,21 @@ export const AIRLINES: Record<string, Airline> = {
   LH: { code: 'LH', name: 'Lufthansa', logoGradient: 'from-amber-400 to-yellow-600' },
   KL: { code: 'KL', name: 'KLM', logoGradient: 'from-cyan-500 to-sky-700' },
   CM: { code: 'CM', name: 'Copa Airlines', logoGradient: 'from-blue-600 to-indigo-800' },
+  AV: { code: 'AV', name: 'Avianca', logoGradient: 'from-red-600 to-rose-800' },
+  AA: { code: 'AA', name: 'American Airlines', logoGradient: 'from-slate-500 to-blue-800' },
+  UA: { code: 'UA', name: 'United Airlines', logoGradient: 'from-blue-500 to-indigo-900' },
+  DL: { code: 'DL', name: 'Delta Air Lines', logoGradient: 'from-red-700 to-blue-900' },
+  AC: { code: 'AC', name: 'Air Canada', logoGradient: 'from-red-500 to-red-800' },
+  AM: { code: 'AM', name: 'Aeroméxico', logoGradient: 'from-blue-700 to-slate-900' },
+  B6: { code: 'B6', name: 'JetBlue', logoGradient: 'from-blue-400 to-blue-700' },
+  UX: { code: 'UX', name: 'Air Europa', logoGradient: 'from-sky-600 to-blue-900' },
+  LX: { code: 'LX', name: 'SWISS', logoGradient: 'from-red-600 to-red-900' },
+  BA: { code: 'BA', name: 'British Airways', logoGradient: 'from-blue-800 to-red-700' },
+  AZ: { code: 'AZ', name: 'ITA Airways', logoGradient: 'from-sky-700 to-blue-950' },
+  EK: { code: 'EK', name: 'Emirates', logoGradient: 'from-red-600 to-amber-700' },
+  QR: { code: 'QR', name: 'Qatar Airways', logoGradient: 'from-purple-800 to-fuchsia-950' },
+  TK: { code: 'TK', name: 'Turkish Airlines', logoGradient: 'from-red-500 to-slate-800' },
+  AR: { code: 'AR', name: 'Aerolíneas Argentinas', logoGradient: 'from-sky-400 to-blue-600' },
 }
 
 interface FlightTemplate {
@@ -291,24 +306,52 @@ function resolveStops(
  * search API would return: the same inventory templates re-keyed to the
  * searched origin/destination pair.
  */
-export function buildFlights(originCode: string, destinationCode: string): Flight[] {
-  return TEMPLATES.map((template, index) => ({
-    id: `${template.airline}-${template.flightNumber.replace(/\s/g, '')}-${index}`,
-    airline: AIRLINES[template.airline],
-    flightNumber: template.flightNumber,
-    departure: { time: template.departureTime, airportCode: originCode },
-    arrival: {
-      time: template.arrivalTime,
-      airportCode: destinationCode,
-      dayOffset: template.arrivalDayOffset,
-    },
-    durationMin: template.durationMin,
-    stops: resolveStops(template.stops, originCode, destinationCode),
-    price: template.price,
-    currency: 'BRL',
-    seatsLeft: template.seatsLeft,
-    tags: template.tags,
-    baggage: template.baggage,
-    emissions: template.emissions,
-  }))
+export function buildFlights(
+  originCode: string,
+  destinationCode: string,
+  cabin: CabinClass = 'economy',
+): Flight[] {
+  const cabinMultiplier: Record<CabinClass, number> = {
+    economy: 1,
+    premium: 1.55,
+    business: 2.8,
+  }
+
+  return TEMPLATES.map((template, index) => {
+    const price = Math.round(template.price * cabinMultiplier[cabin])
+    return {
+      id: `${template.airline}-${template.flightNumber.replace(/\s/g, '')}-${index}`,
+      airline: AIRLINES[template.airline],
+      flightNumber: template.flightNumber,
+      cabin,
+      travelDate: '',
+      departure: { time: template.departureTime, airportCode: originCode },
+      arrival: {
+        time: template.arrivalTime,
+        airportCode: destinationCode,
+        dayOffset: template.arrivalDayOffset,
+      },
+      durationMin: template.durationMin,
+      stops: resolveStops(template.stops, originCode, destinationCode),
+      price,
+      currency: 'BRL' as const,
+      taxesBrl: 0,
+      priceMiles: null,
+      milesProgram: null,
+      seatsLeft: template.seatsLeft,
+      tags: template.tags,
+      baggage: template.baggage,
+      emissions: template.emissions,
+      strategy: null,
+      fareBrand: null,
+      aircraft: null,
+      scheduleEstimated: false,
+      indicative: false,
+      sourceCode: 'mock',
+      sourceLabel: 'Demonstração',
+      bookingUrl: null,
+      // Referência de demonstração: R$ 25 por milheiro.
+      milesEquivalent: price * 40,
+    }
+  })
 }

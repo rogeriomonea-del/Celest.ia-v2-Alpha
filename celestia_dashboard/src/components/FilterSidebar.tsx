@@ -43,7 +43,7 @@ function toggleValue<T>(list: T[], value: T): T[] {
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
-    <h3 className="mb-3 text-xs font-bold uppercase tracking-wide text-slate-500">{children}</h3>
+    <h3 className="mb-3 text-[10px] font-bold uppercase tracking-[0.18em] text-space-200/50">{children}</h3>
   )
 }
 
@@ -79,21 +79,24 @@ export function FilterSidebar({ flights, filters, priceBounds, onChange }: Filte
     })
 
   return (
-    <aside className="space-y-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+    <aside aria-label="Filtros dos resultados" className="nebula-panel filter-console space-y-0 overflow-hidden p-5">
       <div className="flex items-center justify-between">
-        <h2 className="text-base font-bold text-slate-900">Filtros</h2>
+        <div>
+          <p className="system-kicker">Console de rota</p>
+          <h2 className="mt-1 font-serif text-lg font-light text-[#f5ecdd]">Parâmetros da jornada</h2>
+        </div>
         {hasActiveFilters && (
           <button
             type="button"
             onClick={reset}
-            className="text-xs font-semibold text-indigo-600 transition-colors hover:text-indigo-800"
+            className="min-h-10 rounded-full px-2 text-xs font-bold text-gold-200 transition-colors hover:bg-gold-200/[0.07]"
           >
             Limpar tudo
           </button>
         )}
       </div>
 
-      <section>
+      <section className="filter-section">
         <SectionTitle>Escalas</SectionTitle>
         <div className="space-y-2">
           {STOP_OPTIONS.map((option) => {
@@ -102,7 +105,7 @@ export function FilterSidebar({ flights, filters, priceBounds, onChange }: Filte
             return (
               <label
                 key={option.value}
-                className={`flex items-center gap-3 text-sm ${
+                className={`filter-row flex min-h-9 items-center gap-3 text-sm ${
                   count === 0 ? 'cursor-not-allowed opacity-40' : 'cursor-pointer'
                 }`}
               >
@@ -113,14 +116,14 @@ export function FilterSidebar({ flights, filters, priceBounds, onChange }: Filte
                   onChange={() =>
                     onChange({ ...filters, stops: toggleValue(filters.stops, option.value) })
                   }
-                  className="h-4 w-4 rounded border-slate-300 text-indigo-600 accent-indigo-600 focus:ring-indigo-600"
+                  className="nebula-checkbox h-4 w-4 rounded"
                 />
-                <span className="flex-1 font-medium text-slate-700">
+                <span className="flex-1 font-medium text-space-100/75">
                   {option.label}
-                  <span className="ml-1 text-xs font-normal text-slate-400">({count})</span>
+                  <span className="ml-1 text-xs font-normal text-space-200/40">({count})</span>
                 </span>
                 {minPrice !== null && (
-                  <span className="text-xs font-semibold text-slate-500">{formatBRL(minPrice)}</span>
+                  <span className="tnum text-xs font-semibold text-gold-200/80">{formatBRL(minPrice)}</span>
                 )}
               </label>
             )
@@ -128,7 +131,7 @@ export function FilterSidebar({ flights, filters, priceBounds, onChange }: Filte
         </div>
       </section>
 
-      <section>
+      <section className="filter-section">
         <SectionTitle>Preço máximo</SectionTitle>
         <input
           type="range"
@@ -138,15 +141,15 @@ export function FilterSidebar({ flights, filters, priceBounds, onChange }: Filte
           value={filters.maxPrice}
           aria-label="Preço máximo"
           onChange={(event) => onChange({ ...filters, maxPrice: Number(event.target.value) })}
-          className="w-full accent-indigo-600"
+          className="nebula-range w-full"
         />
-        <div className="mt-1 flex items-center justify-between text-xs text-slate-500">
+        <div className="mt-2 flex items-center justify-between text-xs text-space-200/45">
           <span>{formatBRL(priceBounds.min)}</span>
-          <span className="font-bold text-indigo-600">até {formatBRL(filters.maxPrice)}</span>
+          <span className="tnum font-bold text-aqua-200">até {formatBRL(filters.maxPrice)}</span>
         </div>
       </section>
 
-      <section>
+      <section className="filter-section">
         <SectionTitle>Horário de partida</SectionTitle>
         <div className="grid grid-cols-2 gap-2">
           {WINDOW_OPTIONS.map(({ value, label, range, icon: Icon }) => {
@@ -162,40 +165,40 @@ export function FilterSidebar({ flights, filters, priceBounds, onChange }: Filte
                     departureWindows: toggleValue(filters.departureWindows, value),
                   })
                 }
-                className={`flex flex-col items-center gap-0.5 rounded-xl border px-2 py-2.5 text-xs font-semibold transition-colors ${
+                className={`flex min-h-[4.5rem] flex-col items-center gap-0.5 rounded-xl border px-2 py-2.5 text-xs font-semibold transition-colors ${
                   isActive
-                    ? 'border-indigo-600 bg-indigo-50 text-indigo-700'
-                    : 'border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50'
+                    ? 'border-aqua-200/50 bg-aqua-300/[0.08] text-aqua-100 shadow-[inset_0_0_18px_rgba(47,208,212,.04)]'
+                    : 'border-space-100/10 bg-white/[0.015] text-space-100/70 hover:border-space-100/20 hover:bg-white/[0.035]'
                 }`}
               >
                 <Icon className="h-4 w-4" aria-hidden="true" />
                 {label}
-                <span className="font-normal text-slate-500">{range}</span>
+                <span className="font-normal text-space-200/45">{range}</span>
               </button>
             )
           })}
         </div>
       </section>
 
-      <section>
+      <section className="filter-section">
         <SectionTitle>Companhias aéreas</SectionTitle>
         <div className="space-y-2.5">
           {airlines.map((airline) => {
             const minPrice = minPriceByAirline(airline.code)
             return (
-              <label key={airline.code} className="flex cursor-pointer items-center gap-3 text-sm">
+              <label key={airline.code} className="filter-row flex min-h-10 cursor-pointer items-center gap-3 text-sm">
                 <input
                   type="checkbox"
                   checked={filters.airlines.includes(airline.code)}
                   onChange={() =>
                     onChange({ ...filters, airlines: toggleValue(filters.airlines, airline.code) })
                   }
-                  className="h-4 w-4 rounded border-slate-300 text-indigo-600 accent-indigo-600 focus:ring-indigo-600"
+                  className="nebula-checkbox h-4 w-4 rounded"
                 />
                 <AirlineLogo airline={airline} size="sm" />
-                <span className="flex-1 truncate font-medium text-slate-700">{airline.name}</span>
+                <span className="flex-1 truncate font-medium text-space-100/75">{airline.name}</span>
                 {minPrice !== null && (
-                  <span className="shrink-0 text-xs font-semibold text-slate-500">
+                  <span className="tnum shrink-0 text-xs font-semibold text-gold-200/75">
                     {formatBRL(minPrice)}
                   </span>
                 )}

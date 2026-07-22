@@ -1,0 +1,325 @@
+"""Orchestrator — o agente que comanda os demais.
+
+Pipeline de uma busca:
+
+1. **Planejamento** — expande o pedido em candidatos (rota × data), incluindo
+   flexibilidade de datas e conexões via hub (Copa via PTY, LATAM via GRU/SCL).
+2. **Pré-filtro** — PriceScoutAgent cota tudo no Google Flights/Skyscanner
+   (baratos) e o orquestrador mantém só os ``prefilter_top_k`` mais baratos:
+   é isso que derruba o custo por pesquisa.
+3. **Scraping** — gera subagentes CopaScraper/LatamScraper em paralelo
+   (limitados por ``max_subagents``) só para os candidatos aprovados.
+4. **Cálculo** — MilesMathAgent compara as 4 estratégias e o milheiro.
+5. **Auditoria** — dedup, sanidade e ranking final.
+"""
+
+from __future__ import annotations
+
+import time
+from datetime import date, timedelta
+
+from ..config import Settings, load_settings
+from ..models import (
+    FareQuote,
+    FlightOffer,
+    Route,
+    SearchReport,
+    SearchRequest,
+    SearchStats,
+)
+from ..routes import RouteCatalog
+from ..storage import record_carriers, record_report
+from .base import Agent, AgentContext
+from .flex_scout import FlexDateScoutAgent
+from .mesh import live_routes_between
+from .miles import MilesMathAgent
+from .prefilter import Candidate, PriceScoutAgent
+from .scrapers import SCRAPERS_BY_CARRIER
+
+
+class Orchestrator(Agent):
+    name = "orchestrator"
+
+    def __init__(self, settings: Settings):
+        super().__init__(AgentContext(settings=settings))
+        self.scout = PriceScoutAgent(self.ctx)
+        self.miles_math = MilesMathAgent(self.ctx)
+        self.flex_scout = FlexDateScoutAgent(self.ctx)
+
+    @classmethod
+    def from_env(cls) -> "Orchestrator":
+        return cls(load_settings())
+
+    # ------------------------------------------------------------------ plan
+    def _routes_for(self, request: SearchRequest) -> list:
+        routes = RouteCatalog.airline_routes_between(request.origin, request.destination)
+        # malha viva (RPL/DECEA via RouteMeshAgent) complementa a curadoria;
+        # qualquer problema no CSV degrada silenciosamente para a curadoria
+        curated = {route.slug() for route in routes}
+        try:
+            live = live_routes_between(
+                self.ctx.settings, request.origin, request.destination
+            )
+        except Exception as error:  # noqa: BLE001 - mesh nunca derruba a busca
+            self.log(f"malha viva ignorada ({error})")
+            live = []
+        for route in live:
+            if route.slug() not in curated:
+                routes.append(route)
+        if not routes:
+            # fora das malhas CM/LA: ainda dá para cotar via metasearch
+            routes = RouteCatalog.candidates(request.origin, request.destination)
+        return routes
+
+    async def _resolve_dates(self, request: SearchRequest) -> list:
+        """Datas a considerar. Com flexibilidade, o flex-scout lê o calendário
+        de preços e devolve só as mais baratas; senão, ±flex_days."""
+        if request.flexibility and request.flexibility.enabled:
+            return await self.flex_scout.cheapest_dates(request)
+        dates = [
+            request.depart + timedelta(days=offset)
+            for offset in range(-request.flex_days, request.flex_days + 1)
+        ]
+        # partir amanhã com flex 3 não pode cotar ontem: corta o passado
+        # (mesma regra do _window_fallback do flex-scout)
+        today = date.today()
+        return [d for d in dates if d >= today] or [request.depart]
+
+    async def plan_candidates(self, request: SearchRequest) -> list[Candidate]:
+        routes = self._routes_for(request)
+        dates = await self._resolve_dates(request)
+        candidates = [(route, depart) for route in routes for depart in dates]
+        self.log(
+            f"plano: {len(routes)} rota(s) × {len(dates)} data(s) = {len(candidates)} candidatos"
+        )
+        return candidates
+
+    # ---------------------------------------------------------------- search
+    async def search(self, request: SearchRequest) -> SearchReport:
+        started = time.monotonic()
+        # marcos por busca: reusar o mesmo Orchestrator para buscas seguidas
+        # não pode inflar stats nem repetir o log das anteriores no relatório
+        log_start = len(self.ctx.log_lines)
+        spawn_start = self.ctx.subagents_spawned
+        stats = SearchStats()
+        self.log(
+            f"busca {request.origin}→{request.destination} {request.depart} "
+            f"cabine-alvo={request.cabin_target.value} programa={request.program}"
+        )
+
+        candidates = await self.plan_candidates(request)
+        stats.candidates_total = len(candidates)
+
+        # 2. pré-filtro barato
+        best_quotes = await self.scout.prefilter(candidates, request.cabin_target)
+        shortlist = self._shortlist(candidates, best_quotes, stats)
+
+        # 3. scraping caro só na shortlist, em subagentes paralelos
+        offers = await self._scrape_shortlist(shortlist, stats)
+
+        # 3b. premium: os voos ricos do metasearch (mesma chamada paga do
+        # pré-filtro) entram no resultado — raspados primeiro, para a
+        # auditoria preferir a versão reservável quando o voo coincidir
+        meta_offers = list(getattr(self.scout, "metasearch_offers", []) or [])
+        if meta_offers:
+            carriers = sorted({o.carrier for o in meta_offers})
+            self.log(
+                f"metasearch: +{len(meta_offers)} voo(s) de {len(carriers)} "
+                f"companhia(s) ({', '.join(carriers)})"
+            )
+            offers = offers + meta_offers
+
+        # 4. auditoria ANTES da matemática: opções nunca referenciam ofertas
+        # que a auditoria removeria (duplicatas/preços inválidos)
+        offers = self._audit(offers)
+
+        # 5. matemática de milhas/estratégias sobre as ofertas auditadas
+        options = self.miles_math.evaluate_offers(offers, request)
+
+        # aprendizado da malha: companhias inéditas entram no CSV de descobertas
+        new_carriers = record_carriers(self.ctx.settings, offers)
+        if new_carriers:
+            self.log(f"malha: companhia(s) nova(s) descoberta(s): {', '.join(new_carriers)}")
+
+        stats.subagents_spawned = self.ctx.subagents_spawned - spawn_start
+        stats.duration_seconds = round(time.monotonic() - started, 2)
+        self.log(
+            f"concluído em {stats.duration_seconds}s — {len(offers)} ofertas, "
+            f"{len(options)} opções de compra"
+        )
+        report = SearchReport(
+            request=request,
+            quotes=self._unique_quotes(best_quotes),
+            offers=offers,
+            options=options,
+            stats=stats,
+            agent_log=list(self.ctx.log_lines[log_start:]),
+        )
+        history_path = record_report(self.ctx.settings, report)
+        if history_path:
+            self.log(f"histórico gravado em {history_path}")
+            report.agent_log = list(self.ctx.log_lines[log_start:])
+        return report
+
+    # ------------------------------------------------------------- internals
+    @staticmethod
+    def _unique_quotes(best_quotes: dict) -> list[FareQuote]:
+        """As cotações do pré-filtro são por PAR e replicadas por rota
+        candidata. No relatório, uma por (par, data) basta — e quando o par
+        tinha rotas de companhias diferentes, a cotação vira ``*``
+        (metasearch): o preço é do par, não daquela companhia."""
+        unique: dict[tuple, FareQuote] = {}
+        carriers: dict[tuple, set[str]] = {}
+        for quote in best_quotes.values():
+            key = (quote.route.origin, quote.route.destination, quote.depart)
+            carriers.setdefault(key, set()).add(quote.route.carrier)
+            if key not in unique or quote.price_brl < unique[key].price_brl:
+                unique[key] = quote
+        out: list[FareQuote] = []
+        for key, quote in unique.items():
+            if len(carriers[key]) > 1 and quote.route.carrier != "*":
+                quote = FareQuote(
+                    route=Route(
+                        quote.route.origin, quote.route.destination, "*", direct=True
+                    ),
+                    depart=quote.depart,
+                    cabin=quote.cabin,
+                    price_brl=quote.price_brl,
+                    source=quote.source,
+                    fetched_at=quote.fetched_at,
+                )
+            out.append(quote)
+        return sorted(out, key=lambda q: q.price_brl)
+
+    def _shortlist(
+        self,
+        candidates: list[Candidate],
+        best_quotes: dict[tuple[str, str], FareQuote],
+        stats: SearchStats,
+    ) -> list[Candidate]:
+        scrapable = [c for c in candidates if c[0].carrier in SCRAPERS_BY_CARRIER]
+        # teto DURO (multidestinos): vale inclusive no caminho sem pré-filtro,
+        # para o orçamento global de scraping da jornada nunca ser estourado.
+        hard_cap = int(getattr(self.ctx.settings, "scrape_hard_cap", 0) or 0)
+        if not best_quotes:
+            if hard_cap > 0 and len(scrapable) > hard_cap:
+                self.log(
+                    f"sem pré-filtro: teto de scraping aplicado "
+                    f"({hard_cap} de {len(scrapable)} candidatos)"
+                )
+                scrapable = scrapable[:hard_cap]
+            else:
+                self.log("sem pré-filtro: todos os candidatos serão raspados")
+            stats.candidates_scraped = len(scrapable)
+            return scrapable
+
+        def price_of(candidate: Candidate) -> float:
+            route, depart = candidate
+            quote = best_quotes.get((route.slug(), depart.isoformat()))
+            return quote.price_brl if quote else float("inf")
+
+        ranked = sorted(scrapable, key=price_of)
+        top_k = self.ctx.settings.prefilter_top_k
+        if hard_cap > 0:
+            top_k = min(top_k, hard_cap)
+        shortlist = ranked[:top_k]
+        stats.candidates_scraped = len(shortlist)
+        stats.scrapes_saved_by_prefilter = max(0, len(scrapable) - len(shortlist))
+        self.log(
+            f"pré-filtro: {len(shortlist)} candidatos seguem para scraping "
+            f"({stats.scrapes_saved_by_prefilter} scrapes economizados)"
+        )
+        return shortlist
+
+    async def _scrape_shortlist(
+        self, shortlist: list[Candidate], stats: SearchStats
+    ) -> list[FlightOffer]:
+        import asyncio
+
+        async def scrape_one(route: Route, depart) -> list[FlightOffer] | Exception:
+            agent_cls = SCRAPERS_BY_CARRIER[route.carrier]
+            agent = agent_cls(self.ctx)
+            label = f"{agent.name} {route.key()} {depart.isoformat()}"
+            result = await self.ctx.spawn(
+                self.name, label, lambda: agent.fetch_offers(route, depart)
+            )
+            if not isinstance(result, Exception):
+                # anota a conexão planejada da rota (ex.: via PTY) para a API/UI
+                # poder desenhar as escalas mesmo quando o scraper não as devolve
+                for offer in result:
+                    offer.raw.setdefault("route_via", route.via or "")
+            return result
+
+        # return_exceptions: um cancelamento/bug num scrape_one não pode
+        # derrubar os demais scrapes que já estavam em andamento
+        results = await asyncio.gather(
+            *(scrape_one(route, depart) for route, depart in shortlist),
+            return_exceptions=True,
+        )
+        offers: list[FlightOffer] = []
+        failures = 0
+        for result in results:
+            if isinstance(result, BaseException):
+                failures += 1
+                continue
+            offers.extend(result)
+        if failures:
+            self.log(f"{failures} scrape(s) falharam — degradando para o pré-filtro")
+        return offers
+
+    @staticmethod
+    def _merge_offer(kept: FlightOffer, dup: FlightOffer) -> None:
+        """Mesma chave de auditoria: a duplicata COMPLETA os campos ausentes
+        da mantida (ex.: linha em dinheiro + linha em milhas do mesmo voo,
+        ou scraped + metasearch) — informação obtida na busca não é jogada
+        fora. A primeira da lista (scraped) continua vencendo nos campos
+        já preenchidos."""
+        if kept.price_cash_brl is None and dup.price_cash_brl is not None:
+            kept.price_cash_brl = dup.price_cash_brl
+            kept.taxes_brl = kept.taxes_brl or dup.taxes_brl
+        if kept.price_miles is None and dup.price_miles is not None:
+            kept.price_miles = dup.price_miles
+            kept.miles_program = kept.miles_program or dup.miles_program
+        if kept.upgrade_miles is None:
+            kept.upgrade_miles = dup.upgrade_miles
+        if kept.upgrade_cash_brl is None:
+            kept.upgrade_cash_brl = dup.upgrade_cash_brl
+        if kept.seats_left is None:
+            kept.seats_left = dup.seats_left
+        for field, value in (dup.raw or {}).items():
+            kept.raw.setdefault(field, value)
+
+    def _audit(self, offers: list[FlightOffer]) -> list[FlightOffer]:
+        seen: dict[str, FlightOffer] = {}
+        order: list[str] = []
+        dropped = 0
+        for offer in offers:
+            key = f"{offer.itinerary_key()}:{offer.cabin.value}"
+            numbers = "/".join(offer.flight_numbers)
+            pair = f"{offer.origin}-{offer.destination}"
+            if not numbers or "?" in numbers or numbers == pair:
+                # sem número de voo real o itinerary_key é um placeholder
+                # idêntico para voos distintos ("CM ?" ou o fallback "GRU-MCO"
+                # do metasearch): discrimina por horário+preço
+                raw = offer.raw or {}
+                key += (
+                    f":{raw.get('departure_time') or ''}"
+                    f":{offer.price_cash_brl or ''}:{offer.price_miles or ''}"
+                )
+            cash_ok = offer.price_cash_brl is None or offer.price_cash_brl > 0
+            miles_ok = offer.price_miles is None or offer.price_miles > 0
+            if not (cash_ok and miles_ok):
+                dropped += 1
+                continue
+            kept = seen.get(key)
+            if kept is not None:
+                self._merge_offer(kept, offer)
+                dropped += 1
+                continue
+            seen[key] = offer
+            order.append(key)
+        clean = [seen[key] for key in order]
+        clean.sort(key=lambda o: (o.price_cash_brl if o.price_cash_brl is not None else 9e12))
+        if dropped:
+            self.log(f"auditoria: {dropped} oferta(s) mesclada(s)/removida(s)")
+        return clean

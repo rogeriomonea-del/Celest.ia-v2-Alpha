@@ -1,38 +1,192 @@
-# celest.ia Research Planner
+# celest.ia — Plataforma de pesquisa inteligente de voos
 
-Protótipo de uma IA planejadora de pesquisa com capacidades de auto-correção
-(self-healing) e auto-melhoria (self-improvement). O projeto é composto pelo
-módulo principal `research_planner.py` e pelos testes unitários em `tests/`.
+Duas peças principais:
 
-## Funcionalidades
-- Gera novos testes a partir de dados existentes.
-- Analisa resultados para identificar sucessos e falhas.
-- Corrige automaticamente testes falhos.
-- Ajusta sua estratégia com base nos testes bem-sucedidos.
+| Peça | Pasta | Stack |
+|---|---|---|
+| **Engine multi-agente** (busca, scraping, milhas) | `celestia_engine/` | Python 3.11 + asyncio + Playwright |
+| **Front-end de busca** (estilo Kayak/Google Flights) | `celestia_dashboard/` | React + TypeScript + Tailwind |
 
-## Estrutura do Projeto
+## Arquitetura do engine
 
 ```text
-.
-├── README.md
-├── research_planner.py
-├── scrapers.py
-└── tests
-    ├── test_research_planner.py
-    └── test_scrapers.py
+                 ┌──────────────────────┐
+    pedido ────► │   Orchestrator       │  planeja candidatos (rota × data,
+                 │  (agente comandante) │  conexões via hub, flexibilidade)
+                 └──────────┬───────────┘
+                            │ gera subagentes (semáforo MAX_SUBAGENTS)
+        ┌───────────────────┼──────────────────────┐
+        ▼                   ▼                      ▼
+┌───────────────┐   ┌──────────────────┐   ┌───────────────────┐
+│ PriceScout    │   │ CopaScraper      │   │ LatamScraper      │
+│ Google Flights│   │ Firecrawl →      │   │ Firecrawl →       │
+│ + Skyscanner  │   │ Playwright local │   │ Playwright local  │
+│ (PRÉ-FILTRO)  │   │ (ConnectMiles)   │   │ (LATAM Pass)      │
+└───────┬───────┘   └────────┬─────────┘   └─────────┬─────────┘
+        │ top-K mais baratos │ ofertas cash + award  │
+        └───────────────┬────┴───────────────────────┘
+                        ▼
+              ┌───────────────────┐
+              │  MilesMathAgent   │  4 estratégias + milheiro
+              └─────────┬─────────┘
+                        ▼
+              Relatório ranqueado (SearchReport)
 ```
 
-## Execução dos testes
+* **Pré-filtro** — Google Flights/Skyscanner são consultados primeiro (baratos);
+  apenas os `PREFILTER_TOP_K` candidatos mais baratos seguem para o scraping
+  com browser (caro). O relatório mostra quantos scrapes foram economizados.
+* **Rotas** — malha curada de Copa (hub PTY, conexões automáticas via PTY),
+  LATAM (troncos BR + internacionais, conexões via GRU/SCL/LIM) e as rotas
+  populares cobertas via Skyscanner: `python -m celestia_engine routes`.
+* **MilesMathAgent** — agente dedicado ao cálculo de compra:
+  1. **Executiva direto** (dinheiro)
+  2. **Econômica + upgrade com milhas**
+  3. **Emissão em milhas** (award + taxas)
+  4. **Econômica + upgrade em dinheiro**
 
-Requisitos: [pytest](https://pytest.org/).
+  Para cada opção com milhas ele mostra o **equivalente em reais** pelo
+  milheiro configurado e o **milheiro de equilíbrio** (abaixo desse valor,
+  a estratégia com milhas vence a melhor opção em dinheiro).
+
+## Como rodar
 
 ```bash
-pip install pytest
-pytest
+pip install -r requirements.txt
+playwright install chromium          # só para scraping real
+cp .env.example .env                 # preencha suas chaves (ver abaixo)
+
+# demo offline (sem chaves, dados determinísticos)
+CELESTIA_MOCK=1 python -m celestia_engine search GRU MIA --depart 2026-09-10 --flex 1
+
+# busca real
+python -m celestia_engine search GRU PTY --depart 2026-09-10 \
+    --cabin business --miles-balance 120000 --program connectmiles --flex 2
+
+python -m celestia_engine routes      # malha carregada
+python -m celestia_engine milheiro    # tabela de milheiro
+python -m celestia_engine mesh        # atualiza a malha viva (Lyov/DECEA)
+python -m celestia_engine status      # integrações ativas
+python -m celestia_engine doctor      # testa cada integração com 1 chamada real
+python -m celestia_engine strategies  # desempenho aprendido de cada estratégia
+python -m celestia_engine scripts     # playbooks do Firecrawl Interact
+python -m pytest                      # testes offline
 ```
 
-## Scrapers de companhias aéreas
+## Site + motor juntos (a ponte)
 
-O módulo `scrapers.py` inclui funções que demonstram como coletar preços de voo
-na Copa Airlines e Skyscanner, além de consultar o saldo do programa ConnectMiles.
-Antes de realizar scraping, verifique os termos de uso de cada serviço.
+O site consome o motor pela API HTTP (`celestia_engine/api.py`). Dois
+terminais:
+
+```bash
+# terminal 1 — a API do motor (a ponte), porta 8000
+python -m celestia_engine serve                    # real (usa o .env)
+CELESTIA_MOCK=1 python -m celestia_engine serve    # demo offline
+
+# terminal 2 — o site
+cd celestia_dashboard && npm install && npm run dev   # http://localhost:5173
+```
+
+O dev server já faz proxy de `/api` para a porta 8000. Ao buscar no site:
+
+- **API no ar** → busca real do motor (banner verde com estatísticas +
+  painel "Como comprar mais barato" com as 4 estratégias de milhas);
+- **API fora do ar** (ex.: site estático na Vercel) → o site degrada para o
+  modo demonstração com dados fictícios e avisa no banner âmbar.
+
+Endpoints: `POST /api/search`, `POST /api/search/multi-city`,
+`GET /api/scripts`, `GET /api/status`, `GET /api/health`. Em produção, sirva
+o `dist/` e proxie `/api` para o uvicorn no mesmo domínio (nginx), ou builde
+o site com `VITE_API_URL` apontando para a API em outro domínio.
+
+### Multidestinos (jornadas de 2–6 trechos)
+
+O site tem o modo **Multidestinos** (2 a 6 trechos sequenciais, open-jaw
+permitido) e o **ida-e-volta pesquisa os dois sentidos de verdade** — vira
+uma jornada de 2 trechos na mesma infraestrutura. O motor pesquisa os
+trechos com concorrência limitada (semáforo global compartilhado), agrega
+tudo numa resposta só e calcula as melhores **combinações** de compra por
+beam search. Contrato completo, códigos de erro e semântica parcial/falha em
+[`docs/multicity-contract.md`](docs/multicity-contract.md); ajustes finos via
+`MULTICITY_*` no `.env` (ver `.env.example`).
+
+> Os valores multidestinos são combinações de trechos independentes. Não
+> representam necessariamente uma tarifa única, PNR único ou conexões
+> protegidas.
+
+### Hospedagem
+
+- **Tudo junto num VPS (recomendado)** — Hostinger VPS/Ubuntu: guia completo em
+  [`docs/deploy-hostinger.md`](docs/deploy-hostinger.md); a instalação inteira é
+  `bash deploy/hostinger-setup.sh seudominio.com` (nginx + systemd + HTTPS).
+- **Site** (estático): Vercel, Hostinger Website Hosting (conteúdo de
+  `celestia_dashboard/dist/` após `npm run build`), Netlify etc.
+- **Motor/API** (Python): Hostinger **VPS**, Railway, Render ou Fly.io —
+  `pip install -r requirements.txt && python -m celestia_engine serve --host 0.0.0.0`.
+  Hospedagem compartilhada (PHP) **não** roda o motor.
+
+## Scraping com estratégias que se auto-otimizam
+
+O scraping das companhias tem **3 estratégias** (Firecrawl Interact → Firecrawl
+estático → Playwright local). O orquestrador não fixa uma: a cada busca ele
+ordena as estratégias pelo **desempenho real** gravado em
+`data/strategy_performance.csv` e registra o resultado de volta — aprende sozinho
+qual fluxo vale mais a pena por site. O modo **Interact** abre uma sessão de
+browser viva e extrai tarifas de várias companhias de uma vez. Detalhes em
+[`docs/scraping-protocol.md`](docs/scraping-protocol.md).
+
+## Dados que alimentam o ML
+
+Toda busca grava linhas de esquema **fixo** em `data/searches.csv`
+(append-only): cotações do pré-filtro, ofertas raspadas e as estratégias
+calculadas, com contexto completo (rota, datas, milheiro, breakeven,
+estatísticas do orquestrador). É o dataset de treino para previsão de preço
+e recomendação de estratégia — `HISTORY_DIR`/`HISTORY_ENABLED` controlam.
+
+O agente **RouteMeshAgent** (`python -m celestia_engine mesh`) usa a API
+open-source [Lyov](https://github.com/andrebrito16/lyov) (planos RPL oficiais
+do DECEA) para manter `data/routes_live.csv` com a malha real de
+TAM/GOL/Azul; o orquestrador soma essas rotas à curadoria automaticamente.
+
+## Chaves de API — o que conectar e onde
+
+Todas as chaves vão no arquivo **`.env` na raiz** (copie de `.env.example`).
+
+| Variável | Serviço | Onde obter | Para quê |
+|---|---|---|---|
+| `SERPAPI_KEY` | SerpApi (Google Flights) | https://serpapi.com | Pré-filtro de preços |
+| `SKYSCANNER_API_KEY` | Skyscanner Partners v3 | https://developers.skyscanner.net | Pré-filtro + descoberta de rotas |
+| `RAPIDAPI_KEY` | RapidAPI (chave única) | https://rapidapi.com | Assine e use: **google-flights2** (pré-filtro ~45× mais barato que SerpApi), **sky-scrapper**/**flights-sky** (Skyscanner) e **Lyov** (malha RPL/DECEA) |
+| `RAPIDAPI_SKY_HOST` | — | — | Troca o wrapper Skyscanner (`sky-scrapper` ⇄ `flights-sky`) sem código |
+| `FIRECRAWL_API_KEY` | Firecrawl (scraping gerenciado) | https://firecrawl.dev | Copa/LATAM com anti-bot gerenciado; Playwright local vira fallback |
+| `COPA_BOOKING_URL` / `LATAM_OFFERS_URL` | — | — | Ajustar templates se os sites mudarem |
+| `MILHEIRO_*` | — | — | Valor que você paga por 1.000 milhas |
+| `PREFILTER_TOP_K` / `MAX_SUBAGENTS` | — | — | Custo × velocidade da pesquisa |
+
+Sem nenhuma chave o engine continua funcionando: pula o pré-filtro e raspa
+todos os candidatos (mais caro), ou roda 100% offline com `CELESTIA_MOCK=1`.
+
+> **Aviso**: scraping de sites de companhias aéreas está sujeito aos termos de
+> uso de cada site e a proteções anti-bot. Use com moderação, prefira as APIs
+> oficiais quando disponíveis e monitore falhas no log de agentes.
+
+## Front-end (`celestia_dashboard/`)
+
+SPA de busca de voos com typeahead IATA, calendário duplo, popover de
+passageiros, abas Melhor/Mais barato/Mais rápido, filtros funcionais e
+skeleton loaders. Deploy automático no Vercel (ver `vercel.json`).
+
+**SEO pronto para marketing**: meta tags completas, Open Graph + Twitter Card
+com imagem dedicada (`public/og.png`), dados estruturados JSON-LD
+(Organization + WebApplication), `robots.txt`, `sitemap.xml`, favicon e
+título dinâmico por rota pesquisada.
+
+```bash
+cd celestia_dashboard && npm install && npm run dev
+```
+
+## Módulos legados
+
+`scrapers.py` e `research_planner.py` são o protótipo original (mantidos
+pelos testes históricos). A funcionalidade deles foi absorvida e superada
+pelo `celestia_engine/`.
