@@ -20,6 +20,14 @@ Nunca inferir composição/valor de carteira sem importação confirmada.
 1. **Armazenamento**: DuckDB/parquet/SQLite local no lugar de PostgreSQL (ADR-0002).
 2. **EBITDA proxy** = EBIT (DRE 3.05) + depreciação/amortização da DFC-MI; rotulado
    PROXY; difere de EBITDA gerencial divulgado pelas companhias.
+2b. **Escala da composição de capital CVM é inconsistente** (fato verificado:
+   Petrobras/WEG reportam em unidades; Vale/Itaú em milhares). A escala é
+   resolvida por validação cruzada com o LPA básico ON (conta 3.99, em R$/ação,
+   sem ESCALA_MOEDA); fallback: plausibilidade do VPA/ação. Sem validação
+   inequívoca, valor de mercado = INDISPONIVEL (nunca palpite silencioso).
+2c. **Bancos/seguradoras** usam template contábil próprio: PL e lucro líquido são
+   localizados por descrição de conta (conceito), não por código fixo 2.03/3.11.
+2d. **Emissores que reportam em moeda != REAL** ficam fora do universo do MVP.
 3. **Preços B3 não ajustados** por proventos; nenhuma métrica de retorno total é
    exibida no MVP; dividend yield = INDISPONIVEL.
 4. **Classificação setorial** do MVP usa `SETOR_ATIV` do cadastro CVM (menos

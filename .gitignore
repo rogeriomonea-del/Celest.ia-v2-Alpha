@@ -1,0 +1,6 @@
+data/
+!data/gold/screener_quality_deep_value.csv
+__pycache__/
+*.pyc
+.pytest_cache/
+.env
