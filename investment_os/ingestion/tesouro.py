@@ -1,6 +1,7 @@
 """Ingestão bronze do CSV oficial de preços e taxas do Tesouro Direto."""
 from __future__ import annotations
 
+from datetime import date
 from pathlib import Path
 
 from .base import fetch_bronze
@@ -13,9 +14,11 @@ TESOURO_CSV_URL = (
 
 
 def ingest(cache_file: Path | None = None) -> Path:
+    # fonte mutável (novas linhas diárias): bronze versionado por data de
+    # ingestão — imutabilidade preservada, refresh possível
     return fetch_bronze(
         "tesouro_transparente",
         TESOURO_CSV_URL,
-        "precotaxatesourodireto.csv",
+        f"precotaxatesourodireto.{date.today().isoformat()}.csv",
         cache_file=cache_file,
     )

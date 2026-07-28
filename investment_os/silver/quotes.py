@@ -63,11 +63,11 @@ def parse_cotahist(zip_path: Path, tickers: set[str] | None = None) -> pd.DataFr
     return df.drop(columns=["tipreg"])
 
 
-def build(zip_paths: list[Path], tickers: set[str]) -> Path:
-    """Extrai as séries dos tickers de interesse para parquet silver.
+def build(zip_paths: list[Path], tickers: set[str] | None = None) -> Path:
+    """Extrai séries de preços para parquet silver.
 
-    Mercado a vista (tp_merc=010) e BDI padrão/fundos para evitar leilões e
-    mercados a termo.
+    `tickers=None` = universo COMPLETO da B3 (mercado a vista, tp_merc=010):
+    ações, units, FIIs, ETFs e BDRs. Leilões/termo/opções ficam fora.
     """
     frames = [parse_cotahist(p, tickers) for p in zip_paths]
     df = pd.concat([f for f in frames if not f.empty], ignore_index=True)
@@ -81,5 +81,53 @@ def build(zip_paths: list[Path], tickers: set[str]) -> Path:
     return out
 
 
+# Classificação HEURÍSTICA de tipo de ativo (documentada; nunca apresentada
+# como cadastro oficial): BDI 12 = FII; sufixos 34/35/32/33 = BDR; final 11
+# fora de BDI 12 = unit (se emissor FCA) ou ETF/fundo provável; demais = ação.
+_BDR_SUFFIX = ("31", "32", "33", "34", "35", "39")
+
+
+def classify_ticker(ticker: str, cd_bdi: int | None, fca_tickers: set[str]) -> tuple[str, str]:
+    t = ticker.strip().upper()
+    if cd_bdi == 12:
+        return "fii", "ALTA"
+    if any(t.endswith(sfx) for sfx in _BDR_SUFFIX) and len(t) >= 6:
+        return "bdr", "MEDIA"
+    if t.endswith("11") or t.endswith("11B"):
+        if t in fca_tickers:
+            return "unit", "ALTA"
+        return "etf_ou_fundo", "BAIXA"
+    if t in fca_tickers:
+        return "acao_br", "ALTA"
+    return "acao_br", "MEDIA"
+
+
+def build_asset_registry(listings: pd.DataFrame) -> Path:
+    """Registro de TODOS os ativos negociados (última data por ticker) com
+    classificação heurística e vínculo ao emissor quando existir (FCA)."""
+    prices = load()
+    last = prices.sort_values("trade_date").groupby("ticker").tail(1)
+    fca = set(listings["ticker"].unique())
+    by_ticker_cnpj = dict(zip(listings["ticker"], listings["cnpj"]))
+    rows = []
+    for _, r in last.iterrows():
+        tipo, conf = classify_ticker(str(r["ticker"]), int(r["cd_bdi"]) if str(r["cd_bdi"]).isdigit() else None, fca)
+        rows.append({
+            "ticker": r["ticker"], "tipo": tipo, "classificacao_confianca": conf,
+            "cnpj_emissor": by_ticker_cnpj.get(r["ticker"]),
+            "ultimo_pregao": r["trade_date"], "ultimo_fechamento": r["close"],
+            "cd_bdi": r["cd_bdi"], "especificacao": r["especificacao"],
+            "fonte": "b3_cotahist + cvm_fca (classificação heurística documentada)",
+        })
+    reg = pd.DataFrame(rows).sort_values("ticker")
+    out = config.SILVER_DIR / "asset_registry.parquet"
+    reg.to_parquet(out, index=False)
+    return out
+
+
 def load() -> pd.DataFrame:
     return pd.read_parquet(config.SILVER_DIR / "market_prices.parquet")
+
+
+def load_asset_registry() -> pd.DataFrame:
+    return pd.read_parquet(config.SILVER_DIR / "asset_registry.parquet")
