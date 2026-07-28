@@ -20,6 +20,7 @@ python -m investment_os.cli report       # relatórios (Ativo 360, screener, Tes
 python -m investment_os.cli macro        # Fase 6: BCB (SGS+Focus) -> regimes + painel Tesouro
 python -m pytest tests/investment_os -q  # testes do sistema financeiro
 uvicorn investment_os.api.main:app       # API local
+docker compose up -d api                 # API em produção (docs/DEPLOY.md)
 ```
 
 Fase 7: `POST /v1/chat` (Pergunte à IA) exige `ANTHROPIC_API_KEY` (503 sem ela);

@@ -32,13 +32,29 @@ app.include_router(macro_router)
 app.include_router(assets_router)
 app.include_router(chat_router)
 
-# CORS para o frontend local (Celst.ia-Finance em dev). Sem credenciais.
+# CORS para o frontend (Celst.ia-Finance). Sem credenciais. Origens extras
+# (painel hospedado) via IIOS_CORS_ORIGINS: lista separada por vírgula, ex.:
+# IIOS_CORS_ORIGINS=https://meu-painel.vercel.app,https://painel.exemplo.com
+_DEV_ORIGINS = ["http://localhost:3000", "http://127.0.0.1:3000"]
+
+
+def _cors_origins() -> list[str]:
+    import os
+
+    extra = [
+        origin.strip().rstrip("/")
+        for origin in os.environ.get("IIOS_CORS_ORIGINS", "").split(",")
+        if origin.strip()
+    ]
+    return _DEV_ORIGINS + extra
+
+
 try:
     from fastapi.middleware.cors import CORSMiddleware
 
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+        allow_origins=_cors_origins(),
         allow_methods=["*"],
         allow_headers=["*"],
     )
