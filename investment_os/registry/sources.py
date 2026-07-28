@@ -48,6 +48,31 @@ SOURCES: dict[str, Source] = {
             limitacoes="preços NÃO ajustados por proventos",
         ),
         Source(
+            source_id="bcb_sgs",
+            orgao="Banco Central do Brasil (SGS — Sistema Gerenciador de Séries Temporais)",
+            tipo_dado="Séries macroeconômicas (Selic, IPCA, câmbio PTAX, IBC-Br, CDI)",
+            base_url="https://api.bcb.gov.br/dados/serie/",
+            licenca="Dados abertos",
+            frequencia="diária/mensal conforme a série",
+            campo_data_base="data (dd/mm/aaaa)",
+            validacao="JSON [{data, valor}]; valores decimais em string",
+            limitacoes=(
+                "meta Selic publica vigência futura — uso point-in-time exige "
+                "truncar em data <= hoje; IPCA replicado do IBGE"
+            ),
+        ),
+        Source(
+            source_id="bcb_focus",
+            orgao="Banco Central do Brasil (Expectativas de Mercado — Focus/Olinda)",
+            tipo_dado="Expectativas de mercado (IPCA, Selic, câmbio, PIB)",
+            base_url="https://olinda.bcb.gov.br/olinda/servico/Expectativas/",
+            licenca="Dados abertos",
+            frequencia="semanal (pesquisa Focus)",
+            campo_data_base="Data (data da pesquisa)",
+            validacao="OData JSON; mediana/média/desvio por indicador e referência",
+            limitacoes="expectativas ≠ fatos: sempre rotuladas como EXPECTATIVA DE MERCADO",
+        ),
+        Source(
             source_id="tesouro_transparente",
             orgao="Secretaria do Tesouro Nacional (Tesouro Transparente)",
             tipo_dado="Preços e taxas diárias dos títulos do Tesouro Direto",
@@ -70,6 +95,8 @@ _ALLOWED_HOSTS = {
     "www.tesourotransparente.gov.br",
     "www.rad.cvm.gov.br",
     "web.rad.cvm.gov.br",
+    "api.bcb.gov.br",
+    "olinda.bcb.gov.br",
 }
 
 

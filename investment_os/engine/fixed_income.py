@@ -18,14 +18,14 @@ from dataclasses import dataclass
 from datetime import date, timedelta
 
 NOTIONAL = 1000.0
-COUPON_RATE_SEMI = 1.06**0.5 - 1.0  # cupom real NTN-B por semestre
+DEFAULT_COUPON_ANNUAL = 0.06  # NTN-B: 6% a.a. real; Prefixado c/ Juros: 10% a.a. nominal
 
 
 def _year_fraction(start: date, end: date) -> float:
     return (end - start).days / 365.25
 
 
-def ntnb_cashflows(settle: date, maturity: date, with_coupons: bool) -> list[tuple[date, float]]:
+def ntnb_cashflows(settle: date, maturity: date, with_coupons: bool, *, coupon_annual: float = DEFAULT_COUPON_ANNUAL) -> list[tuple[date, float]]:
     """Fluxos reais futuros (data, valor) de um título IPCA+ do Tesouro."""
     if maturity <= settle:
         raise ValueError("vencimento no passado")
@@ -43,18 +43,19 @@ def ntnb_cashflows(settle: date, maturity: date, with_coupons: bool) -> list[tup
                 year -= 1
             day = min(d.day, 28) if month == 2 else d.day
             d = date(year, month, day)
+        coupon_semi = (1.0 + coupon_annual) ** 0.5 - 1.0
         for cd in sorted(dates):
-            flows.append((cd, NOTIONAL * COUPON_RATE_SEMI))
+            flows.append((cd, NOTIONAL * coupon_semi))
     flows.append((maturity, NOTIONAL))
     return flows
 
 
-def price_from_yield(settle: date, maturity: date, yield_pct: float, with_coupons: bool) -> float:
+def price_from_yield(settle: date, maturity: date, yield_pct: float, with_coupons: bool, *, coupon_annual: float = DEFAULT_COUPON_ANNUAL) -> float:
     """PU real a partir da taxa real anual (% a.a., composta anualmente)."""
     y = yield_pct / 100.0
     return sum(
         cf / (1.0 + y) ** _year_fraction(settle, d)
-        for d, cf in ntnb_cashflows(settle, maturity, with_coupons)
+        for d, cf in ntnb_cashflows(settle, maturity, with_coupons, coupon_annual=coupon_annual)
     )
 
 
@@ -67,9 +68,9 @@ class RiskProfile:
     convexity: float
 
 
-def risk_profile(settle: date, maturity: date, yield_pct: float, with_coupons: bool) -> RiskProfile:
+def risk_profile(settle: date, maturity: date, yield_pct: float, with_coupons: bool, *, coupon_annual: float = DEFAULT_COUPON_ANNUAL) -> RiskProfile:
     y = yield_pct / 100.0
-    flows = ntnb_cashflows(settle, maturity, with_coupons)
+    flows = ntnb_cashflows(settle, maturity, with_coupons, coupon_annual=coupon_annual)
     price = sum(cf / (1.0 + y) ** _year_fraction(settle, d) for d, cf in flows)
     weighted_t = sum(
         _year_fraction(settle, d) * cf / (1.0 + y) ** _year_fraction(settle, d)
@@ -79,8 +80,8 @@ def risk_profile(settle: date, maturity: date, yield_pct: float, with_coupons: b
     modified = macaulay / (1.0 + y)
 
     bump = 0.0001  # 1 bp
-    p_up = price_from_yield(settle, maturity, (y + bump) * 100, with_coupons)
-    p_dn = price_from_yield(settle, maturity, (y - bump) * 100, with_coupons)
+    p_up = price_from_yield(settle, maturity, (y + bump) * 100, with_coupons, coupon_annual=coupon_annual)
+    p_dn = price_from_yield(settle, maturity, (y - bump) * 100, with_coupons, coupon_annual=coupon_annual)
     dv01 = (p_dn - p_up) / 2.0
     convexity = (p_up + p_dn - 2.0 * price) / (price * bump**2)
     return RiskProfile(price, macaulay, modified, dv01, convexity)
@@ -89,17 +90,18 @@ def risk_profile(settle: date, maturity: date, yield_pct: float, with_coupons: b
 def mtm_scenarios(
     settle: date, maturity: date, yield_pct: float, with_coupons: bool,
     shocks_bps: tuple[int, ...] = (-200, -150, -100, -50, 50, 100, 150, 200),
+    *, coupon_annual: float = DEFAULT_COUPON_ANNUAL,
 ) -> list[dict]:
     """Reprecificação para choques paralelos na taxa real.
 
     Decompõe o efeito em duration (1ª ordem) e convexidade (2ª ordem) e mostra o
     resíduo da reprecificação exata.
     """
-    base = risk_profile(settle, maturity, yield_pct, with_coupons)
+    base = risk_profile(settle, maturity, yield_pct, with_coupons, coupon_annual=coupon_annual)
     out = []
     for bps in shocks_bps:
         dy = bps / 10000.0
-        exact = price_from_yield(settle, maturity, yield_pct + bps / 100.0, with_coupons)
+        exact = price_from_yield(settle, maturity, yield_pct + bps / 100.0, with_coupons, coupon_annual=coupon_annual)
         duration_effect = -base.modified_duration_years * dy * base.price
         convexity_effect = 0.5 * base.convexity * dy**2 * base.price
         out.append(

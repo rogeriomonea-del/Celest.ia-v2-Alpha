@@ -110,12 +110,38 @@ def cmd_report() -> None:
         print("report:", p)
 
 
+def cmd_macro() -> None:
+    """Fase 6: ingestão BCB (SGS + Focus) -> silver -> gold (regimes + Tesouro)."""
+    from .ingestion import bcb as ing_bcb
+    from .reports.macro_report import build as build_macro
+    from .reports.tesouro_full import build as build_tesouro_full
+    from .silver import macro as sv_macro
+
+    config.ensure_dirs()
+    print("bronze: BCB SGS + Focus...")
+    paths = ing_bcb.ingest_all()
+    for ind, p in paths["focus"].items():
+        if isinstance(p, str):
+            print(f"  focus {ind}: {p}")
+    print("silver: séries macro...")
+    sv_macro.build_sgs(paths["sgs"])
+    sv_macro.build_focus({k: v for k, v in paths["focus"].items() if not isinstance(v, str)})
+    print("gold: regimes macro...")
+    build_macro()
+    print("gold: painel Tesouro completo...")
+    t = build_tesouro_full()
+    print(f"tesouro: {len(t['titulos'])} títulos na data-base {t['data_base']}; "
+          f"{len(t['radar_janelas'])} janela(s) no radar")
+
+
 def main() -> None:
     cmd = sys.argv[1] if len(sys.argv) > 1 else "all"
     if cmd in ("ingest", "all"):
         cmd_ingest()
     if cmd in ("build", "all"):
         cmd_build()
+    if cmd in ("macro", "all"):
+        cmd_macro()
     if cmd in ("report", "all"):
         cmd_report()
 
