@@ -127,7 +127,7 @@ def assess(conn: sqlite3.Connection, profile_id: int, answers: dict[str, str]) -
     pdb.audit(conn, "profile_assessed", assessment_id=cur.lastrowid,
               answered=len(answers), pending=len(pending), conflicts=len(conflicts))
     return {"assessment_id": cur.lastrowid, "scores": scores, "conflicts": conflicts,
-            "pending_questions": pending, "confidence": confidence}
+            "pending_questions": pending, "confidence": confidence, "answers": answers}
 
 
 # ---------------------------------------------------------------------- IPS
@@ -202,11 +202,56 @@ def generate_ips(assessment: dict, monthly_contribution: float | None = None) ->
         "frequencia_revisao": "trimestral ou após evento material",
         "regras_excecao": "exceções exigem registro de motivo e nova versão da IPS",
         "aporte_mensal_configurado": monthly_contribution if monthly_contribution is not None else config.MONTHLY_CONTRIBUTION,
+        # transparência: o plano de aportes depende deste número — se veio do
+        # default de configuração, o usuário DEVE revisá-lo antes de confirmar
+        "aporte_mensal_origem": "informado_pelo_usuario" if monthly_contribution is not None else "default_de_configuracao_revisar",
     }
+
+
+def validate_ips_content(content: dict) -> list[str]:
+    """Validação de coerência da IPS. Retorna lista de erros (vazia = ok).
+
+    Aplicada a QUALQUER conteúdo (gerado ou editado) antes de criar versão:
+    faixas presentes, min<=max, somas viáveis, bandas/aporte não negativos.
+    """
+    errors: list[str] = []
+    faixas = content.get("faixas_por_classe")
+    if not isinstance(faixas, dict) or not faixas:
+        return ["faixas_por_classe ausente ou vazia"]
+    soma_min = soma_max = 0.0
+    for cls, band in faixas.items():
+        try:
+            lo, hi = float(band["min_pct"]), float(band["max_pct"])
+        except (KeyError, TypeError, ValueError):
+            errors.append(f"faixa de '{cls}' sem min_pct/max_pct numéricos")
+            continue
+        if lo < 0 or hi < 0 or lo > 100 or hi > 100:
+            errors.append(f"faixa de '{cls}' fora de 0-100 ({lo}-{hi})")
+        if lo > hi:
+            errors.append(f"faixa de '{cls}' com mínimo {lo} > máximo {hi}")
+        soma_min += max(lo, 0.0)
+        soma_max += max(hi, 0.0)
+    if soma_min > 100.0 + 1e-9:
+        errors.append(f"soma dos mínimos ({soma_min:.0f}%) excede 100% — alocação impossível")
+    if soma_max < 100.0 - 1e-9:
+        errors.append(f"soma dos máximos ({soma_max:.0f}%) abaixo de 100% — carteira não alocável")
+    for proibida in content.get("classes_proibidas", []):
+        band = faixas.get(proibida)
+        if band and float(band.get("max_pct", 0)) > 0:
+            errors.append(f"classe proibida '{proibida}' com faixa máxima > 0")
+    if float(content.get("bandas_rebalanceamento_pp", 0)) < 0:
+        errors.append("bandas_rebalanceamento_pp negativa")
+    aporte = content.get("aporte_mensal_configurado")
+    if aporte is not None and float(aporte) < 0:
+        errors.append("aporte_mensal_configurado negativo")
+    return errors
 
 
 def create_policy_version(conn: sqlite3.Connection, profile_id: int, content: dict,
                           reason: str, author: str) -> dict:
+    errors = validate_ips_content(content)
+    if errors:
+        raise ValueError("IPS incoerente: " + "; ".join(errors))
     pol = conn.execute(
         "SELECT id FROM investment_policy WHERE profile_id=?", (profile_id,)
     ).fetchone()
@@ -261,6 +306,8 @@ def confirm_policy(conn: sqlite3.Connection, version_id: int) -> dict:
     row = conn.execute("SELECT * FROM policy_version WHERE id=?", (version_id,)).fetchone()
     if row is None:
         raise ValueError("versão de política não encontrada")
+    if row["status"] != "draft":
+        raise ValueError(f"apenas versões em rascunho podem ser confirmadas (status atual: {row['status']})")
     conn.execute(
         "UPDATE policy_version SET status='superseded' WHERE policy_id=? AND status='confirmed'",
         (row["policy_id"],),

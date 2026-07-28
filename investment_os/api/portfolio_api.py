@@ -123,7 +123,10 @@ def policy_draft(body: PolicyDraftIn, conn=Depends(get_conn)) -> dict:
             "answers": json.loads(row["answers_json"]),
         }
         content = prof.generate_ips(assessment)
-    version = prof.create_policy_version(conn, pid, content, body.reason, body.author)
+    try:
+        version = prof.create_policy_version(conn, pid, content, body.reason, body.author)
+    except ValueError as exc:
+        raise _error(422, "ips_invalida", str(exc))
     return {**version, "content": content}
 
 
@@ -145,7 +148,8 @@ def policy_confirm(version_id: int, conn=Depends(get_conn)) -> dict:
     try:
         return prof.confirm_policy(conn, version_id)
     except ValueError as exc:
-        raise _error(404, "version_not_found", str(exc))
+        status = 404 if "não encontrada" in str(exc) else 409
+        raise _error(status, "confirm_rejected", str(exc))
 
 
 @router.get("/policy/confirmed")

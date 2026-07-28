@@ -68,9 +68,40 @@ def build_plan(conn: sqlite3.Connection, profile_id: int, snapshot_id: int,
         })
         seq += 1
 
-    # Decisões sobre violações críticas ANTES da simulação (dependem só dos
-    # totais): classes cuja violação não se resolve com o 1º aporte ficam
-    # excluídas de novos aportes até voltarem à faixa.
+    # Violações críticas POR ATIVO/EMISSOR e de classe proibida: sempre geram
+    # ação explícita (nunca desaparecem do plano). Ativo acima do limite não
+    # recebe aporte; a diluição vem do crescimento do restante da carteira.
+    handled_violations: list[dict] = []
+    for v in critical:
+        if v["tipo"] in ("asset_limit", "issuer_limit"):
+            actions.append({
+                "seq": seq, "scope": "asset", "key": v["chave"],
+                "action": "nao_aumentar", "priority": 1, "amount_brl": None,
+                "current_pct": v["peso_pct"], "target_max_pct": v["limite_pct"],
+                "rationale": f"violação crítica do limite por {'ativo' if v['tipo'] == 'asset_limit' else 'emissor'} "
+                             f"({v['peso_pct']:.1f}% vs {v['limite_pct']}%): não aumentar; diluição via "
+                             "aportes no restante da carteira; reduzir se persistir após 12 meses",
+                "revisao": "reavaliar a cada aporte",
+            })
+            handled_violations.append(v)
+            seq += 1
+        elif v["tipo"] == "classe_proibida":
+            actions.append({
+                "seq": seq, "scope": "class", "key": v["chave"],
+                "action": "reduzir", "priority": 1,
+                "amount_brl": round(v["peso_pct"] / 100.0 * total, 2),
+                "current_pct": v["peso_pct"], "target_max_pct": 0,
+                "rationale": f"classe proibida pela IPS em carteira ({v['peso_pct']:.1f}%): "
+                             "eliminar a posição de forma ordenada",
+                "custo_imposto": "imposto não estimado quando houver custo desconhecido nas posições da classe",
+                "revisao": "confirmar eliminação no próximo snapshot",
+            })
+            handled_violations.append(v)
+            seq += 1
+
+    # Decisões sobre violações críticas de BANDA DE CLASSE antes da simulação
+    # (dependem só dos totais): classes cuja violação não se resolve com o 1º
+    # aporte ficam excluídas de novos aportes até voltarem à faixa.
     no_contrib_classes: set[str] = set()
     critical_decisions: list[dict] = []
     for v in critical:
@@ -122,11 +153,11 @@ def build_plan(conn: sqlite3.Connection, profile_id: int, snapshot_id: int,
             remaining = monthly - sum(alloc.values())
         if remaining > 1e-6:
             # sem déficit: distribuir proporcional aos centros das faixas
-            # permitidas, excluindo classes em violação sob diluição
+            # permitidas, excluindo QUALQUER classe já acima do próprio teto
             centers = {
                 c: (b["min_pct"] + b["max_pct"]) / 2
                 for c, b in bands.items()
-                if b["max_pct"] > 0 and not (c in no_contrib_classes and weights.get(c, 0.0) > b["max_pct"])
+                if b["max_pct"] > 0 and weights.get(c, 0.0) <= b["max_pct"]
             }
             s = sum(centers.values()) or 1.0
             for cls, c in centers.items():
@@ -178,14 +209,22 @@ def build_plan(conn: sqlite3.Connection, profile_id: int, snapshot_id: int,
                 "revisao": "reavaliar a cada aporte"})
         seq += 1
 
+    # classes sem nenhum ativo ingerido/rastreável (ex.: internacional, cripto
+    # antes das fases 6+): o aporte é recomendado, mas a execução e o
+    # acompanhamento são externos ao sistema — declarado na ação
+    tracked_classes = {p["asset_class"] for p in analysis["posicoes"]} | {"acao_br", "fii", "renda_fixa"}
     for cls, amount in monthly_allocations[0].items():
         band = bands.get(cls, {})
+        rationale = "classe abaixo da faixa-alvo pós-aporte; aporte novo evita venda e giro"
+        if cls not in tracked_classes:
+            rationale += (" | ATENÇÃO: classe ainda sem ativos ingeridos no sistema — execução e "
+                          "acompanhamento externos até a integração (fases 6+)")
         actions.append({
             "seq": seq, "scope": "class", "key": cls, "action": "aumentar_com_aportes",
             "priority": 2, "amount_brl": amount,
             "current_pct": round(class_weights.get(cls, 0.0), 2),
             "target_min_pct": band.get("min_pct"), "target_max_pct": band.get("max_pct"),
-            "rationale": "classe abaixo da faixa-alvo pós-aporte; aporte novo evita venda e giro",
+            "rationale": rationale,
             "revisao": "recalcular a cada aporte com preços atualizados",
         })
         seq += 1
@@ -202,7 +241,10 @@ def build_plan(conn: sqlite3.Connection, profile_id: int, snapshot_id: int,
             "preços estáticos durante a simulação (horizonte de planejamento, não previsão)",
             "sem dados de proventos e vencimentos ingeridos (fases futuras) — não considerados",
             "imposto não estimado onde o custo de aquisição é desconhecido",
-        ],
+        ] + ([
+            f"ATENÇÃO: aporte mensal de R$ {monthly:,.0f} veio do DEFAULT de configuração, "
+            "não de valor informado pelo usuário — todo o plano depende dele; revise a IPS"
+        ] if content.get("aporte_mensal_origem") == "default_de_configuracao_revisar" else []),
         "proximo_aporte": monthly_allocations[0],
         "plano_3_meses": monthly_allocations[:3],
         "plano_6_meses": monthly_allocations[:months],
@@ -217,7 +259,14 @@ def build_plan(conn: sqlite3.Connection, profile_id: int, snapshot_id: int,
         "violacoes_criticas_resolvidas": sum(
             1 for a in actions if a["priority"] == 1 and a["action"] in ("nao_aumentar", "reduzir")
         ),
-        "violacoes_remanescentes": [v for v in analysis["violacoes"] if v["severidade"] != "critica"],
+        # TODAS as violações não endereçadas por ação aparecem aqui — nenhuma
+        # violação crítica pode desaparecer silenciosamente do plano
+        "violacoes_remanescentes": [
+            v for v in analysis["violacoes"]
+            if v["severidade"] != "critica"
+            or (v not in handled_violations and not any(
+                d["cls"] == v.get("chave") for d in critical_decisions))
+        ],
         "acoes": actions,
         "confianca": analysis["confianca"],
         "qualidade_dados": analysis["qualidade_dados"],

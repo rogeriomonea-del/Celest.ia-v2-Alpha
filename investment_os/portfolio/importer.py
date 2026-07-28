@@ -113,14 +113,21 @@ def _clean_number(raw) -> float | None:
         return None
     if "," in s:
         s = s.replace(".", "").replace(",", ".")
+    elif re.match(r"^-?\d{1,3}(\.\d{3})+$", s):
+        # convenção pt-BR dos adaptadores: ponto agrupando milhares (1.234 = 1234)
+        s = s.replace(".", "")
     try:
         return float(s)
     except ValueError:
         return None
 
 
+_FORMULA_RE = re.compile(r"^\s*(?:[=@]|[+-][^\d.,\s])")
+
+
 def _cell_is_formula(value) -> bool:
-    return isinstance(value, str) and value.strip().startswith(("=", "+@", "@"))
+    """Prefixos de injeção de fórmula (=, @, +cmd, -cmd); números negativos ok."""
+    return isinstance(value, str) and bool(_FORMULA_RE.match(value))
 
 
 def _norm_header(h) -> str:
@@ -219,8 +226,20 @@ def parse_file(path: Path, kind: str) -> tuple[str, list[ParsedRow], int]:
         ticker_raw, n1 = scrub_value(cell("ticker"))
         pii_total += n1
         ticker_raw = ticker_raw.strip().upper()
-        quantity = _clean_number(cell("quantity"))
-        avg_cost = _clean_number(cell("avg_cost"))
+        # PII em campo numérico (ex.: CPF na coluna de quantidade) nunca pode
+        # ser convertida em número e persistida — rejeita a linha inteira.
+        from .pii import contains_pii
+
+        pii_fields: set[str] = set()
+        for field_name in ("quantity", "avg_cost"):
+            raw_cell = cell(field_name)
+            if raw_cell is not None and contains_pii(str(raw_cell)):
+                issues.append(f"possível PII no campo numérico '{field_name}' — linha rejeitada")
+                pii_total += 1
+                pii_fields.add(field_name)
+        # valor com PII jamais é convertido/persistido — nem em parsed_json
+        quantity = None if "quantity" in pii_fields else _clean_number(cell("quantity"))
+        avg_cost = None if "avg_cost" in pii_fields else _clean_number(cell("avg_cost"))
         data_base_raw, n2 = scrub_value(cell("data_base"))
         pii_total += n2
         data_base = _parse_date(data_base_raw)
@@ -333,7 +352,8 @@ def start_import(conn: sqlite3.Connection, portfolio_id: int, file_path: Path,
     )
     import_id = cur.lastrowid
 
-    seen: set[tuple[str, str | None]] = set()
+    seen_exact: set[tuple] = set()
+    seen_ticker: set[tuple[str, str | None]] = set()
     for r in rows:
         if r.issues:
             status, reason, resolution = "rejected", "; ".join(r.issues), {}
@@ -341,10 +361,19 @@ def start_import(conn: sqlite3.Connection, portfolio_id: int, file_path: Path,
             resolution = resolve_instrument(r.ticker_raw, by_ticker, by_cnpj)
             status = {"ok": "ok", "ambiguous": "ambiguous", "unknown": "unknown"}[resolution["status"]]
             reason = resolution.get("reason", "")
-            key = (r.ticker_raw, r.data_base)
-            if key in seen:
-                status, reason = "duplicate", "linha duplicada (mesmo ticker e data-base)"
-            seen.add(key)
+            exact_key = (r.ticker_raw, r.data_base, r.quantity, r.avg_cost)
+            ticker_key = (r.ticker_raw, r.data_base)
+            if exact_key in seen_exact:
+                # linha idêntica: descarte seguro
+                status, reason = "duplicate", "linha idêntica duplicada (ticker, data-base, quantidade e custo)"
+            elif ticker_key in seen_ticker:
+                # mesmo ticker com quantidade/custo diferentes: pode ser lote
+                # legítimo (outra corretora) — NUNCA descartar silenciosamente
+                status = "ambiguous"
+                reason = ("mesmo ticker com quantidade/custo distintos — possíveis lotes "
+                          "múltiplos; confirme se devem ser somados ou corrija")
+            seen_exact.add(exact_key)
+            seen_ticker.add(ticker_key)
         parsed_payload = {
             "ticker": r.ticker_raw, "quantity": r.quantity,
             "avg_cost": r.avg_cost,
@@ -445,7 +474,10 @@ def confirm_import(conn: sqlite3.Connection, import_id: int, *, accept_partial: 
         snap = conn.execute(
             "SELECT * FROM portfolio_snapshot WHERE import_id=?", (import_id,)
         ).fetchone()
-        return {"snapshot_id": snap["id"], "version": snap["version"], "idempotent": True}
+        if snap is not None:
+            return {"snapshot_id": snap["id"], "version": snap["version"], "idempotent": True}
+        # import confirmado pelo caminho idempotente: snapshot pertence a outro
+        # import — segue para a busca por hash de conteúdo abaixo
     ok_rows = [r for r in prev["rows"] if r["status"] == "ok"]
     problem_rows = [r for r in prev["rows"] if r["status"] not in ("ok", "duplicate")]
     if not ok_rows:
@@ -460,7 +492,9 @@ def confirm_import(conn: sqlite3.Connection, import_id: int, *, accept_partial: 
     portfolio_id = imp["portfolio_id"]
 
     normalized = sorted(
-        (r["ticker"], r["quantity"], r["avg_cost"], r["data_base"]) for r in ok_rows
+        (r["ticker"], r["quantity"], r["avg_cost"], r["data_base"],
+         (r.get("resolution") or {}).get("asset_class") or "outro", r["currency"])
+        for r in ok_rows
     )
     content_sha = hashlib.sha256(json.dumps(normalized, default=str).encode()).hexdigest()
     existing = conn.execute(
