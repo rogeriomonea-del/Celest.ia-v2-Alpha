@@ -291,7 +291,7 @@ Gerado executando `investment_os.chat.tools` contra o gold real desta máquina. 
 }
 ```
 
-## challenge_thesis(GMAT3)
+## challenge_thesis(ALPA3) — empresa reprovada (critérios inteiros + custo de oportunidade rotulado por natureza da taxa)
 
 - Fonte: screener (CVM/B3) + macro (BCB) + Tesouro Transparente — evidências determinísticas
 - Data-base: 2026-07-27
@@ -299,42 +299,41 @@ Gerado executando `investment_os.chat.tools` contra o gold real desta máquina. 
 
 ```json
 {
- "ticker": "GMAT3",
+ "ticker": "ALPA3",
  "evidencias_contrarias": [
-  "Nenhum critério reprovado no preset atual — risco de viés de confirmação; verifique dimensões fora do preset (governança, ciclo).",
+  "Critério do screener REPROVADO: P/VPA < 1",
+  "Critério do screener REPROVADO: P/L positivo e baixo",
+  "Critério do screener REPROVADO: ROE mediano 5a > 12%",
+  "Critério do screener REPROVADO: CAGR receita > 10%",
+  "Critério do screener REPROVADO: CAGR lucro > 10%",
+  "Critério do screener REPROVADO: Lucro positivo nos 5 anos",
   "Regime macro (inflacao): acelerando — IPCA 12m 4.64%; 3m anualizado 5.78%; fora da banda da meta (3.0±1.5) [premissa]",
   "Regime macro (politica_monetaria): afrouxando — meta Selic 14.25% a.a. vs 15.00% há ~6 meses",
   "Regime macro (atividade): acelerando — IBC-Br com ajuste sazonal: média 3m 110.8 vs 3m anteriores 110.0 (+0.72%)",
   "Regime macro (cambio): neutro — PTAX 5.12 vs média 12m 5.26 (±0.17)",
   "Regime macro (risco_fiscal): aumentando — dívida bruta/PIB 81.0% vs 75.8% há 12m (+5.2 p.p.)",
   "Regime macro (expectativas_inflacao): ancoradas — mediana Focus IPCA ano seguinte: 4.22% vs meta 3.0±1.5 [premissa]",
-  "Custo de oportunidade: Tesouro Prefixado com Juros Semestrais 2035-01-01 paga 14.74% (percentil 89.8) na data-base 2026-07-27."
- ],
- "checklist_red_team": [
-  "O lucro LTM é sustentável ou há itens não recorrentes?",
-  "A conversão de caixa acompanha o lucro contábil?",
-  "O múltiplo baixo é desconto real ou value trap (setor/ciclo/governança)?",
-  "Qual o impacto de Selic alta prolongada na tese e no custo de oportunidade vs Tesouro IPCA+?",
-  "Concentração: quanto a posição adicionaria ao risco por emissor/setor da carteira?",
-  "O que invalidaria a tese (gatilhos objetivos e verificáveis)?"
- ]
-}
+  "Custo de oportunidade em Tesouro IPCA+ 2029-05-15: taxa REAL a.a. (acima do IPCA) de 8.23% (percentil 95.9 da própria série) na data-base 2026-07-27.",
+  "Custo de oportunidade em Tesouro IPCA+ com Juros Semestrais 2030-08-15: taxa REAL a.a. (acima do IPCA) de 8.29% (percentil 98.1 da própria série) na data-base 2026-07-27.",
+  "Custo de oportunidade em Tesouro Prefixado 2032-01-01: taxa NOMINAL a.a. de 14.69% (percentil 87.8 da própria série) na data-base 2026-07-27.",
+  "Custo de oportunidade em Tesouro Prefixado com Juros Semestrais 2035-01-01: taxa NOMINAL a.a. de 14.74% (percentil 89.8 da própria série) na data-base 2026-07-27.",
+  "Atenção: taxas REAIS (IPCA+/IGP-M+) e NOMINAIS (prefixado) não são comparáveis diretamente entre si nem com retornos nominais de ações
 ```
 
 ## get_intraday_quote(PETR4)
 
 - Fonte: brapi.dev (AGREGADOR — não oficial; uso indicativo autorizado pelo usuário)
-- Data-base: 2026-07-28T19:24:30.000Z
+- Data-base: 2026-07-28T19:39:30.000Z
 - Avisos: ['Cotação intradiária de agregador: NÃO é fonte primária, NÃO é usada em cálculos e pode divergir do oficial B3. Referência oficial: COTAHIST (D-1).', 'Nunca usar este valor em cálculo de indicador.']
 
 ```json
 {
  "intradiario": {
   "ticker": "PETR4",
-  "preco": 41.18,
-  "variacao_pct": 0.41,
-  "fechamento_anterior": 41.18,
-  "data_hora": "2026-07-28T19:24:30.000Z",
+  "preco": 41.23,
+  "variacao_pct": 0.54,
+  "fechamento_anterior": 41.22,
+  "data_hora": "2026-07-28T19:39:30.000Z",
   "moeda": "BRL",
   "fonte": "brapi.dev (AGREGADOR — não oficial; uso indicativo autorizado pelo usuário)",
   "aviso": "Cotação intradiária de agregador: NÃO é fonte primária, NÃO é usada em cálculos e pode divergir do oficial B3. Referência oficial: COTAHIST (D-1).",
@@ -351,3 +350,12 @@ Gerado executando `investment_os.chat.tools` contra o gold real desta máquina. 
  }
 }
 ```
+
+## Nota de auditoria sobre o payload do agregador
+
+Na primeira geração deste demo, o payload do brapi era internamente
+inconsistente: `preco` igual a `fechamento_anterior` (41.18) mas
+`variacao_pct` 0.41% — coerente com o fechamento oficial B3 D-1 (41.01), não
+com o campo do próprio agregador. É payload real (não inventado) e ilustra
+exatamente por que a cotação de agregador é INDICATIVA, rotulada e proibida
+em cálculos.

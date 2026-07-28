@@ -161,6 +161,40 @@ class TestPIIeValidacao:
         out = orchestrator.ask("p", client=fake)
         assert out["resposta"]["confianca"] == "BAIXA"
 
+    def test_gate_alta_sem_evidencias_rebaixa_para_baixa(self, _tools_ok):
+        # GATE anti-alucinação: número afirmado sem evidência/fonte NUNCA sai
+        # com confiança ALTA — rebaixa e declara a lacuna em dados_ausentes.
+        sem_ev = Block("tool_use", id="tu", name="finalize_answer",
+                       input={**FINAL_OK.input, "evidencias": [], "fontes": []})
+        out = orchestrator.ask("p", client=FakeClient([Msg([sem_ev])]))
+        assert out["resposta"]["confianca"] == "BAIXA"
+        assert any("confiança rebaixada" in d for d in out["resposta"]["dados_ausentes"])
+
+    def test_evidencia_sem_fonte_e_descartada_e_rebaixa(self, _tools_ok):
+        ev_ruim = Block("tool_use", id="tu", name="finalize_answer",
+                        input={**FINAL_OK.input,
+                               "evidencias": [{"afirmacao": "P/L 3,14"}]})
+        out = orchestrator.ask("p", client=FakeClient([Msg([ev_ruim])]))
+        assert out["resposta"]["evidencias"] == []
+        assert out["resposta"]["confianca"] == "BAIXA"
+
+    def test_listas_como_string_normalizadas(self, _tools_ok):
+        misto = Block("tool_use", id="tu", name="finalize_answer",
+                      input={**FINAL_OK.input, "premissas": "premissa única",
+                             "riscos": "risco único"})
+        fake = FakeClient([Msg([misto])])
+        out = orchestrator.ask("meu CPF é 123.456.789-09, e aí?", client=fake)
+        # string não vira lista de caracteres, mesmo com o aviso PII na frente
+        assert out["resposta"]["premissas"][-1] == "premissa única"
+        assert out["resposta"]["riscos"] == ["risco único"]
+
+    def test_historico_com_item_nao_dict_ignorado(self, _tools_ok):
+        fake = FakeClient([Msg([FINAL_OK])])
+        out = orchestrator.ask("segue", historico=[
+            "string solta", None, {"role": "user", "content": "oi"}], client=fake)
+        assert len(fake.requests[0]["messages"]) == 2
+        assert out["resposta"]["confianca"] == "ALTA"
+
     def test_pergunta_vazia(self):
         with pytest.raises(ValueError):
             orchestrator.ask("   ", client=FakeClient([]))

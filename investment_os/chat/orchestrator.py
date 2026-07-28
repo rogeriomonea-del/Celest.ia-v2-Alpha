@@ -101,13 +101,44 @@ def _fallback_answer(motivo: str) -> dict:
     }
 
 
+def _as_str_list(v) -> list[str]:
+    """Campos de lista podem chegar como string do modelo — nunca iterar
+    string por caractere; normaliza para lista de strings não vazias."""
+    if isinstance(v, str):
+        return [v.strip()] if v.strip() else []
+    if isinstance(v, list):
+        return [str(x).strip() for x in v if str(x).strip()]
+    return []
+
+
 def _validate_answer(raw: dict) -> dict:
     out = _fallback_answer("")
     out.update({k: raw[k] for k in out if k in raw})
+    for k in ("fontes", "premissas", "riscos", "dados_ausentes", "gatilhos_revisao"):
+        out[k] = _as_str_list(out.get(k))
+    # evidência válida = dict com afirmação E fonte não vazias (contrato do
+    # projeto: nenhuma afirmação factual sem fonte; data-base recomendada)
+    evidencias = []
+    for e in out.get("evidencias") or []:
+        if (isinstance(e, dict) and str(e.get("afirmacao", "")).strip()
+                and str(e.get("fonte", "")).strip()):
+            evidencias.append({
+                "afirmacao": str(e["afirmacao"]).strip(),
+                "valor": str(e["valor"]).strip() if e.get("valor") is not None else None,
+                "fonte": str(e["fonte"]).strip(),
+                "data_base": str(e["data_base"]).strip() if e.get("data_base") else None,
+            })
+    out["evidencias"] = evidencias
     if out["confianca"] not in CONFIANCAS:
         out["confianca"] = "BAIXA"
     if not str(out.get("resposta_direta", "")).strip():
         return _fallback_answer("resposta_direta vazia")
+    # GATE anti-alucinação: sem evidências com fonte (ou sem fontes), a
+    # confiança NUNCA fica acima de BAIXA e a lacuna é declarada.
+    if (not evidencias or not out["fontes"]) and out["confianca"] != "BAIXA":
+        out["confianca"] = "BAIXA"
+        out["dados_ausentes"] = out["dados_ausentes"] + [
+            "evidências com fonte/data-base para as afirmações — confiança rebaixada"]
     return out
 
 
@@ -130,6 +161,8 @@ def ask(pergunta: str, historico: list[dict] | None = None, *,
 
     messages: list[dict] = []
     for m in historico or []:
+        if not isinstance(m, dict):
+            continue
         if m.get("role") in ("user", "assistant") and isinstance(m.get("content"), str):
             clean = scrub_text(m["content"]).text
             messages.append({"role": m["role"], "content": clean})
@@ -189,5 +222,5 @@ def ask(pergunta: str, historico: list[dict] | None = None, *,
             f"limite de {max_iterations} iterações de ferramentas atingido")
 
     if aviso_pii:
-        resposta["premissas"] = [aviso_pii] + list(resposta.get("premissas") or [])
+        resposta["premissas"] = [aviso_pii] + _as_str_list(resposta.get("premissas"))
     return {"resposta": resposta, "ferramentas_chamadas": trace, "modelo": model}

@@ -69,10 +69,27 @@ def fetch_bronze(
     started = _utcnow()
 
     if target.exists():
-        # Imutabilidade: só re-registra; nova versão exigiria novo nome.
+        # Imutabilidade: um bruto existente NUNCA é sobrescrito.
         meta_path = target.with_suffix(target.suffix + ".meta.json")
         if meta_path.exists():
             return target
+        # Sidecar ausente (estado parcial): re-registra hash/meta/auditoria a
+        # partir do arquivo existente, sem re-download e sem overwrite.
+        digest = _sha256(target)
+        meta = {
+            "source_id": source_id,
+            "url": url,
+            "sha256": digest,
+            "bytes": target.stat().st_size,
+            "downloaded_at": _utcnow(),
+            "immutable": True,
+            "note": "meta regenerado de bruto preexistente (sidecar ausente)",
+        }
+        meta_path.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
+        _audit({"source_id": source_id, "url": url, "file": filename, "sha256": digest,
+                "bytes": meta["bytes"], "status": "meta_regenerated",
+                "started_at": started, "finished_at": _utcnow()})
+        return target
 
     tmp = target.with_suffix(target.suffix + ".part")
     error: str | None = None

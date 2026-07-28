@@ -82,8 +82,8 @@ def build(zip_paths: list[Path], tickers: set[str] | None = None) -> Path:
 
 
 # Classificação HEURÍSTICA de tipo de ativo (documentada; nunca apresentada
-# como cadastro oficial): BDI 12 = FII; sufixos 34/35/32/33 = BDR; final 11
-# fora de BDI 12 = unit (se emissor FCA) ou ETF/fundo provável; demais = ação.
+# como cadastro oficial): BDI 12 = FII; sufixos 31/32/33/34/35/39 = BDR; final
+# 11 fora de BDI 12 = unit (se emissor FCA) ou ETF/fundo provável; demais = ação.
 _BDR_SUFFIX = ("31", "32", "33", "34", "35", "39")
 
 

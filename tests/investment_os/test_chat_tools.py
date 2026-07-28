@@ -22,17 +22,19 @@ SCREENER_SYNTH = {
     "run_date": "2026-07-27",
     "pendencias_globais_do_preset": ["dividend yield indisponível no MVP"],
     "empresas": [
+        # criterios_* como STRING "; "-separada — formato REAL do gold
+        # (screener/run.py faz "; ".join). Fixture fiel ao esquema de produção.
         {"ticker": "GMAT3", "empresa": "GRUPO MATEUS", "setor": "Varejo",
          "status": "APROVADA", "pl": "5.08", "pvpa": "0.80", "roe_ltm": "16.24",
          "roe_med5": "15.16", "div_liq_ebitda": "0.28", "cagr_receita": "20.1",
-         "conversao_caixa": "1.1", "criterios_reprovados": [],
-         "criterios_nao_avaliados": [], "preco_data": "2026-07-27",
+         "conversao_caixa": "1.1", "criterios_reprovados": "",
+         "criterios_nao_avaliados": "", "preco_data": "2026-07-27",
          "ultima_demonstracao": "1T26", "fontes": ["cvm", "b3"]},
         {"ticker": "XPTO3", "empresa": "XPTO SA", "setor": "Varejo",
          "status": "REPROVADA", "pl": "PREJUIZO", "pvpa": "1.9", "roe_ltm": "-3.0",
          "roe_med5": "2.0", "div_liq_ebitda": "4.1", "cagr_receita": "SERIE_NAO_COMPARAVEL",
-         "conversao_caixa": "0.2", "criterios_reprovados": ["pl", "roe_ltm"],
-         "criterios_nao_avaliados": ["cagr_receita"], "preco_data": "2026-07-27",
+         "conversao_caixa": "0.2", "criterios_reprovados": "pl; roe_ltm",
+         "criterios_nao_avaliados": "cagr_receita", "preco_data": "2026-07-27",
          "ultima_demonstracao": "1T26", "fontes": ["cvm", "b3"]},
     ],
 }
@@ -56,7 +58,10 @@ TESOURO_SYNTH = {
     "curvas": {}, "radar_janelas": [
         {"tipo": "Tesouro IPCA+", "vencimento": "2050-08-15", "taxa_atual_pct": 7.37,
          "percentil": 94.3, "criterio": "p80", "saida_hysteresis_pct": 7.0,
-         "invalidacao": "abaixo de 7.0%", "nota": "alta histórica"}],
+         "invalidacao": "abaixo de 7.0%", "nota": "alta histórica"},
+        {"tipo": "Tesouro Prefixado", "vencimento": "2032-01-01", "taxa_atual_pct": 13.4,
+         "percentil": 89.0, "criterio": "p80", "saida_hysteresis_pct": 12.5,
+         "invalidacao": "abaixo de 12.5%", "nota": "alta histórica"}],
     "parametros_radar": {"percentil_entrada": 80},
     "historico_oficial_desde": "2004-12-31",
 }
@@ -224,17 +229,48 @@ class TestIntraday:
 
 
 class TestChallengeThesis:
-    def test_reprovada_lista_criterios(self, env):
+    def test_reprovada_lista_criterios_do_formato_gold(self, env):
         r = tools.challenge_thesis("XPTO3")
         assert r["ok"]
-        joined = " ".join(r["dados"]["evidencias_contrarias"])
-        assert "REPROVADO: pl" in joined and "NÃO AVALIÁVEL" in joined
-        assert "7.37%" in joined  # custo de oportunidade Tesouro
+        ev = r["dados"]["evidencias_contrarias"]
+        # string "pl; roe_ltm" vira 2 critérios INTEIROS — nunca caracteres
+        assert "Critério do screener REPROVADO: pl" in ev
+        assert "Critério do screener REPROVADO: roe_ltm" in ev
+        assert not any(len(c.split(": ")[-1]) == 1 for c in ev if "REPROVADO" in c)
+        joined = " ".join(ev)
+        assert "NÃO AVALIÁVEL" in joined and "cagr_receita" in joined
         assert any("red-team" in a for a in r["avisos"])
+
+    def test_custo_oportunidade_rotula_real_vs_nominal(self, env):
+        ev = tools.challenge_thesis("XPTO3")["dados"]["evidencias_contrarias"]
+        ipca = [c for c in ev if "Tesouro IPCA+" in c and "Custo de oportunidade" in c]
+        pre = [c for c in ev if "Tesouro Prefixado" in c and "Custo de oportunidade" in c]
+        assert len(ipca) == 1 and "REAL" in ipca[0] and "7.37%" in ipca[0]
+        assert len(pre) == 1 and "NOMINAL" in pre[0] and "13.4%" in pre[0]
+        assert any("não são" in c and "comparáveis" in c for c in ev)
+
+    def test_radar_vazio_nao_quebra(self, env, monkeypatch, tmp_path):
+        import json as _json
+        vazio = {**TESOURO_SYNTH, "radar_janelas": []}
+        gold = tmp_path / "gold2"
+        gold.mkdir()
+        (gold / "tesouro_paineis.json").write_text(_json.dumps(vazio), encoding="utf-8")
+        (gold / "screener_quality_deep_value.json").write_text(
+            _json.dumps(SCREENER_SYNTH), encoding="utf-8")
+        (gold / "macro_regimes.json").write_text(_json.dumps(MACRO_SYNTH), encoding="utf-8")
+        monkeypatch.setattr("investment_os.config.GOLD_DIR", gold)
+        r = tools.challenge_thesis("XPTO3")
+        assert r["ok"] and not any("Custo de oportunidade" in c
+                                   for c in r["dados"]["evidencias_contrarias"])
 
     def test_aprovada_alerta_vies_confirmacao(self, env):
         r = tools.challenge_thesis("GMAT3")
         assert any("viés de" in c for c in r["dados"]["evidencias_contrarias"])
+
+    def test_crit_list_aceita_string_e_lista(self):
+        assert tools._crit_list("pl; roe_ltm") == ["pl", "roe_ltm"]
+        assert tools._crit_list(["pl", "roe_ltm"]) == ["pl", "roe_ltm"]
+        assert tools._crit_list("") == [] == tools._crit_list(None)
 
 
 class TestRunToolSaneamento:

@@ -56,12 +56,18 @@ chave brapi do próprio usuário como fonte intradiária.
    estouro do limite de iterações viram fallback estruturado de confiança
    BAIXA.
 
-6. **Privacidade e anti-injeção no chat.** PII é removida da pergunta e do
-   histórico pelo scrubber determinístico da Fase 5 ANTES de qualquer envio
-   ao LLM; resultados de ferramenta viajam serializados como DADOS (nunca
-   instruções — regra fixada no system prompt); o chat não recebe SQL nem
-   segredos; sem `ANTHROPIC_API_KEY` o endpoint responde 503 estruturado e
-   NENHUMA outra função do sistema depende do LLM.
+6. **Privacidade e anti-injeção no chat.** PII ESTRUTURADA (CPF, e-mail,
+   telefone, CEP, agência/conta, endereço — o escopo do scrubber
+   determinístico da Fase 5) é removida da pergunta e do histórico ANTES de
+   qualquer envio ao LLM. Limite declarado: nomes próprios, RG e data de
+   nascimento NÃO são detectados pelo scrubber atual — não digite dados
+   pessoais além do necessário. Resultados de ferramenta viajam serializados
+   como DADOS (nunca instruções — regra fixada no system prompt); o chat não
+   recebe SQL nem segredos; sem `ANTHROPIC_API_KEY` o endpoint responde 503
+   estruturado e NENHUMA outra função do sistema depende do LLM.
+   Gate anti-alucinação em código (não só no prompt): resposta sem evidências
+   com fonte tem a confiança rebaixada para BAIXA e a lacuna registrada em
+   `dados_ausentes`.
 
 7. **Chat não recomenda.** O assistente apresenta evidências e
    contra-argumento; recomendação positiva continua exigindo red-team +
@@ -73,5 +79,12 @@ chave brapi do próprio usuário como fonte intradiária.
   fora do escopo desta fase).
 - O bronze acumula uma versão datada por dia de ingestão (custo de disco
   aceito em troca de auditabilidade e reprodutibilidade point-in-time).
+- Virada de ano: o build resolve fixo-vs-datado pelo timestamp de INGESTÃO do
+  sidecar meta (não por preferência incondicional), e o COTAHIST do ano
+  anterior continua datado por 1 ano — o download completo pós-fechamento
+  vence as variantes parciais. Limite residual documentado: se NENHUMA
+  ingestão ocorrer durante todo o ano seguinte ao fechamento, a última
+  variante parcial permanece a mais recente até a próxima ingestão do
+  período (mesmo comportamento de qualquer dado não re-ingerido).
 - BDR/FII/ETF têm registro e cotação, mas sem análise fundamentalista no MVP
   (screener cobre companhias abertas CVM) — o chat declara isso em avisos.

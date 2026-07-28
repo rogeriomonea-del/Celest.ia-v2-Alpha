@@ -334,6 +334,32 @@ def get_intraday_quote(ticker: str) -> dict:
                [brapi.AVISO, "Nunca usar este valor em cálculo de indicador."])
 
 
+def _crit_list(v) -> list[str]:
+    """Critérios do gold chegam como string '; '-separada (screener/run.py);
+    aceita também lista (fixtures antigas). Nunca iterar string por caractere."""
+    if isinstance(v, str):
+        return [c.strip() for c in v.split(";") if c.strip()]
+    return [str(c).strip() for c in (v or []) if str(c).strip()]
+
+
+# Natureza da taxa por tipo de título: taxas REAIS e NOMINAIS não são
+# comparáveis entre si — cada linha de custo de oportunidade é rotulada.
+_NATUREZA_TAXA = (
+    ("ipca", "REAL a.a. (acima do IPCA)"),
+    ("igp", "REAL a.a. (acima do IGP-M)"),
+    ("prefixado", "NOMINAL a.a."),
+    ("selic", "PÓS-FIXADA (% a.a. atrelada à Selic)"),
+)
+
+
+def _natureza_taxa(tipo: str) -> str:
+    t = tipo.lower()
+    for chave, rotulo in _NATUREZA_TAXA:
+        if chave in t:
+            return rotulo
+    return "natureza não classificada"
+
+
 _CHECKLIST_RED_TEAM = [
     "O lucro LTM é sustentável ou há itens não recorrentes?",
     "A conversão de caixa acompanha o lucro contábil?",
@@ -352,9 +378,9 @@ def challenge_thesis(ticker: str) -> dict:
         raise ToolError("ativo_nao_encontrado", f"{t} não consta na base")
     contrarias: list[str] = []
     if fund:
-        for c in fund.get("criterios_reprovados") or []:
+        for c in _crit_list(fund.get("criterios_reprovados")):
             contrarias.append(f"Critério do screener REPROVADO: {c}")
-        for c in fund.get("criterios_nao_avaliados") or []:
+        for c in _crit_list(fund.get("criterios_nao_avaliados")):
             contrarias.append(f"Critério NÃO AVALIÁVEL (dado ausente — não presuma aprovação): {c}")
         if fund.get("status") == "APROVADA" and not contrarias:
             contrarias.append("Nenhum critério reprovado no preset atual — risco de viés de "
@@ -365,13 +391,23 @@ def challenge_thesis(ticker: str) -> dict:
     for r in macro["regimes"]:
         contrarias.append(f"Regime macro ({r['dimensao']}): {r['estado']} — {r['detalhe']}")
     tes = _gold("tesouro_paineis.json")
-    radar = [j for j in tes["radar_janelas"]]
-    if radar:
-        melhor = max(radar, key=lambda j: j.get("taxa_atual_pct") or 0)
+    radar = tes["radar_janelas"]
+    # melhor janela POR TIPO, cada uma rotulada pela natureza da taxa — taxa
+    # real (IPCA+) e nominal (prefixado) nunca são fundidas num único "melhor".
+    melhor_por_tipo: dict[str, dict] = {}
+    for j in radar:
+        atual = melhor_por_tipo.get(j["tipo"])
+        if atual is None or (j.get("taxa_atual_pct") or 0) > (atual.get("taxa_atual_pct") or 0):
+            melhor_por_tipo[j["tipo"]] = j
+    for tipo, j in sorted(melhor_por_tipo.items()):
         contrarias.append(
-            f"Custo de oportunidade: {melhor['tipo']} {melhor['vencimento']} paga "
-            f"{melhor['taxa_atual_pct']}% (percentil {melhor['percentil']}) na data-base "
-            f"{tes['data_base']}.")
+            f"Custo de oportunidade em {tipo} {j['vencimento']}: taxa "
+            f"{_natureza_taxa(tipo)} de {j['taxa_atual_pct']}% (percentil "
+            f"{j['percentil']} da própria série) na data-base {tes['data_base']}.")
+    if melhor_por_tipo:
+        contrarias.append(
+            "Atenção: taxas REAIS (IPCA+/IGP-M+) e NOMINAIS (prefixado) não são "
+            "comparáveis diretamente entre si nem com retornos nominais de ações.")
     return _ok(
         {"ticker": t, "evidencias_contrarias": contrarias, "checklist_red_team": _CHECKLIST_RED_TEAM},
         "screener (CVM/B3) + macro (BCB) + Tesouro Transparente — evidências determinísticas",

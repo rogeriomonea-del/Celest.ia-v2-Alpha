@@ -52,17 +52,34 @@ def cmd_ingest() -> dict:
 
 
 def _bronze(name: str, source: str) -> Path:
-    """Resolve o bronze mais RECENTE: aceita o nome fixo ou variantes datadas
-    `{stem}.{YYYY-MM-DD}{ext}` (fontes mutáveis são versionadas por ingestão)."""
+    """Resolve o bronze mais RECENTEMENTE INGERIDO entre o nome fixo e as
+    variantes datadas `{stem}.{YYYY-MM-DD}.{ext}`.
+
+    A escolha usa o timestamp de ingestão do sidecar meta (fallback: mtime),
+    NUNCA preferência incondicional pela variante datada — assim, quando um ano
+    fecha e o arquivo completo é re-baixado com nome fixo, ele vence variantes
+    datadas antigas/parciais do período em que o ano ainda era corrente."""
+    import json as _json
+    from datetime import datetime, timezone
+
     base = config.BRONZE_DIR / source
-    fixed = base / name
     stem, ext = name.rsplit(".", 1)
-    dated = sorted(base.glob(f"{stem}.????-??-??.{ext}"))
-    if dated:
-        return dated[-1]
-    if fixed.exists():
-        return fixed
-    sys.exit(f"bronze ausente: {name} (ou variante datada) em {base} — rode 'ingest' antes")
+    candidates = [p for p in (base / name, *sorted(base.glob(f"{stem}.????-??-??.{ext}")))
+                  if p.exists()]
+    if not candidates:
+        sys.exit(f"bronze ausente: {name} (ou variante datada) em {base} — rode 'ingest' antes")
+
+    def _ingested_at(p: Path) -> str:
+        meta = p.with_suffix(p.suffix + ".meta.json")
+        if meta.exists():
+            try:
+                return str(_json.loads(meta.read_text(encoding="utf-8"))["downloaded_at"])
+            except (ValueError, KeyError):
+                pass
+        return datetime.fromtimestamp(p.stat().st_mtime, tz=timezone.utc).isoformat(
+            timespec="seconds")
+
+    return max(candidates, key=_ingested_at)
 
 
 def cmd_build(universe_tickers: set[str] | None = None) -> None:

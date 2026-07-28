@@ -65,7 +65,8 @@ def listar_ativos(tipo: str | None = None, busca: str | None = None,
             raise _error(422, "tipo_invalido", f"tipo '{tipo}' inválido; use {TIPOS_VALIDOS}")
         df = df[df["tipo"] == tipo]
     if busca:
-        df = df[df["ticker"].str.contains(busca.strip().upper(), na=False)]
+        # regex=False: busca literal — entrada do usuário nunca vira regex
+        df = df[df["ticker"].str.contains(busca.strip().upper(), na=False, regex=False)]
     limite = max(1, min(int(limite), 500))
     pagina = max(1, int(pagina))
     total = len(df)
@@ -106,9 +107,11 @@ def intradiario(ticker: str) -> dict:
     oficial = _row_out(hit.iloc[0])
     try:
         quote = brapi.get_quote(t)
-    except brapi.BrapiUnavailableError as e:
+    except brapi.BrapiUnavailableError:
+        # mensagem estática: nenhum detalhe interno de rede/proxy vai ao cliente
         raise _error(503, "intradiario_indisponivel",
-                     f"{e} — use o fechamento oficial D-1 ({oficial['ultimo_pregao']})")
+                     "cotação intradiária indisponível no agregador — use o "
+                     f"fechamento oficial D-1 ({oficial['ultimo_pregao']})")
     return {
         "ticker": t,
         "intradiario": quote,

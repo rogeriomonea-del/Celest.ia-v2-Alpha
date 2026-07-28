@@ -51,6 +51,12 @@ class TestRegistro:
         r = client.get("/v1/ativos", params={"tipo": "cripto"})
         assert r.status_code == 422 and r.json()["detail"]["code"] == "tipo_invalido"
 
+    def test_busca_literal_nunca_regex(self, client):
+        # metacaracteres não quebram (500) nem viram curinga
+        r = client.get("/v1/ativos", params={"busca": "("})
+        assert r.status_code == 200 and r.json()["total"] == 0
+        assert client.get("/v1/ativos", params={"busca": ".*"}).json()["total"] == 0
+
     def test_paginacao(self, client):
         r = client.get("/v1/ativos", params={"limite": 2, "pagina": 2}).json()
         assert r["total"] == 3 and len(r["ativos"]) == 1
@@ -88,12 +94,14 @@ class TestIntradiario:
 
     def test_brapi_indisponivel_503_com_fallback_oficial(self, client, monkeypatch):
         def _boom(t):
-            raise brapi.BrapiUnavailableError("timeout simulado")
+            raise brapi.BrapiUnavailableError("timeout simulado: proxy 10.0.0.1")
         monkeypatch.setattr(brapi, "get_quote", _boom)
         r = client.get("/v1/ativos/PETR4/intradiario")
         assert r.status_code == 503
         d = r.json()["detail"]
         assert d["code"] == "intradiario_indisponivel" and "2026-07-27" in d["message"]
+        # mensagem estática: detalhe interno de rede NUNCA vaza ao cliente
+        assert "proxy" not in d["message"] and "10.0.0.1" not in d["message"]
 
     def test_ticker_fora_do_registro_404(self, client):
         assert client.get("/v1/ativos/XXXX99/intradiario").status_code == 404
