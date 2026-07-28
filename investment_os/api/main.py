@@ -13,9 +13,31 @@ from .. import config
 
 app = FastAPI(
     title=config.SYSTEM_NAME,
-    description="API de leitura dos artefatos gold (fontes oficiais: CVM, B3, Tesouro).",
-    version="0.1.0",
+    description=(
+        "API do Investment Intelligence OS. Leitura dos artefatos gold (fontes "
+        "oficiais: CVM, B3, Tesouro) + Fase 5: perfil, IPS, importação de "
+        "carteira, análise e rebalanceamento. Esquema de autorização Bearer "
+        "declarado no contrato; autenticação completa na fase de produção."
+    ),
+    version="0.2.0",
 )
+
+from .portfolio_api import router as portfolio_router  # noqa: E402
+
+app.include_router(portfolio_router)
+
+# CORS para o frontend local (Celst.ia-Finance em dev). Sem credenciais.
+try:
+    from fastapi.middleware.cors import CORSMiddleware
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+except ImportError:  # pragma: no cover
+    pass
 
 
 def _gold(name: str) -> dict:
