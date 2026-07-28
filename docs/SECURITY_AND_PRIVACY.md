@@ -10,7 +10,8 @@ Ameaças principais e mitigação:
 | Ameaça | Mitigação |
 |---|---|
 | Prompt injection via PDF/relatório/página | Documentos são DADOS: extração de texto isolada das instruções; agentes de pesquisa read-only; nenhuma instrução embutida em documento é executada; testes de injeção em `tests/investment_os/test_documents.py` |
-| Vazamento de PII para LLM/logs | Serviço `pii.py` (fase 5) remove CPF, conta, código de investidor, endereço, telefone, e-mail antes de qualquer LLM; logs de aplicação nunca registram conteúdo financeiro pessoal |
+| Vazamento de PII para LLM/logs | IMPLEMENTADO (Fase 5): `portfolio/pii.py` remove deterministicamente CPF, conta, agência, código de investidor, endereço, telefone, e-mail e CEP ANTES de qualquer persistência/log (CNPJ de emissor preservado — identificador analítico); testes em `test_pii.py`; audit_log grava apenas eventos/hashes/contagens |
+| Upload malicioso de carteira | IMPLEMENTADO (Fase 5): validação de assinatura vs extensão (MIME falso), rejeição de executáveis, xlsx corrompido, macros VBA e fórmulas em células; limite de 10MB; processamento em diretório temporário; arquivo bruto removido após o parse (resta só sha256) — testes em `test_importer.py` |
 | Credenciais | NUNCA armazenar senha de B3/corretora/banco/gov.br; sem login automatizado na B3 no MVP; importação apenas por arquivo exportado manualmente |
 | Secrets no repo | `.env.example` sem valores; secrets só via env; verificação em CI |
 | Fonte adulterada / MITM | HTTPS com verificação TLS; sha256 registrado por download; bronze imutável |

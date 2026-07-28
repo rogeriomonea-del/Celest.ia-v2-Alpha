@@ -24,8 +24,18 @@ python -m investment_os.cli build         # silver + gold: normalização, indic
 python -m investment_os.cli report        # relatórios em data/reports/ (inclui download de docs oficiais)
 
 python -m pytest tests/investment_os -q   # testes (motor financeiro, períodos, janelas, citações)
-uvicorn investment_os.api.main:app        # API de leitura (http://127.0.0.1:8000/docs)
+uvicorn investment_os.api.main:app        # API (http://127.0.0.1:8000/docs)
 ```
+
+### Fase 5 — Perfil, carteira e rebalanceamento (via API + frontend)
+
+A Fase 5 roda inteiramente pela API (`/v1/profile/*`, `/v1/policy/*`,
+`/v1/portfolio/*`) e pelo frontend do repo irmão `Celst.ia-Finance`
+(páginas `/politica`, `/importacao`, `/carteira`, `/plano-aportes`):
+questionário adaptativo → IPS versionada e confirmada → importação de carteira
+(XLSX/CSV com PII scrubber e prévia/confirmação) → análise → plano de aportes.
+O banco local `data/portfolio.db` (SQLite, migrations automáticas) guarda os
+dados pessoais fora do repositório. Ver `docs/adr/0004-fase5-scope.md`.
 
 ## O que a primeira fatia vertical entrega
 
