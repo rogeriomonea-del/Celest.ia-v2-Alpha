@@ -9,3 +9,4 @@ pytest>=8
 openpyxl>=3.1
 python-multipart>=0.0.9
 httpx2>=0.1  # TestClient (starlette novo); localmente httpx antigo também funciona
+anthropic>=0.120  # chat "Pergunte à IA" (Fase 7); sem chave o /v1/chat responde 503

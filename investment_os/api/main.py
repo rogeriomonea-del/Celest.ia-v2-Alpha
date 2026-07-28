@@ -23,12 +23,14 @@ app = FastAPI(
 )
 
 from .assets_api import router as assets_router  # noqa: E402
+from .chat_api import router as chat_router  # noqa: E402
 from .macro_api import router as macro_router  # noqa: E402
 from .portfolio_api import router as portfolio_router  # noqa: E402
 
 app.include_router(portfolio_router)
 app.include_router(macro_router)
 app.include_router(assets_router)
+app.include_router(chat_router)
 
 # CORS para o frontend local (Celst.ia-Finance em dev). Sem credenciais.
 try:
