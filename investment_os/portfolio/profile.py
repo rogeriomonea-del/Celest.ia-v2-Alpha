@@ -242,7 +242,12 @@ def validate_ips_content(content: dict) -> list[str]:
     if float(content.get("bandas_rebalanceamento_pp", 0)) < 0:
         errors.append("bandas_rebalanceamento_pp negativa")
     aporte = content.get("aporte_mensal_configurado")
-    if aporte is not None and float(aporte) < 0:
+    if aporte is None:
+        errors.append(
+            "aporte_mensal_configurado ausente — o plano de aportes depende dele; "
+            "informe 0 explicitamente se não houver aportes previstos"
+        )
+    elif float(aporte) < 0:
         errors.append("aporte_mensal_configurado negativo")
     return errors
 

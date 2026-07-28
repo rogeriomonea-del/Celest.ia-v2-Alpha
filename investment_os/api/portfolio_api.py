@@ -225,10 +225,16 @@ class ConfirmIn(BaseModel):
 
 @router.post("/portfolio/import/{import_id}/confirm")
 def import_confirm(import_id: int, body: ConfirmIn, conn=Depends(get_conn)) -> dict:
+    import sqlite3
+
     try:
         return importer.confirm_import(conn, import_id, accept_partial=body.accept_partial)
     except importer.ImportError_ as exc:
         raise _error(409, "confirm_rejected", str(exc))
+    except sqlite3.IntegrityError:
+        # defesa em profundidade: dado inconsistente jamais vira 500 sem contrato
+        raise _error(409, "confirm_rejected",
+                     "linha com dados obrigatórios ausentes não pode ser confirmada; corrija-a antes")
 
 
 # ----------------------------------------------------------------- carteira

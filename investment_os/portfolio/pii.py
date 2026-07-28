@@ -16,6 +16,8 @@ _PATTERNS: list[tuple[str, re.Pattern]] = [
     ("email", re.compile(r"\b[\w.+-]+@[\w-]+\.[\w.-]+\b")),
     ("telefone", re.compile(r"(?:\+55\s?)?(?:\(\d{2}\)\s?)\d{4,5}[- ]\d{4}\b")),
     ("telefone", re.compile(r"\+55\s?\d{2}\s?\d{4,5}[- ]?\d{4}\b")),
+    # DDD sem parênteses (ex.: 11 91234-5678); exige hífen p/ evitar falsos positivos
+    ("telefone", re.compile(r"\b\d{2}\s\d{4,5}-\d{4}\b")),
     ("cep", re.compile(r"\b\d{5}-\d{3}\b")),
     ("agencia", re.compile(r"(?i)\bag[êe]ncia\b[:\s]*[\d-]+")),
     ("conta", re.compile(r"(?i)\bconta(?:\s+corrente)?\b[:\s]*[\d.-]+")),

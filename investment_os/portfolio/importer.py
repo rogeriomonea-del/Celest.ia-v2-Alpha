@@ -447,6 +447,18 @@ def correct_row(conn: sqlite3.Connection, import_id: int, row_id: int, ticker: s
     payload["ticker"] = ticker
     payload["resolution"] = resolution
     status = "ok" if resolution["status"] == "ok" else resolution["status"]
+    # revalidação: corrigir o ticker NUNCA promove linha com problemas de dados
+    # (quantidade ausente/negativa, PII, fórmula) — B1 da auditoria
+    blocking: list[str] = []
+    if payload.get("quantity") is None:
+        blocking.append("quantidade ausente ou inválida")
+    elif payload["quantity"] < 0:
+        blocking.append("quantidade negativa exige revisão")
+    if "PII" in (row["reason"] or "") or "fórmula" in (row["reason"] or ""):
+        blocking.append(row["reason"])
+    if blocking:
+        status = "rejected"
+        resolution = {**resolution, "reason": "; ".join(blocking)}
     conn.execute(
         "UPDATE portfolio_import_row SET parsed_json=?, status=?, reason=?, resolution_confidence=?"
         " WHERE id=?",

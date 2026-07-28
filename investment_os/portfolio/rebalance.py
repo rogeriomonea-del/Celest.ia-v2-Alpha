@@ -256,9 +256,9 @@ def build_plan(conn: sqlite3.Connection, profile_id: int, snapshot_id: int,
         "concentracao_antes": analysis["concentracao"],
         "exposicao_cambial_antes": analysis["pesos"]["por_moeda"],
         "exposicao_cambial_depois": "inalterada pela simulação (aportes em BRL; classes internacionais pendentes de ingestão)",
-        "violacoes_criticas_resolvidas": sum(
-            1 for a in actions if a["priority"] == 1 and a["action"] in ("nao_aumentar", "reduzir")
-        ),
+        # toda ação de prioridade 1 endereça uma violação crítica, inclusive
+        # 'manter' quando o próprio aporte resolve a diluição
+        "violacoes_criticas_enderecadas": sum(1 for a in actions if a["priority"] == 1),
         # TODAS as violações não endereçadas por ação aparecem aqui — nenhuma
         # violação crítica pode desaparecer silenciosamente do plano
         "violacoes_remanescentes": [

@@ -181,3 +181,25 @@ class TestFormulasENumeros:
         assert _clean_number("1.234.567") == 1234567.0
         assert _clean_number("1.234,56") == 1234.56
         assert _clean_number("61,50") == 61.5
+
+
+class TestAuditoriaB1CorrecaoNaoPromoveRejeitada:
+    def test_linha_sem_quantidade_permanece_rejeitada_apos_correcao(self, conn, tmp_path):
+        from investment_os.portfolio.importer import correct_row, start_import
+
+        p = tmp_path / "c.csv"
+        p.write_bytes("ticker;quantidade\nXPTO9;\nVALE3;10\n".encode())
+        prev = start_import(conn, 1, p, "c.csv")
+        rej = next(r for r in prev["rows"] if r["status"] == "rejected")
+        prev = correct_row(conn, prev["import_id"], rej["row_id"], "PETR4")
+        fixed = next(r for r in prev["rows"] if r["row_id"] == rej["row_id"])
+        assert fixed["status"] == "rejected"
+        assert "quantidade" in fixed["reason"]
+
+
+class TestAuditoriaB2AporteObrigatorio:
+    def test_ips_sem_aporte_rejeitada(self):
+        from investment_os.portfolio.profile import validate_ips_content
+
+        errors = validate_ips_content({"faixas_por_classe": {"a": {"min_pct": 0, "max_pct": 100}}})
+        assert any("aporte_mensal_configurado" in e for e in errors)
