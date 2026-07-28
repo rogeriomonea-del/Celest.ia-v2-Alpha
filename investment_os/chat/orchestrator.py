@@ -221,6 +221,14 @@ def ask(pergunta: str, historico: list[dict] | None = None, *,
         resposta = _fallback_answer(
             f"limite de {max_iterations} iterações de ferramentas atingido")
 
+    # Proveniência: confiança acima de BAIXA exige que ALGUMA ferramenta
+    # determinística tenha sido consultada neste turno — sem trace, as fontes
+    # citadas não têm proveniência verificável (fonte pode ter sido fabricada).
+    if not trace and resposta.get("confianca") != "BAIXA":
+        resposta["confianca"] = "BAIXA"
+        resposta["dados_ausentes"] = _as_str_list(resposta.get("dados_ausentes")) + [
+            "nenhuma ferramenta determinística consultada neste turno — confiança rebaixada"]
+
     if aviso_pii:
         resposta["premissas"] = [aviso_pii] + _as_str_list(resposta.get("premissas"))
     return {"resposta": resposta, "ferramentas_chamadas": trace, "modelo": model}

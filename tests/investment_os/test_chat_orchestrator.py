@@ -101,7 +101,9 @@ class TestLoop:
             Msg([FINAL_OK]),
         ])
         out = orchestrator.ask("oi?", client=fake)
-        assert out["resposta"]["confianca"] == "ALTA"
+        assert out["resposta"]["resposta_direta"].startswith("GMAT3")
+        # sem nenhuma ferramenta consultada, a confiança é rebaixada (proveniência)
+        assert out["resposta"]["confianca"] == "BAIXA"
         forcado = fake.requests[1]
         assert forcado["tool_choice"] == {"type": "tool", "name": "finalize_answer"}
         assert forcado["thinking"] == {"type": "disabled"}
@@ -193,7 +195,24 @@ class TestPIIeValidacao:
         out = orchestrator.ask("segue", historico=[
             "string solta", None, {"role": "user", "content": "oi"}], client=fake)
         assert len(fake.requests[0]["messages"]) == 2
-        assert out["resposta"]["confianca"] == "ALTA"
+        assert out["resposta"]["resposta_direta"].startswith("GMAT3")
+
+    def test_gate_proveniencia_sem_ferramentas_rebaixa(self, _tools_ok):
+        # FINAL_OK tem evidências e fontes, mas NENHUMA ferramenta foi
+        # consultada no turno: fonte pode ter sido fabricada → BAIXA.
+        out = orchestrator.ask("p", client=FakeClient([Msg([FINAL_OK])]))
+        assert out["ferramentas_chamadas"] == []
+        assert out["resposta"]["confianca"] == "BAIXA"
+        assert any("nenhuma ferramenta" in d for d in out["resposta"]["dados_ausentes"])
+
+    def test_com_ferramenta_consultada_alta_e_preservada(self, _tools_ok):
+        fake = FakeClient([
+            Msg([Block("tool_use", id="tu_1", name="analyze_asset",
+                       input={"ticker": "GMAT3"})]),
+            Msg([FINAL_OK]),
+        ])
+        out = orchestrator.ask("GMAT3?", client=fake)
+        assert out["ferramentas_chamadas"] and out["resposta"]["confianca"] == "ALTA"
 
     def test_pergunta_vazia(self):
         with pytest.raises(ValueError):

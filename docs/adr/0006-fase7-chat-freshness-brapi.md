@@ -67,7 +67,9 @@ chave brapi do próprio usuário como fonte intradiária.
    estruturado e NENHUMA outra função do sistema depende do LLM.
    Gate anti-alucinação em código (não só no prompt): resposta sem evidências
    com fonte tem a confiança rebaixada para BAIXA e a lacuna registrada em
-   `dados_ausentes`.
+   `dados_ausentes`; o mesmo vale para PROVENIÊNCIA — se nenhuma ferramenta
+   determinística foi consultada no turno, a confiança nunca fica acima de
+   BAIXA (fonte citada sem ferramenta pode ter sido fabricada pelo modelo).
 
 7. **Chat não recomenda.** O assistente apresenta evidências e
    contra-argumento; recomendação positiva continua exigindo red-team +
