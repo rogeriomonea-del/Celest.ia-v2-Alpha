@@ -1,0 +1,179 @@
+{
+  "titulo": "Tesouro IPCA+",
+  "vencimento": "2050-08-15",
+  "data_base": "2026-07-27",
+  "taxa_atual_pct": 7.37,
+  "threshold_pct": 7.11,
+  "janela": {
+    "threshold": 7.11,
+    "total_sessions": 369,
+    "sessions_at_or_above": 106,
+    "fraction": 0.2872628726287263,
+    "windows": [
+      {
+        "start": "2025-02-03",
+        "end": "2025-03-31",
+        "sessions": 39
+      },
+      {
+        "start": "2025-04-02",
+        "end": "2025-04-11",
+        "sessions": 8
+      },
+      {
+        "start": "2025-04-15",
+        "end": "2025-04-29",
+        "sessions": 9
+      },
+      {
+        "start": "2025-05-02",
+        "end": "2025-05-06",
+        "sessions": 3
+      },
+      {
+        "start": "2025-08-21",
+        "end": "2025-08-21",
+        "sessions": 1
+      },
+      {
+        "start": "2025-09-04",
+        "end": "2025-09-05",
+        "sessions": 2
+      },
+      {
+        "start": "2025-10-14",
+        "end": "2025-10-15",
+        "sessions": 2
+      },
+      {
+        "start": "2025-10-17",
+        "end": "2025-10-17",
+        "sessions": 1
+      },
+      {
+        "start": "2026-01-15",
+        "end": "2026-01-15",
+        "sessions": 1
+      },
+      {
+        "start": "2026-01-20",
+        "end": "2026-01-20",
+        "sessions": 1
+      },
+      {
+        "start": "2026-03-26",
+        "end": "2026-03-27",
+        "sessions": 2
+      },
+      {
+        "start": "2026-05-21",
+        "end": "2026-05-21",
+        "sessions": 1
+      },
+      {
+        "start": "2026-06-02",
+        "end": "2026-06-11",
+        "sessions": 7
+      },
+      {
+        "start": "2026-06-17",
+        "end": "2026-07-27",
+        "sessions": 29
+      }
+    ],
+    "longest_window": {
+      "start": "2025-02-03",
+      "end": "2025-03-31",
+      "sessions": 39
+    },
+    "last_occurrence": "2026-07-27",
+    "threshold_percentile": 71.27371273712737,
+    "max_rate": 7.52,
+    "min_rate": 6.69,
+    "mean_rate": 7.03373983739837,
+    "median_rate": 7.0,
+    "first_date": "2025-02-03",
+    "last_date": "2026-07-27"
+  },
+  "risco": {
+    "duration_macaulay_anos": 24.05201916495551,
+    "modified_duration_anos": 22.401060971365844,
+    "dv01_brl": 0.4050154755557003,
+    "convexidade": 522.6712258255565
+  },
+  "cenarios_mtm": [
+    {
+      "choque_bps": -200,
+      "taxa_pct": 5.37,
+      "pu_novo": 284.19,
+      "variacao_pct": 57.18,
+      "efeito_duration_brl": 81.0,
+      "efeito_convexidade_brl": 18.9,
+      "residuo_brl": 3.49
+    },
+    {
+      "choque_bps": -150,
+      "taxa_pct": 5.87,
+      "pu_novo": 253.61,
+      "variacao_pct": 40.27,
+      "efeito_duration_brl": 60.75,
+      "efeito_convexidade_brl": 10.63,
+      "residuo_brl": 1.42
+    },
+    {
+      "choque_bps": -100,
+      "taxa_pct": 6.37,
+      "pu_novo": 226.44,
+      "variacao_pct": 25.24,
+      "efeito_duration_brl": 40.5,
+      "efeito_convexidade_brl": 4.72,
+      "residuo_brl": 0.41
+    },
+    {
+      "choque_bps": -50,
+      "taxa_pct": 6.87,
+      "pu_novo": 202.28,
+      "variacao_pct": 11.88,
+      "efeito_duration_brl": 20.25,
+      "efeito_convexidade_brl": 1.18,
+      "residuo_brl": 0.05
+    },
+    {
+      "choque_bps": 50,
+      "taxa_pct": 7.87,
+      "pu_novo": 161.69,
+      "variacao_pct": -10.57,
+      "efeito_duration_brl": -20.25,
+      "efeito_convexidade_brl": 1.18,
+      "residuo_brl": -0.05
+    },
+    {
+      "choque_bps": 100,
+      "taxa_pct": 8.37,
+      "pu_novo": 144.67,
+      "variacao_pct": -19.99,
+      "efeito_duration_brl": -40.5,
+      "efeito_convexidade_brl": 4.72,
+      "residuo_brl": -0.36
+    },
+    {
+      "choque_bps": 150,
+      "taxa_pct": 8.87,
+      "pu_novo": 129.5,
+      "variacao_pct": -28.37,
+      "efeito_duration_brl": -60.75,
+      "efeito_convexidade_brl": 10.63,
+      "residuo_brl": -1.18
+    },
+    {
+      "choque_bps": 200,
+      "taxa_pct": 9.37,
+      "pu_novo": 115.99,
+      "variacao_pct": -35.85,
+      "efeito_duration_brl": -81.0,
+      "efeito_convexidade_brl": 18.9,
+      "residuo_brl": -2.71
+    }
+  ],
+  "fonte": "tesouro_transparente"
+}
