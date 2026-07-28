@@ -6,3 +6,4 @@ fastapi>=0.110
 uvicorn>=0.29
 pdfplumber>=0.11
 pytest>=8
+openpyxl>=3.1
