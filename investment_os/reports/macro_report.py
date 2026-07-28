@@ -9,14 +9,14 @@ from ..engine import regimes as R
 from ..silver import macro as sv_macro
 
 
-def _focus_next_year_median(focus_df) -> tuple[float | None, str | None]:
+def _focus_next_year_median(focus_df, *, today: date) -> tuple[float | None, str | None]:
     """Mediana Focus do IPCA para o ANO SEGUINTE, pesquisa mais recente."""
     if focus_df is None:
         return None, None
     df = focus_df[focus_df["Indicador"] == "IPCA"]
     if df.empty or "DataReferencia" not in df.columns:
         return None, None
-    next_year = str(date.today().year + 1)
+    next_year = str(today.year + 1)
     df = df[df["DataReferencia"].astype(str) == next_year]
     if "baseCalculo" in df.columns:
         df = df[df["baseCalculo"] == 0]
@@ -32,7 +32,7 @@ def build(*, today: date | None = None) -> dict:
     focus = sv_macro.load_focus()
 
     s = lambda sid: sv_macro.series_dict(series, sid)  # noqa: E731
-    focus_median, focus_date = _focus_next_year_median(focus)
+    focus_median, focus_date = _focus_next_year_median(focus, today=today)
 
     regimes = [
         R.inflacao(s("ipca_mensal"), today=today),
@@ -40,7 +40,7 @@ def build(*, today: date | None = None) -> dict:
         R.atividade(s("ibc_br"), today=today),
         R.cambio(s("ptax_venda"), today=today),
         R.risco_fiscal(s("divida_bruta_pib"), today=today),
-        R.expectativas_inflacao(focus_median, focus_date),
+        R.expectativas_inflacao(focus_median, focus_date, today=today),
     ]
 
     recent: dict[str, list] = {}

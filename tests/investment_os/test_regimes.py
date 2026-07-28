@@ -84,3 +84,20 @@ class TestExpectativas:
 
     def test_indisponivel(self):
         assert expectativas_inflacao(None, None).estado == "INDISPONIVEL"
+
+
+class TestAuditoriaF6:
+    def test_anualizacao_geometrica_do_ipca_3m(self):
+        # 3x 1%/m: geométrico = (1.01^3)^4 - 1 = 12.68%, não 12.0% (linear)
+        r = inflacao(monthly([0.2] * 15 + [1.0] * 3), today=TODAY)
+        assert "12.68" in r.detalhe
+
+    def test_focus_stale_reduz_confianca(self):
+        r = expectativas_inflacao(4.2, "2026-01-10", today=TODAY)
+        assert r.confianca == "BAIXA"
+        r2 = expectativas_inflacao(4.2, "2026-07-24", today=TODAY)
+        assert r2.confianca == "ALTA"
+
+    def test_atividade_fonte_dessazonalizada(self):
+        r = atividade(monthly([100] * 8), today=TODAY)
+        assert "24364" in r.fonte and "ajuste sazonal" in r.detalhe

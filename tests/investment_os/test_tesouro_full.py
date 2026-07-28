@@ -74,3 +74,25 @@ class TestPainel:
         assert tipos_nominal <= {"Tesouro Prefixado", "Tesouro Prefixado com Juros Semestrais"}
         assert tipos_real <= {"Tesouro IPCA+", "Tesouro IPCA+ com Juros Semestrais"}
         assert "ANBIMA" in p["fonte"]
+
+
+class TestSilverMacroPointInTime:
+    def test_vigencia_futura_da_meta_selic_truncada(self, tmp_path, monkeypatch):
+        """FIXTURE SINTÉTICA: o SGS publica vigência futura da meta Selic; o
+        silver deve descartar datas > hoje (auditoria F6, item G)."""
+        import json
+        from datetime import date
+        from investment_os.silver import macro as sv_macro
+        import pandas as pd
+
+        monkeypatch.setattr("investment_os.config.SILVER_DIR", tmp_path)
+        bronze = tmp_path / "sgs_432.json"
+        bronze.write_text(json.dumps([
+            {"data": "25/07/2026", "valor": "14.25"},
+            {"data": "28/07/2026", "valor": "14.25"},
+            {"data": "05/08/2026", "valor": "14.25"},  # vigência futura
+        ]), encoding="utf-8")
+        out = sv_macro.build_sgs({432: bronze}, today=date(2026, 7, 28))
+        df = pd.read_parquet(out)
+        assert len(df) == 2
+        assert df["data"].max() == date(2026, 7, 28)

@@ -121,7 +121,9 @@ def build() -> dict:
         titulos.append(entry)
 
     def _curve(tipos: tuple[str, ...]) -> list[dict]:
-        pts = [t for t in titulos if t["tipo"] in tipos]
+        # mesmo filtro de prazo do radar: taxa cotada perto do vencimento distorce
+        pts = [t for t in titulos if t["tipo"] in tipos
+               and (date.fromisoformat(t["vencimento"]) - last_db).days >= MIN_DIAS_ATE_VENCIMENTO_RADAR]
         return sorted(
             [{"vencimento": t["vencimento"], "taxa_pct": t["taxa_compra_pct"], "tipo": t["tipo"]} for t in pts],
             key=lambda p: p["vencimento"],
@@ -134,7 +136,7 @@ def build() -> dict:
         "curvas": {
             "nominal_prefixado": _curve(("Tesouro Prefixado", "Tesouro Prefixado com Juros Semestrais")),
             "real_ipca": _curve(("Tesouro IPCA+", "Tesouro IPCA+ com Juros Semestrais")),
-            "nota": "pontos por vencimento na última data-base; títulos com e sem cupom marcados — durations distintas",
+            "nota": "pontos por vencimento na última data-base; títulos com e sem cupom marcados — durations distintas; vencimentos < 1 ano excluídos (taxa de fim de prazo distorce)",
         },
         "radar_janelas": janelas,
         "parametros_radar": {

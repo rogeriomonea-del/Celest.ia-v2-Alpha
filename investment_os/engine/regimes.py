@@ -61,7 +61,8 @@ def inflacao(ipca_mensal: Serie, *, today: date) -> Regime:
     srt = sorted(ipca_mensal)
     last_date = srt[-1][0]
     vals = [v for _, v in srt]
-    m3_anualizado = _acum(vals[-3:]) * 4  # aproximação anualizada do trimestre
+    # anualização GEOMÉTRICA do trimestre: (1+acum3m)^4 - 1
+    m3_anualizado = ((1.0 + _acum(vals[-3:]) / 100.0) ** 4 - 1.0) * 100.0
     m12 = _acum(vals[-12:])
     prev_m12 = _acum(vals[-15:-3][-12:])
     if m3_anualizado > m12 + 0.5 and m12 >= prev_m12:
@@ -98,6 +99,9 @@ def politica_monetaria(selic_meta: Serie, *, today: date) -> Regime:
 
 
 def atividade(ibc_br: Serie, *, today: date) -> Regime:
+    """PRÉ-CONDIÇÃO: a série DEVE ser o IBC-Br COM ajuste sazonal (SGS 24364).
+    A regra 3m vs 3m anteriores não dessazonaliza — com a série bruta (24363)
+    o resultado seria artefato sazonal (achado bloqueante da auditoria F6)."""
     if len(ibc_br) < 7:
         return _indisponivel("atividade", "IBC-Br com menos de 7 meses")
     srt = sorted(ibc_br)
@@ -109,8 +113,8 @@ def atividade(ibc_br: Serie, *, today: date) -> Regime:
     estado = "acelerando" if delta > 0.15 else "desacelerando" if delta < -0.15 else "estavel"
     return Regime(
         "atividade", estado,
-        f"IBC-Br (dessaz.): média 3m {m3:.1f} vs 3m anteriores {m3_prev:.1f} ({delta:+.2f}%)",
-        _staleness_conf(last_date, today, 75, 120), last_date.isoformat(), "bcb_sgs:24363",
+        f"IBC-Br com ajuste sazonal: média 3m {m3:.1f} vs 3m anteriores {m3_prev:.1f} ({delta:+.2f}%)",
+        _staleness_conf(last_date, today, 75, 120), last_date.isoformat(), "bcb_sgs:24364",
     )
 
 
@@ -148,20 +152,27 @@ def risco_fiscal(divida_pib: Serie, *, today: date) -> Regime:
     estado = "aumentando" if delta > 0.5 else "reduzindo" if delta < -0.5 else "estavel"
     return Regime(
         "risco_fiscal", estado,
-        f"dívida bruta/PIB {last:.1f}% vs {prev:.1f}% há 12m ({delta:+.1f} p.p.)",
+        f"dívida bruta/PIB {round(last,1):.1f}% vs {round(prev,1):.1f}% há 12m ({round(last,1)-round(prev,1):+.1f} p.p.)",
         _staleness_conf(last_date, today, 75, 120), last_date.isoformat(), "bcb_sgs:13762",
     )
 
 
-def expectativas_inflacao(focus_ipca_median_next_year: float | None, data_pesquisa: str | None) -> Regime:
+def expectativas_inflacao(focus_ipca_median_next_year: float | None, data_pesquisa: str | None,
+                          *, today: date | None = None) -> Regime:
     if focus_ipca_median_next_year is None:
         return _indisponivel("expectativas_inflacao", "Focus indisponível nesta ingestão")
     ancorada = abs(focus_ipca_median_next_year - META_IPCA_PCT) <= TOLERANCIA_IPCA_PP
+    conf = "MEDIA"
+    if today is not None and data_pesquisa:
+        try:
+            conf = _staleness_conf(date.fromisoformat(str(data_pesquisa)[:10]), today, 21, 45)
+        except ValueError:
+            pass
     return Regime(
         "expectativas_inflacao",
         "ancoradas" if ancorada else "desancoradas",
         f"mediana Focus IPCA ano seguinte: {focus_ipca_median_next_year:.2f}% vs meta "
         f"{META_IPCA_PCT:.1f}±{TOLERANCIA_IPCA_PP:.1f} [premissa]",
-        "MEDIA", data_pesquisa, "bcb_focus",
+        conf, data_pesquisa, "bcb_focus",
         natureza="EXPECTATIVA DE MERCADO (Focus) — não é fato nem previsão do sistema",
     )

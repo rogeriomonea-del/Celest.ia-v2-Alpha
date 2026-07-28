@@ -48,7 +48,7 @@ configurada).
 - Acesso: https://api.bcb.gov.br/dados/serie/bcdata.sgs.{codigo}/dados?formato=json&dataInicial=&dataFinal=
   (a API limita 'ultimos/N' a 20 valores; intervalo máx. 10 anos p/ séries diárias).
 - Séries: 432 Selic meta, 4389 CDI, 433 IPCA (IBGE via SGS), 1 PTAX venda,
-  24363 IBC-Br, 189 IGP-M (FGV via SGS), 13762 dívida bruta/PIB.
+  24364 IBC-Br com ajuste sazonal, 189 IGP-M (FGV via SGS), 13762 dívida bruta/PIB.
 - Limitação: meta Selic publica vigência futura — silver trunca em data <= ingestão.
 
 ### BCB — Focus/Olinda (expectativas de mercado) [INTEGRADA — Fase 6]

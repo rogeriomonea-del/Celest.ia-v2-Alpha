@@ -17,7 +17,7 @@ SGS_SERIES: dict[int, tuple[str, str, str, str]] = {
     4389: ("cdi_anual", "CDI anualizado base 252", "% a.a.", "diaria"),
     433: ("ipca_mensal", "IPCA variação mensal (IBGE via SGS)", "% a.m.", "mensal"),
     1: ("ptax_venda", "Dólar comercial PTAX venda", "BRL/USD", "diaria"),
-    24363: ("ibc_br", "IBC-Br índice de atividade econômica (dessaz.)", "índice", "mensal"),
+    24364: ("ibc_br", "IBC-Br com ajuste sazonal (SGS 24364)", "índice", "mensal"),
     189: ("igp_m", "IGP-M variação mensal (FGV via SGS)", "% a.m.", "mensal"),
     13762: ("divida_bruta_pib", "Dívida bruta do governo geral (% PIB)", "% PIB", "mensal"),
 }

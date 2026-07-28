@@ -112,6 +112,7 @@ def overview() -> dict:
                 "taxa_pct": ref["taxa_compra_pct"],
                 "percentil_historico": ref.get("historico", {}).get("percentil_taxa_atual"),
                 "threshold_monitorado_pct": config.REFERENCE_RATE_PCT,
+                "threshold_origem": "premissa configurável do usuário (IIOS_REFERENCE_RATE_PCT) — não é meta oficial",
             } if ref else None,
         }
     else:
@@ -123,7 +124,9 @@ def overview() -> dict:
         out["macro"] = {
             "data_geracao": m["data_geracao"],
             "regimes": [{"dimensao": r["dimensao"], "estado": r["estado"],
-                         "confianca": r["confianca"]} for r in m["regimes"]],
+                         "confianca": r["confianca"],
+                         "eh_expectativa": "EXPECTATIVA" in (r.get("natureza") or "")}
+                        for r in m["regimes"]],
         }
     else:
         out["macro"] = {"status": "indisponivel", "motivo": "rode 'cli macro'"}
