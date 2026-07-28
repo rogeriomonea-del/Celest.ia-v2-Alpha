@@ -8,3 +8,4 @@ pdfplumber>=0.11
 pytest>=8
 openpyxl>=3.1
 python-multipart>=0.0.9
+httpx2>=0.1  # TestClient (starlette novo); localmente httpx antigo também funciona
