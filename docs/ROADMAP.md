@@ -11,7 +11,7 @@ Fase 1–4 (parcial) entregues nesta iteração.
 | 3 — Screener e Ativo 360 | Presets versionados, aprovadas/quase aprovadas, relatórios MD/CSV/HTML, Ativo 360, ranking sem forçar vencedores | ✅ entregue (universo = companhias com DFP consolidado + preço B3; comparação percentil setorial limitada ao universo ingerido) |
 | 4 — Inteligência documental | Download oficial, extração por página, citações verificáveis, análise do último período vs 3T25 | ◐ parcial (download DFP/press release via CVM + citações; RAG/pgvector futuro) |
 | 5 — Perfil, carteira e B3 | Questionário, IPS, importador B3 com PII scrubber, análise de posições, rebalanceamento aporte-first | ✅ entregue (XLSX/CSV; PDF fora do MVP — ADR-0004; frontend conectado à API) |
-| 6 — Macro e Tesouro | BCB/IBGE/Focus, regimes, curvas completas, matriz geopolítica | ⏳ (módulo Tesouro Direto já entregue na fatia) |
+| 6 — Macro e Tesouro | BCB SGS/Focus, regimes determinísticos, painel Tesouro completo (curvas, radar, MTM) | ✅ entregue (IBGE/global e matriz geopolítica adiados — ADR-0005; geopolítica sem fonte oficial não pontua) |
 | 7 — Chat | Ferramentas estruturadas, respostas citadas, anti-alucinação | ⏳ |
 | 8 — Backtests, alertas e produção | Point-in-time, alertas com hysteresis, observabilidade, deploy | ⏳ |
 

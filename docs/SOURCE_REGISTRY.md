@@ -43,11 +43,23 @@ configurada).
 - Taxas são as ofertadas ao investidor de varejo pelo Tesouro Direto; NÃO misturar
   com taxas indicativas ANBIMA (mercado secundário) sem rotular metodologia.
 
+### BCB — SGS (séries temporais) [INTEGRADA — Fase 6]
+- Órgão: Banco Central do Brasil. Licença: dados abertos. Frequência: diária/mensal.
+- Acesso: https://api.bcb.gov.br/dados/serie/bcdata.sgs.{codigo}/dados?formato=json&dataInicial=&dataFinal=
+  (a API limita 'ultimos/N' a 20 valores; intervalo máx. 10 anos p/ séries diárias).
+- Séries: 432 Selic meta, 4389 CDI, 433 IPCA (IBGE via SGS), 1 PTAX venda,
+  24363 IBC-Br, 189 IGP-M (FGV via SGS), 13762 dívida bruta/PIB.
+- Limitação: meta Selic publica vigência futura — silver trunca em data <= ingestão.
+
+### BCB — Focus/Olinda (expectativas de mercado) [INTEGRADA — Fase 6]
+- Acesso: https://olinda.bcb.gov.br/olinda/servico/Expectativas/ (OData JSON).
+- Expectativas anuais (IPCA, Selic, Câmbio, PIB). SEMPRE rotuladas como
+  EXPECTATIVA DE MERCADO — nunca fato; falha de ingestão não bloqueia o pipeline.
+
 ## Fontes registradas, não integradas no MVP (roadmap)
 
 - ANBIMA (taxas indicativas de títulos públicos) — fonte distinta do Tesouro Direto.
-- BCB SGS / Expectativas (Focus) — macro Brasil.
-- IBGE agregados v3 — inflação/atividade.
+- IBGE agregados v3 — acesso direto (IPCA/IGP-M chegam hoje via SGS, replicação BCB).
 - SEC EDGAR, FRED, IMF, BIS, World Bank, OECD, ECB, US Treasury Fiscal Data — internacional.
 - B3 cadastro de empresas listadas e classificação setorial (páginas B3) — no MVP a
   classificação setorial usa `SETOR_ATIV` do cadastro CVM, com granularidade menor

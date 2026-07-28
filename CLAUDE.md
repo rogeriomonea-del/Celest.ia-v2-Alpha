@@ -17,6 +17,7 @@ pip install -r requirements.txt          # deps do investment_os
 python -m investment_os.cli ingest all   # ingestão oficial (Tesouro, CVM, B3)
 python -m investment_os.cli build        # silver + gold (indicadores, screener)
 python -m investment_os.cli report       # relatórios (Ativo 360, screener, Tesouro)
+python -m investment_os.cli macro        # Fase 6: BCB (SGS+Focus) -> regimes + painel Tesouro
 python -m pytest tests/investment_os -q  # testes do sistema financeiro
 uvicorn investment_os.api.main:app       # API local
 ```
