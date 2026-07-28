@@ -37,6 +37,26 @@ questionário adaptativo → IPS versionada e confirmada → importação de car
 O banco local `data/portfolio.db` (SQLite, migrations automáticas) guarda os
 dados pessoais fora do repositório. Ver `docs/adr/0004-fase5-scope.md`.
 
+### Fase 6 — Macro e Tesouro completo
+
+`python -m investment_os.cli macro` ingere BCB (SGS + Focus), calcula regimes
+determinísticos e o painel completo do Tesouro (curvas, radar de janelas com
+hysteresis, cenários MTM). API: `/v1/overview`, `/v1/macro/*`, `/v1/tesouro/*`.
+Ver `docs/adr/0005-fase6-scope.md`.
+
+### Fase 7 — Banco de ativos B3, freshness e chat "Pergunte à IA"
+
+- Universo COMPLETO do mercado a vista B3 no silver (~2.468 tickers) +
+  `GET /v1/ativos` (registro com classificação heurística rotulada).
+- Bronze datado para fontes mutáveis: re-executar o pipeline atualiza os dados
+  (fontes oficiais são D-1/EOD — "tempo real" não existe com fonte oficial
+  gratuita; ver ADR-0006). Intradiário INDICATIVO opcional via brapi
+  (`IIOS_BRAPI_TOKEN`, fonte secundária autorizada, nunca em cálculos).
+- Chat `POST /v1/chat` (exige `ANTHROPIC_API_KEY`): o LLM nunca calcula —
+  11 ferramentas determinísticas com fonte + data-base; resposta estruturada
+  obrigatória (evidências, confiança, riscos, contra-argumento, dados
+  ausentes); PII removida antes do envio. Ver `docs/adr/0006-fase7-chat-freshness-brapi.md`.
+
 ## O que a primeira fatia vertical entrega
 
 - Ingestão auditada (sha256 + JSONL) de: CVM (DFP 2021–2025, ITR 2025–2026, FCA,

@@ -22,6 +22,11 @@ python -m pytest tests/investment_os -q  # testes do sistema financeiro
 uvicorn investment_os.api.main:app       # API local
 ```
 
+Fase 7: `POST /v1/chat` (Pergunte à IA) exige `ANTHROPIC_API_KEY` (503 sem ela);
+o LLM nunca calcula — só ferramentas determinísticas (`investment_os/chat/`).
+Intradiário indicativo via brapi (SECUNDÁRIA autorizada, ADR-0006):
+`IIOS_BRAPI_TOKEN`.
+
 ## Regras arquiteturais
 
 - Camadas bronze (bruto imutável + sha256) → silver (normalizado) → gold
