@@ -68,47 +68,40 @@ def build_plan(conn: sqlite3.Connection, profile_id: int, snapshot_id: int,
         })
         seq += 1
 
-    # 1-2. violações críticas de banda de classe: diluir via aporte se couber no prazo
+    # Decisões sobre violações críticas ANTES da simulação (dependem só dos
+    # totais): classes cuja violação não se resolve com o 1º aporte ficam
+    # excluídas de novos aportes até voltarem à faixa.
+    no_contrib_classes: set[str] = set()
+    critical_decisions: list[dict] = []
     for v in critical:
         if v["tipo"] != "class_band":
             continue
         cls = v["chave"]
         value_cls = v["peso_pct"] / 100.0 * total
         band = v["faixa"]
+        naive_sale = max(value_cls - band["max_pct"] / 100.0 * total, 0.0)
+        weight_after_1m = value_cls / (total + monthly) * 100 if (total + monthly) > 0 else v["peso_pct"]
         m = _months_to_dilute(value_cls, total, band["max_pct"], monthly)
-        naive_sale = value_cls - band["max_pct"] / 100.0 * total  # venda que um rebalance ingênuo faria
-        if m <= DILUTION_MONTHS_LIMIT:
-            sales_avoided_brl += max(naive_sale, 0.0)
-            actions.append({
-                "seq": seq, "scope": "class", "key": cls, "action": "nao_aumentar",
-                "priority": 1, "amount_brl": None,
-                "current_pct": v["peso_pct"], "target_min_pct": band["min_pct"],
-                "target_max_pct": band["max_pct"],
-                "rationale": f"violação crítica diluível por aportes em ~{m:.0f} meses "
-                             f"(premissa: preços estáticos); venda de R$ {naive_sale:,.0f} evitada",
-                "revisao": "se em 12 meses o peso não voltar à faixa, reduzir ativamente",
-            })
+        decision = {"cls": cls, "band": band, "peso": v["peso_pct"],
+                    "naive_sale": naive_sale, "months": m, "after_1m": weight_after_1m}
+        if weight_after_1m <= band["max_pct"]:
+            decision["kind"] = "resolvida_pelo_aporte"
+        elif m <= DILUTION_MONTHS_LIMIT:
+            decision["kind"] = "diluir"
+            no_contrib_classes.add(cls)
         else:
-            actions.append({
-                "seq": seq, "scope": "class", "key": cls, "action": "reduzir",
-                "priority": 1, "amount_brl": round(max(naive_sale, 0.0), 2),
-                "current_pct": v["peso_pct"], "target_min_pct": band["min_pct"],
-                "target_max_pct": band["max_pct"],
-                "rationale": f"violação crítica não diluível por aportes em {DILUTION_MONTHS_LIMIT} meses "
-                             f"(precisaria ~{m:.0f}); redução até o teto da faixa",
-                "custo_imposto": "imposto não estimado quando houver custo desconhecido nas posições da classe",
-                "revisao": "reavaliar a cada aporte",
-            })
-        seq += 1
+            decision["kind"] = "reduzir"
+            no_contrib_classes.add(cls)
+        critical_decisions.append(decision)
 
     # 3. aportes: destino = classes abaixo da faixa (déficit até o mínimo primeiro,
-    # depois até o centro), nunca classes acima do teto ou proibidas
+    # depois até o centro), nunca classes acima do teto/excluídas/proibidas
     def _alloc_one_month(weights: dict[str, float], total_now: float) -> dict[str, float]:
         deficits_min: dict[str, float] = {}
         deficits_center: dict[str, float] = {}
         for cls, band in bands.items():
             w = weights.get(cls, 0.0)
-            if band["max_pct"] <= 0:
+            if band["max_pct"] <= 0 or (cls in no_contrib_classes and w > band["max_pct"]):
                 continue
             value_now = w / 100 * total_now
             min_target = band["min_pct"] / 100 * (total_now + monthly)
@@ -128,8 +121,13 @@ def build_plan(conn: sqlite3.Connection, profile_id: int, snapshot_id: int,
                 alloc[cls] = round(alloc.get(cls, 0.0) + take, 2)
             remaining = monthly - sum(alloc.values())
         if remaining > 1e-6:
-            # sem déficit: distribuir proporcional aos centros das faixas permitidas
-            centers = {c: (b["min_pct"] + b["max_pct"]) / 2 for c, b in bands.items() if b["max_pct"] > 0}
+            # sem déficit: distribuir proporcional aos centros das faixas
+            # permitidas, excluindo classes em violação sob diluição
+            centers = {
+                c: (b["min_pct"] + b["max_pct"]) / 2
+                for c, b in bands.items()
+                if b["max_pct"] > 0 and not (c in no_contrib_classes and weights.get(c, 0.0) > b["max_pct"])
+            }
             s = sum(centers.values()) or 1.0
             for cls, c in centers.items():
                 alloc[cls] = round(alloc.get(cls, 0.0) + remaining * c / s, 2)
@@ -148,6 +146,38 @@ def build_plan(conn: sqlite3.Connection, profile_id: int, snapshot_id: int,
             sim_weights[cls] = value_cls / new_total * 100
         sim_total = new_total
 
+    # 1-2. violações críticas de banda de classe, DEPOIS de conhecer a alocação
+    # do 1º aporte — as ações precisam ser coerentes com ela: se o próprio
+    # aporte já dilui a classe para dentro da faixa, a violação se resolve sem
+    # ação de venda; se não, "não aumentar" (diluição em N meses) ou "reduzir".
+    for d in critical_decisions:
+        cls, band = d["cls"], d["band"]
+        base = {"scope": "class", "key": cls, "current_pct": d["peso"],
+                "target_min_pct": band["min_pct"], "target_max_pct": band["max_pct"]}
+        if d["kind"] == "resolvida_pelo_aporte":
+            sales_avoided_brl += d["naive_sale"]
+            actions.append({**base, "seq": seq, "action": "manter", "priority": 1,
+                "amount_brl": None,
+                "rationale": f"violação crítica resolvida pelo próprio 1º aporte "
+                             f"(peso projetado {d['after_1m']:.1f}% <= teto {band['max_pct']}%); "
+                             f"venda de R$ {d['naive_sale']:,.0f} evitada",
+                "revisao": "confirmar no próximo aporte com preços atualizados"})
+        elif d["kind"] == "diluir":
+            sales_avoided_brl += d["naive_sale"]
+            actions.append({**base, "seq": seq, "action": "nao_aumentar", "priority": 1,
+                "amount_brl": None,
+                "rationale": f"violação crítica diluível por aportes em ~{d['months']:.0f} meses "
+                             f"(premissa: preços estáticos); venda de R$ {d['naive_sale']:,.0f} evitada",
+                "revisao": "se em 12 meses o peso não voltar à faixa, reduzir ativamente"})
+        else:
+            actions.append({**base, "seq": seq, "action": "reduzir", "priority": 1,
+                "amount_brl": round(d["naive_sale"], 2),
+                "rationale": f"violação crítica não diluível por aportes em {DILUTION_MONTHS_LIMIT} meses "
+                             f"(precisaria ~{d['months']:.0f}); redução até o teto da faixa",
+                "custo_imposto": "imposto não estimado quando houver custo desconhecido nas posições da classe",
+                "revisao": "reavaliar a cada aporte"})
+        seq += 1
+
     for cls, amount in monthly_allocations[0].items():
         band = bands.get(cls, {})
         actions.append({
@@ -155,7 +185,7 @@ def build_plan(conn: sqlite3.Connection, profile_id: int, snapshot_id: int,
             "priority": 2, "amount_brl": amount,
             "current_pct": round(class_weights.get(cls, 0.0), 2),
             "target_min_pct": band.get("min_pct"), "target_max_pct": band.get("max_pct"),
-            "rationale": "classe abaixo da faixa-alvo; aporte novo evita venda e giro",
+            "rationale": "classe abaixo da faixa-alvo pós-aporte; aporte novo evita venda e giro",
             "revisao": "recalcular a cada aporte com preços atualizados",
         })
         seq += 1
