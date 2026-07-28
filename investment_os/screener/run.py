@@ -147,6 +147,7 @@ def export(screen: dict) -> dict[str, Path]:
                 "criterios_nao_avaliados": "; ".join(not_ev),
                 "ultima_demonstracao": r["ultima_demonstracao"],
                 "dt_receb_ultimo_doc": r["dt_receb_ultimo_doc"],
+                "link_doc": r["link_doc"],
                 "fontes": "CVM DFP/ITR (dados.cvm.gov.br); B3 COTAHIST; preços não ajustados",
             }
         )

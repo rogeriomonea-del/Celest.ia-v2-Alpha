@@ -113,6 +113,55 @@ class CompanyFacts:
         return ttm(last_annual, self.quarters(grupo, cd_conta=cd_conta, concept=concept))
 
 
+def merged_net_income(cf: CompanyFacts) -> tuple[dict[int, float], list[PeriodValue], tuple[float | None, str], str]:
+    """Lucro atribuível com fallback por período para o consolidado total.
+
+    Data quality real (ex.: PetroRecôncavo): companhias sem participação de não
+    controladores às vezes reportam 3.11.01 como 0 no ITR, mantendo o lucro em
+    3.11. Regra determinística: por período, usa o atribuível quando != 0;
+    senão usa o total (nota registrada). Zeros legítimos só são substituídos
+    quando o total do MESMO período é não-zero.
+    """
+    def _merge_periods(attrib: list[PeriodValue], total: list[PeriodValue]) -> tuple[list[PeriodValue], bool]:
+        t_by_key = {(p.start, p.end): p for p in total}
+        merged: dict[tuple, PeriodValue] = {(p.start, p.end): p for p in attrib}
+        used_total = False
+        for key, p in merged.items():
+            t = t_by_key.get(key)
+            if p.value == 0 and t is not None and t.value != 0:
+                merged[key] = t
+                used_total = True
+        for key, t in t_by_key.items():
+            merged.setdefault(key, t)
+        return sorted(merged.values(), key=lambda p: p.end), used_total
+
+    a_annual = _periods(cf._ultimo(cf._sel("DFP", "DRE", concept="net_income_attrib")))
+    t_annual = _periods(cf._ultimo(cf._sel("DFP", "DRE", concept="net_income_total")))
+    annual_periods, used1 = _merge_periods(a_annual, t_annual)
+
+    a_q = cf.quarters("DRE", concept="net_income_attrib")
+    t_q = cf.quarters("DRE", concept="net_income_total")
+    quarter_periods, used2 = _merge_periods(a_q, t_q)
+
+    annual_by_year: dict[int, float] = {}
+    for p in annual_periods:
+        if p.months >= 12:
+            annual_by_year[p.end.year] = p.value
+
+    if annual_periods:
+        last_annual = max((p for p in annual_periods if p.months >= 12), default=None, key=lambda p: p.end)
+        ltm_result = ttm(last_annual, quarter_periods)
+    else:
+        ltm_result = (None, "sem exercício anual")
+
+    note = (
+        "linha 'atribuído a controladores' zerada em alguns períodos; usado lucro consolidado total nesses períodos"
+        if (used1 or used2)
+        else ""
+    )
+    return annual_by_year, quarter_periods, ltm_result, note
+
+
 def equity_attributable_latest(cf: CompanyFacts) -> tuple[float | None, date | None]:
     total, end = cf.balance_latest("BPP", concept="equity_total")
     if total is None:
@@ -171,11 +220,7 @@ def build_company_row(
     is_financial = bool(_FINANCIAL_SECTOR_RE.search(setor or ""))
 
     revenue_a = cf.annual_series("DRE", cd_conta="3.01")
-    ni_attrib_a = cf.annual_series("DRE", concept="net_income_attrib")
-    ni_note = ""
-    if not ni_attrib_a:
-        ni_attrib_a = cf.annual_series("DRE", concept="net_income_total")
-        ni_note = "lucro consolidado total (linha atribuível indisponível)"
+    ni_attrib_a, _ni_quarters, (ni_ltm, ni_ltm_desc), ni_note = merged_net_income(cf)
     ebit_a = cf.annual_series("DRE", cd_conta="3.05")
     cfo_a = cf.annual_series("DFC_MI", cd_conta="6.01")
     capex_a = cf.annual_series("DFC_MI", ds_re=_CAPEX_RE, prefix="6.02", agg=True)
@@ -184,9 +229,6 @@ def build_company_row(
 
     years = sorted(set(revenue_a) | set(ni_attrib_a))[-5:]
 
-    ni_ltm, ni_ltm_desc = cf.ltm("DRE", concept="net_income_attrib")
-    if ni_ltm is None:
-        ni_ltm, ni_ltm_desc = cf.ltm("DRE", concept="net_income_total")
     rev_ltm, rev_ltm_desc = cf.ltm("DRE", cd_conta="3.01")
     cfo_ltm, _ = cf.ltm("DFC_MI", cd_conta="6.01")
     ebit_ltm, _ = cf.ltm("DRE", cd_conta="3.05")
@@ -260,6 +302,10 @@ def build_company_row(
 
     last_stmt = facts.assign(_end=facts["dt_fim_exerc"].map(_to_date))["_end"].max()
     dt_receb = facts["dt_receb"].dropna().max() if "dt_receb" in facts else None
+    link_doc = None
+    if "link_doc" in facts and dt_receb is not None:
+        links = facts.loc[facts["dt_receb"] == dt_receb, "link_doc"].dropna()
+        link_doc = str(links.iloc[0]) if not links.empty else None
 
     return {
         "cd_cvm": cd_cvm,
@@ -296,4 +342,5 @@ def build_company_row(
         "pior_queda_receita": worst_rev_decline,
         "ultima_demonstracao": last_stmt.isoformat() if last_stmt else None,
         "dt_receb_ultimo_doc": str(dt_receb)[:10] if dt_receb is not None else None,
+        "link_doc": link_doc,
     }
