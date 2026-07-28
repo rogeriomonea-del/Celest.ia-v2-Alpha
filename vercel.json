@@ -1,6 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "installCommand": "npm install --prefix celestia_dashboard",
-  "buildCommand": "npm run build --prefix celestia_dashboard",
-  "outputDirectory": "celestia_dashboard/dist"
+  "installCommand": "npm install --prefix painel_demo",
+  "buildCommand": "IIOS_STATIC_EXPORT=1 NEXT_PUBLIC_IIOS_DEMO=1 npm run build --prefix painel_demo",
+  "outputDirectory": "painel_demo/out",
+  "framework": null
 }
