@@ -1,0 +1,13 @@
+# Só o backend entra na imagem — legado de voos e prévia do painel ficam fora.
+.git
+__pycache__
+**/__pycache__
+*.pyc
+celestia_dashboard
+painel_demo
+scrapers.py
+research_planner.py
+tests
+data/bronze
+data/documents
+.env

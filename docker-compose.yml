@@ -1,0 +1,28 @@
+# Investment Intelligence OS — backend real para o painel (sem modo demonstração)
+#
+#   docker compose up -d api                       # sobe a API em :8000
+#   docker compose run --rm pipeline               # ingestão + build + macro + report (D-1)
+#
+# O painel (Celst.ia-Finance) aponta para esta API via NEXT_PUBLIC_IIOS_API_URL
+# e NÃO define NEXT_PUBLIC_IIOS_DEMO. Detalhes: docs/DEPLOY.md.
+
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file:
+      - path: .env
+        required: false
+    volumes:
+      - ./data:/app/data
+
+  pipeline:
+    build: .
+    profiles: ["tools"]
+    command: python -m investment_os.cli all
+    env_file:
+      - path: .env
+        required: false
+    volumes:
+      - ./data:/app/data

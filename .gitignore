@@ -1,0 +1,13 @@
+data/*
+!data/gold/
+data/gold/*
+!data/gold/screener_quality_deep_value.csv
+!data/gold/screener_quality_deep_value.json
+!data/gold/tesouro_ipca2050.json
+!data/reports/
+data/reports/*
+!data/reports/*.md
+__pycache__/
+*.pyc
+.pytest_cache/
+.env

@@ -1,0 +1,12 @@
+# Investment Intelligence OS — backend (investment_os/)
+pandas>=2.0
+pyarrow>=14
+duckdb>=0.10
+fastapi>=0.110
+uvicorn>=0.29
+pdfplumber>=0.11
+pytest>=8
+openpyxl>=3.1
+python-multipart>=0.0.9
+httpx2>=0.1  # TestClient (starlette novo); localmente httpx antigo também funciona
+anthropic>=0.120  # chat "Pergunte à IA" (Fase 7); sem chave o /v1/chat responde 503
