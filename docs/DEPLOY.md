@@ -59,6 +59,27 @@ Qualquer host que rode um container serve. Requisitos:
 > da Fase 5 exige disco persistente e o pipeline roda minutos — use um host
 > com processo/disco de longa duração.
 
+### Hostinger VPS (caminho preparado)
+
+O repositório versiona um `.mcp.json` com os servidores MCP oficiais da
+Hostinger (hosting, domains, dns, billing, reach, vps). O token NUNCA é
+commitado: o arquivo referencia `${HOSTINGER_API_TOKEN}` do ambiente.
+
+1. Crie um token de API no hPanel (Conta → API) — trate como senha.
+2. Disponibilize `HOSTINGER_API_TOKEN` como variável de ambiente da sessão
+   do Claude Code (nas configurações do ambiente remoto, ou no shell local).
+   Os servidores MCP carregam na PRÓXIMA sessão e permitem orquestrar o VPS.
+3. No VPS (Ubuntu com Docker), o deploy é o fluxo padrão da Opção B:
+
+```bash
+ssh root@<vps> 'git clone https://github.com/rogeriomonea-del/Celest.ia-v2-Alpha.git \
+  && cd Celest.ia-v2-Alpha \
+  && docker compose run --rm pipeline \
+  && docker compose up -d api'
+# depois: IIOS_CORS_ORIGINS com a origem do painel; cron diário do pipeline;
+# e um proxy com HTTPS + autenticação na frente da porta 8000 (ver Segurança).
+```
+
 ## Apontando o painel (desligando o modo demonstração)
 
 No repo `Celst.ia-Finance` (ver também `docs/INTEGRATION.md`):
