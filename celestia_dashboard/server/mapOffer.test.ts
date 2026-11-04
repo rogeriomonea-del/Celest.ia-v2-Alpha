@@ -125,6 +125,17 @@ describe('mapOffers — one-way direct', () => {
     expect(flight.tags).toEqual([])
   })
 
+  it('divides by seated passengers only: a lap infant does not count (1 adult + 1 infant)', () => {
+    const withInfant: DuffelOffer = {
+      ...oneWay,
+      total_amount: '1100.00',
+      passengers: [...oneWay.passengers, { id: 'pas_infant', type: null, age: 1 }],
+    }
+    const [flight] = mapOffers([withInfant])
+    expect(flight.totalPrice).toBe(1100)
+    expect(flight.price).toBe(1100)
+  })
+
   it('falls back to segment durations when the slice duration is null', () => {
     const noDuration = { ...oneWay, slices: [{ ...oneWay.slices[0], duration: null }] }
     expect(mapOffers([noDuration])[0].durationMin).toBe(770)

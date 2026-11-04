@@ -130,12 +130,18 @@ function emissionsKgOf(offer: DuffelOffer): number | null {
   return Number.isFinite(kg) ? kg : null
 }
 
+/** Lap infants (under 2, no seat) are sent to Duffel with an age; they do not count as a seat. */
+function seatedPassengerCount(offer: DuffelOffer): number {
+  const seated = offer.passengers.filter((p) => !(typeof p.age === 'number' && p.age < 2)).length
+  return Math.max(1, seated)
+}
+
 /** Maps one offer; `emissions` is 'average' until mapOffers() ranks the set. */
 function mapOffer(offer: DuffelOffer): Flight {
   const slices = offer.slices.map(mapSlice)
   const outbound = slices[0]
   const totalPrice = Number(offer.total_amount)
-  const passengerCount = Math.max(1, offer.passengers.length)
+  const passengerCount = seatedPassengerCount(offer)
   const refundable = offer.conditions?.refund_before_departure?.allowed ?? null
   const changeable = offer.conditions?.change_before_departure?.allowed ?? null
   const tags: FlightTag[] = changeable === true ? ['flexible'] : []
