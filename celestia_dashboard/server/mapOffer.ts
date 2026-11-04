@@ -145,8 +145,12 @@ function seatedPassengerCount(offer: DuffelOffer): number {
   return Math.max(1, seated)
 }
 
-/** Maps one offer; `emissions` is 'average' until mapOffers() ranks the set. */
-function mapOffer(offer: DuffelOffer): Flight {
+/**
+ * Maps one offer on its own (GET /api/offers/:id). `emissionsKg` is mapped, but the
+ * `emissions` bucket is always 'average': it is relative to a result set, and one offer
+ * has nothing to rank against. The browser keeps the bucket from the search result.
+ */
+export function mapSingleOffer(offer: DuffelOffer): Flight {
   const slices = offer.slices.map(mapSlice)
   const outbound = slices[0]
   const totalPrice = Number(offer.total_amount)
@@ -192,7 +196,7 @@ function median(values: number[]): number {
 
 /** Maps a result set; emissions buckets are relative to the set's median. */
 export function mapOffers(offers: DuffelOffer[]): Flight[] {
-  const flights = offers.map(mapOffer)
+  const flights = offers.map(mapSingleOffer)
   const known = flights.map((f) => f.emissionsKg).filter((kg): kg is number => kg !== null)
   if (known.length === 0) return flights
   const med = median(known)

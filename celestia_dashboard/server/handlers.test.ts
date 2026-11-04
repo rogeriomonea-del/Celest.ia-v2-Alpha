@@ -359,6 +359,19 @@ describe('GET /api/offers/[id]', () => {
     expect(body.liveMode).toBe(expected)
   })
 
+  it.each([
+    [null, null],
+    ['1650', 1650],
+  ])("maps emissionsKg (%s) and leaves the single-offer bucket at 'average'", async (kg, expectedKg) => {
+    const offer = { ...fixture.roundTripWithConnection, total_emissions_kg: kg }
+    fetchMock.mockResolvedValue(duffelJson({ data: offer }))
+    const res = await offerGET(offerRequest(offer.id))
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as OfferResponse
+    expect(body.offer.emissionsKg).toBe(expectedKg)
+    expect(body.offer.emissions).toBe('average')
+  })
+
   it('reads the id from the path when no query param is present', async () => {
     fetchMock.mockResolvedValue(duffelJson({ data: fixture.oneWayDirect }))
     const res = await offerGET(new Request(`https://celestia.test/api/offers/${fixture.oneWayDirect.id}`))
