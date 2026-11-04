@@ -15,13 +15,41 @@ const CALLBACK_FAILED = 'Não foi possível concluir o login. Tente novamente.'
 /** OAuth callback params left in the URL by Supabase (query or hash). */
 const REDIRECT_PARAMS = ['code', 'error', 'error_code', 'error_description']
 
-function readRedirect(): { hadCode: boolean; errorDescription: string | null } {
+/**
+ * Fixed messages for known OAuth/Supabase error codes. The URL's
+ * error_description is attacker-controllable and is never displayed.
+ */
+const INTERRUPTED = 'O login expirou ou foi interrompido. Tente novamente.'
+const ERROR_CODE_MESSAGES = new Map<string, string>([
+  ['bad_oauth_state', INTERRUPTED],
+  ['bad_oauth_callback', INTERRUPTED],
+  ['flow_state_expired', INTERRUPTED],
+  ['flow_state_not_found', INTERRUPTED],
+  ['signup_disabled', 'Novos cadastros estão desativados no momento.'],
+  ['provider_disabled', 'Este provedor de login está desativado no momento.'],
+  ['email_not_confirmed', 'Confirme seu e-mail com o provedor de login e tente novamente.'],
+])
+
+/** Fixed messages for standard OAuth 2.0 `error` values. */
+const PROVIDER_DOWN = 'O provedor de login está indisponível no momento. Tente novamente mais tarde.'
+const ERROR_MESSAGES = new Map<string, string>([
+  ['access_denied', 'O acesso foi negado ou o login foi cancelado. Tente novamente.'],
+  ['server_error', PROVIDER_DOWN],
+  ['temporarily_unavailable', PROVIDER_DOWN],
+])
+
+function readRedirect(): { hadCode: boolean; errorMessage: string | null } {
   const url = new URL(window.location.href)
   const hash = new URLSearchParams(url.hash.slice(1))
   const get = (key: string) => url.searchParams.get(key) ?? hash.get(key)
+  const error = get('error')
+  const errorCode = get('error_code')
+  const failed = error !== null || errorCode !== null || get('error_description') !== null
   return {
     hadCode: url.searchParams.has('code'),
-    errorDescription: get('error_description') ?? get('error'),
+    errorMessage: failed
+      ? (ERROR_CODE_MESSAGES.get(errorCode ?? '') ?? ERROR_MESSAGES.get(error ?? '') ?? CALLBACK_FAILED)
+      : null,
   }
 }
 
@@ -70,11 +98,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setSession(current)
         setLoading(false)
         stripRedirectParams()
-        const message = redirect.errorDescription
-          ? `Não foi possível entrar: ${redirect.errorDescription}`
-          : redirect.hadCode && !current
+        const message =
+          redirect.errorMessage ??
+          (redirect.hadCode && !current
             ? CALLBACK_FAILED
-            : null
+            : null)
         if (message) {
           setError(message)
           setLoginOpen(true)

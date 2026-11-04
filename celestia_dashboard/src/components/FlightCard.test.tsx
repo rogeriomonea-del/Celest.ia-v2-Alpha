@@ -87,16 +87,64 @@ describe('FlightCard', () => {
       expect(within(details).queryByText('Remarcável')).not.toBeInTheDocument()
     })
 
-    it('show refundable and changeable when known', () => {
-      const details = openDetails(makeFlight({ conditions: { refundable: true, changeable: true, refundPenalty: null, changePenalty: null } }))
+    it('show refundable and changeable when allowed with no fee', () => {
+      const free = { amount: 0, currency: 'BRL' }
+      const details = openDetails(makeFlight({ conditions: { refundable: true, changeable: true, refundPenalty: free, changePenalty: free } }))
       expect(within(details).getByText('Reembolsável')).toBeInTheDocument()
       expect(within(details).getByText('Remarcável')).toBeInTheDocument()
     })
 
-    it('show "Não reembolsável" and no change label when not refundable nor changeable', () => {
+    it('spell out the fee when refund or change is allowed with a penalty', () => {
+      const details = openDetails(
+        makeFlight({
+          conditions: {
+            refundable: true,
+            changeable: true,
+            refundPenalty: { amount: 450, currency: 'BRL' },
+            changePenalty: { amount: 120, currency: 'USD' },
+          },
+        }),
+      )
+      expect(plain(within(details).getByText(/^Reembolsável com multa de/).textContent)).toBe(
+        'Reembolsável com multa de R$ 450',
+      )
+      expect(plain(within(details).getByText(/^Remarcação com taxa de/).textContent)).toBe(
+        'Remarcação com taxa de US$ 120,00',
+      )
+      expect(within(details).queryByText('Reembolsável')).not.toBeInTheDocument()
+      expect(within(details).queryByText('Remarcável')).not.toBeInTheDocument()
+    })
+
+    it('flag an unknown fee instead of claiming the condition is free', () => {
+      const details = openDetails(makeFlight({ conditions: { refundable: true, changeable: true, refundPenalty: null, changePenalty: null } }))
+      expect(within(details).getByText('Reembolsável (taxa a confirmar)')).toBeInTheDocument()
+      expect(within(details).getByText('Remarcável (taxa a confirmar)')).toBeInTheDocument()
+      expect(within(details).queryByText('Reembolsável')).not.toBeInTheDocument()
+      expect(within(details).queryByText('Remarcável')).not.toBeInTheDocument()
+    })
+
+    it('show "Não reembolsável" and "Não remarcável" when not refundable nor changeable', () => {
       const details = openDetails(makeFlight({ conditions: { refundable: false, changeable: false, refundPenalty: null, changePenalty: null } }))
       expect(within(details).getByText('Não reembolsável')).toBeInTheDocument()
+      expect(within(details).getByText('Não remarcável')).toBeInTheDocument()
       expect(within(details).queryByText('Remarcável')).not.toBeInTheDocument()
+    })
+  })
+
+  describe('emissions in the details', () => {
+    function openDetails(flight: Flight) {
+      renderCard(flight)
+      fireEvent.click(screen.getByRole('button', { name: 'Detalhes do voo' }))
+    }
+
+    it('are hidden when the provider has no CO₂ estimate', () => {
+      openDetails(makeFlight({ emissions: 'low', emissionsKg: null }))
+      expect(screen.queryByText(/Emissões/)).not.toBeInTheDocument()
+    })
+
+    it('show the bucket and the CO₂ estimate when known', () => {
+      openDetails(makeFlight({ emissions: 'low', emissionsKg: 412 }))
+      expect(plain(screen.getByText(/Emissões/).textContent)).toBe('Emissões abaixo da média · 412 kg CO₂')
     })
   })
 })

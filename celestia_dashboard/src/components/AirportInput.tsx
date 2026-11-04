@@ -41,6 +41,8 @@ export function AirportInput({ label, icon: Icon, value, onChange, excludeCode }
     const timer = setTimeout(() => {
       fetchPlaces(trimmed, controller.signal).then(
         (places) => {
+          // A late answer for a superseded query must not touch the state.
+          if (controller.signal.aborted) return
           setRemote({ query: trimmed, places })
           setRemoteLoading(false)
         },

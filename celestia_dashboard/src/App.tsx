@@ -1,5 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { AlertTriangle, ArrowRight, Bookmark, BookmarkCheck, Plane, PlaneTakeoff, SearchX, SlidersHorizontal } from 'lucide-react'
+import { z } from 'zod'
+import {
+  AlertTriangle,
+  ArrowRight,
+  Bookmark,
+  BookmarkCheck,
+  FlaskConical,
+  Plane,
+  PlaneTakeoff,
+  SearchX,
+  SlidersHorizontal,
+} from 'lucide-react'
 import { Header } from './components/Header'
 import { Footer } from './components/Footer'
 import { SearchBar } from './components/SearchBar'
@@ -14,10 +25,11 @@ import {
 } from './components/Skeletons'
 import { findAirport } from './data/airports'
 import { ApiError, searchFlights, UNREACHABLE_MESSAGE } from './lib/api'
+import { useAuth } from './auth/context'
 import { useSavedSearches } from './features/savedSearches/useSavedSearches'
 import type { SavedSearch } from './features/savedSearches/types'
 import { applyFilters, sortFlights } from './utils/flightLogic'
-import { addDays, startOfDay } from './utils/dates'
+import { addDays, fromISODate, startOfDay, toISODate } from './utils/dates'
 import { formatShortDate } from './utils/format'
 import type { Filters, Flight, SearchParams, SortKey } from './types'
 
@@ -26,6 +38,57 @@ const SKELETON_COUNT = 5
 const PRICE_STEP = 50
 
 type Status = 'idle' | 'loading' | 'error' | 'results'
+
+const PAST_DATES_HINT = 'As datas desta busca já passaram. Escolha novas datas e busque novamente.'
+const SAVE_FAILED = 'Não foi possível salvar a busca. Tente novamente.'
+
+/** Search the user asked to save while logged out; survives the OAuth redirect. */
+export const PENDING_SAVE_KEY = 'celestia:pendingSave'
+
+const airportSchema = z.object({ code: z.string(), city: z.string(), name: z.string(), country: z.string() })
+const pendingSaveSchema = z.object({
+  origin: airportSchema,
+  destination: airportSchema,
+  departDate: z.string().nullable(),
+  returnDate: z.string().nullable(),
+  passengers: z.object({
+    adults: z.number().int(),
+    children: z.number().int(),
+    infants: z.number().int(),
+  }),
+  tripType: z.enum(['roundtrip', 'oneway']),
+  cabin: z.enum(['economy', 'premium', 'business']),
+})
+
+function storePendingSave(params: SearchParams) {
+  try {
+    const stored: z.infer<typeof pendingSaveSchema> = {
+      ...params,
+      departDate: params.departDate ? toISODate(params.departDate) : null,
+      returnDate: params.returnDate ? toISODate(params.returnDate) : null,
+    }
+    window.sessionStorage.setItem(PENDING_SAVE_KEY, JSON.stringify(stored))
+  } catch {
+    // Storage unavailable (private mode, quota): the save is simply not resumed.
+  }
+}
+
+/** Reads and removes the pending save. Returns null when absent or invalid. */
+function takePendingSave(): SearchParams | null {
+  try {
+    const raw = window.sessionStorage.getItem(PENDING_SAVE_KEY)
+    if (raw === null) return null
+    window.sessionStorage.removeItem(PENDING_SAVE_KEY)
+    const stored = pendingSaveSchema.parse(JSON.parse(raw))
+    return {
+      ...stored,
+      departDate: stored.departDate ? fromISODate(stored.departDate) : null,
+      returnDate: stored.returnDate ? fromISODate(stored.returnDate) : null,
+    }
+  } catch {
+    return null
+  }
+}
 
 function buildDefaultSearch(): SearchParams {
   const today = startOfDay(new Date())
@@ -63,8 +126,16 @@ export default function App() {
   const [showMobileFilters, setShowMobileFilters] = useState(false)
   const [searchedParams, setSearchedParams] = useState<SearchParams | null>(null)
   const [savedId, setSavedId] = useState<string | null>(null)
+  const [saveError, setSaveError] = useState<string | null>(null)
+  const [totalOffers, setTotalOffers] = useState(0)
+  const [truncated, setTruncated] = useState(false)
+  const [liveMode, setLiveMode] = useState(true)
   const [offer, setOffer] = useState<Flight | null>(null)
   const controllerRef = useRef<AbortController | null>(null)
+  // Bumped on every search, so a save that resolves late can tell it is stale.
+  const searchSeqRef = useRef(0)
+  const { user } = useAuth()
+  const userId = user?.id ?? null
   const { save } = useSavedSearches()
   const loading = status === 'loading'
 
@@ -72,15 +143,21 @@ export default function App() {
     controllerRef.current?.abort()
     const controller = new AbortController()
     controllerRef.current = controller
+    searchSeqRef.current += 1
     setParams(nextParams)
     setSearchedParams(nextParams)
     setSavedId(null)
+    setSaveError(null)
     setHint(null)
     setStatus('loading')
     searchFlights(nextParams, controller.signal).then(
-      ({ offers }) => {
+      (response) => {
         if (controller.signal.aborted) return
+        const { offers } = response
         setResults(offers)
+        setTotalOffers(response.totalOffers)
+        setTruncated(response.truncated)
+        setLiveMode(response.liveMode)
         setFilters(buildDefaultFilters(offers))
         setStatus('results')
       },
@@ -101,7 +178,7 @@ export default function App() {
       if (departDate && departDate < today) {
         setParams({ ...saved.params, departDate: null, returnDate: null })
         setFormKey((key) => key + 1)
-        setHint('As datas desta busca já passaram. Escolha novas datas e busque novamente.')
+        setHint(PAST_DATES_HINT)
         return
       }
       setFormKey((key) => key + 1)
@@ -110,11 +187,42 @@ export default function App() {
     [runSearch],
   )
 
+  /** Saves `target`; the result is applied only if no search ran meanwhile. */
+  const saveSearch = useCallback(
+    async (target: SearchParams, loggedIn: boolean) => {
+      const seq = searchSeqRef.current
+      setSaveError(null)
+      const saved = await save(target)
+      if (searchSeqRef.current !== seq) return
+      if (saved) setSavedId(saved.id)
+      else if (loggedIn) setSaveError(SAVE_FAILED)
+    },
+    [save],
+  )
+
   const handleSave = async () => {
     if (!searchedParams) return
-    const saved = await save(searchedParams)
-    if (saved) setSavedId(saved.id)
+    // save() opens the OAuth login, which leaves the page: keep the search to resume it.
+    if (!userId) storePendingSave(searchedParams)
+    await saveSearch(searchedParams, userId !== null)
   }
+
+  // Back from login with a pending save: restore that search, run it and save it.
+  useEffect(() => {
+    if (!userId) return
+    const pending = takePendingSave()
+    if (!pending) return
+    const today = startOfDay(new Date())
+    if (!pending.departDate || pending.departDate < today) {
+      setParams({ ...pending, departDate: null, returnDate: null })
+      setFormKey((key) => key + 1)
+      setHint(PAST_DATES_HINT)
+      return
+    }
+    setFormKey((key) => key + 1)
+    runSearch(pending)
+    void saveSearch(pending, true)
+  }, [userId, runSearch, saveSearch])
 
   const priceBounds = useMemo(() => {
     if (results.length === 0) return { min: 0, max: 0 }
@@ -158,7 +266,8 @@ export default function App() {
     status === 'loading'
       ? 'buscando…'
       : status === 'results'
-        ? `${filteredFlights.length} de ${results.length} voos`
+        ? `${filteredFlights.length} de ${results.length} voos` +
+          (truncated ? ` · Mostrando ${results.length} de ${totalOffers} ofertas` : '')
         : status === 'error'
           ? 'erro na busca'
           : 'nenhuma busca ainda'
@@ -180,7 +289,7 @@ export default function App() {
                 Para onde você quer voar?
               </h1>
               <p className="mt-2 text-sm text-indigo-100 sm:text-base">
-                Tarifas reais de companhias aéreas, atualizadas a cada busca.
+                Compare tarifas de companhias aéreas e encontre o melhor voo.
               </p>
             </div>
             <SearchBar key={formKey} initialParams={params} loading={loading} onSearch={runSearch} />
@@ -206,7 +315,12 @@ export default function App() {
                 {summary}
               </p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              {saveError && (
+                <p role="alert" className="text-sm font-medium text-red-700">
+                  {saveError}
+                </p>
+              )}
               <button
                 type="button"
                 onClick={() => void handleSave()}
@@ -233,6 +347,16 @@ export default function App() {
               )}
             </div>
           </div>
+
+          {status === 'results' && !liveMode && (
+            <p
+              role="note"
+              className="mb-5 flex items-center gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800"
+            >
+              <FlaskConical className="h-4 w-4 shrink-0" aria-hidden="true" />
+              Modo de teste: preços fictícios, apenas para demonstração.
+            </p>
+          )}
 
           {status === 'idle' && (
             <StatePanel
