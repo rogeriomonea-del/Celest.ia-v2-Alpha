@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "celestia-travel"
+version = "2.0.0"
+description = "Plataforma multi-agente de pesquisa de passagens aéreas e milhas."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = []
+
+[project.optional-dependencies]
+# Narrativa analítica opcional via API da Anthropic.
+llm = ["anthropic>=0.40"]
+dev = ["pytest>=8"]
+
+[project.scripts]
+celestia-travel = "celestia_travel.cli:main"
+
+[tool.setuptools]
+packages = [
+    "celestia_travel",
+    "celestia_travel.agents",
+    "celestia_travel.providers",
+    "celestia_travel.miles",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

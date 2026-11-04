@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowRight, Plane, SearchX, SlidersHorizontal, TrendingDown } from 'lucide-react'
+import { LoginGate } from './auth/LoginGate'
 import { Header } from './components/Header'
 import { Footer } from './components/Footer'
 import { SearchBar } from './components/SearchBar'
@@ -45,7 +46,7 @@ function buildDefaultFilters(flights: Flight[]): Filters {
   }
 }
 
-export default function App() {
+function PlataformaVoos() {
   const [params, setParams] = useState<SearchParams>(buildDefaultSearch)
   const [results, setResults] = useState<Flight[]>([])
   const [filters, setFilters] = useState<Filters | null>(null)
@@ -240,5 +241,14 @@ export default function App() {
 
       <Footer />
     </div>
+  )
+}
+
+/** Raiz da SPA: tudo fica atrás do portão de login (sessão compartilhada com a área financeira). */
+export default function App() {
+  return (
+    <LoginGate>
+      <PlataformaVoos />
+    </LoginGate>
   )
 }
