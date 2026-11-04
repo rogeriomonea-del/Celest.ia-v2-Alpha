@@ -1,0 +1,26 @@
+import { searchRequestSchema } from '../../src/shared/api.js'
+import type { SearchResponse } from '../../src/shared/api.js'
+import { createOfferRequest } from '../../server/duffel.js'
+import { handleError, json, methodNotAllowed, NO_STORE, parseJsonBody, validationErrorResponse } from '../../server/http.js'
+import { mapOffers } from '../../server/mapOffer.js'
+
+export const MAX_OFFERS = 60
+
+/** POST /api/flights/search — body: SearchRequest -> SearchResponse. */
+export async function POST(request: Request): Promise<Response> {
+  try {
+    const parsed = searchRequestSchema.safeParse(await parseJsonBody(request))
+    if (!parsed.success) return validationErrorResponse(parsed.error)
+
+    const offers = mapOffers(await createOfferRequest(parsed.data))
+      .sort((a, b) => a.totalPrice - b.totalPrice)
+      .slice(0, MAX_OFFERS)
+    const body: SearchResponse = { offers, searchedAt: new Date().toISOString() }
+    return json(body, 200, NO_STORE)
+  } catch (err) {
+    return handleError(err)
+  }
+}
+
+const notAllowed = methodNotAllowed(['POST'])
+export { notAllowed as GET, notAllowed as PUT, notAllowed as PATCH, notAllowed as DELETE }
