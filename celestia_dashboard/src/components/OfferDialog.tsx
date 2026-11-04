@@ -148,7 +148,8 @@ export function OfferDialog({ flight, passengerCount, onClose, onResearch }: Off
                 <p className="text-sm text-slate-600">
                   {money(state.offer.price, state.offer.currency)} por pessoa
                 </p>
-                {(state.offer.totalPrice !== flight.totalPrice || state.offer.currency !== flight.currency) && (
+                {/* Compare what the user sees: BRL is shown without cents. */}
+                {money(state.offer.totalPrice, state.offer.currency) !== money(flight.totalPrice, flight.currency) && (
                   <p className="mt-1 text-sm font-medium text-amber-700">
                     O preço mudou desde a busca (antes {money(flight.totalPrice, flight.currency)}).
                   </p>
@@ -157,7 +158,8 @@ export function OfferDialog({ flight, passengerCount, onClose, onResearch }: Off
                   Válida até {timeFormatter.format(new Date(state.offer.expiresAt))}
                 </p>
               </div>
-              <OfferDetails flight={state.offer} />
+              {/* The emissions bucket is relative to the search results, so keep the card's. */}
+              <OfferDetails flight={{ ...state.offer, emissions: flight.emissions }} />
               <p className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-600">Reserva online em breve.</p>
             </div>
           )}

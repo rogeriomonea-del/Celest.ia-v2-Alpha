@@ -147,6 +147,35 @@ describe('AirportInput remote suggestions', () => {
     expect(screen.queryByText('Buscando aeroportos…')).not.toBeInTheDocument()
   })
 
+  it('ignores an answer that arrives after its request was aborted', async () => {
+    // A fake that, unlike fetch, still resolves after abort.
+    let resolveStale!: (places: Airport[]) => void
+    vi.mocked(fetchPlaces)
+      .mockImplementationOnce(() => new Promise((resolve) => (resolveStale = resolve)))
+      .mockReturnValueOnce(new Promise(() => {}))
+    const { input } = renderInput()
+    fireEvent.focus(input)
+    type(input, 'xy')
+    await advance(PLACES_DEBOUNCE_MS)
+    const staleSignal = vi.mocked(fetchPlaces).mock.calls[0][1]!
+
+    type(input, 'xyz')
+    await advance(PLACES_DEBOUNCE_MS)
+    expect(staleSignal.aborted).toBe(true)
+    expect(fetchPlaces).toHaveBeenCalledTimes(2)
+
+    resolveStale([remote('OLD')])
+    await flush()
+
+    // The fresh request is still pending: its loading row must stay.
+    expect(screen.getByText('Buscando aeroportos…')).toBeInTheDocument()
+    expect(optionCodes()).not.toContain('OLD')
+
+    // Going back to the stale query must not show the late answer as cached.
+    type(input, 'xy')
+    expect(optionCodes()).not.toContain('OLD')
+  })
+
   it('aborts the pending request when the input closes', async () => {
     vi.mocked(fetchPlaces).mockReturnValue(new Promise(() => {}))
     const { input } = renderInput()

@@ -42,7 +42,33 @@ describe('OfferDialog', () => {
     expect(screen.queryByText(/O preço mudou/)).not.toBeInTheDocument()
     expect(screen.getByText(/^Válida até/)).toBeInTheDocument()
     expect(screen.getByText('Não reembolsável')).toBeInTheDocument()
-    expect(screen.getByText('Remarcável')).toBeInTheDocument()
+    expect(screen.getByText('Remarcável (taxa a confirmar)')).toBeInTheDocument()
+  })
+
+  it('keeps the emissions bucket from the search results, not the single re-fetched offer', async () => {
+    const card = makeFlight({ id: 'off_7', emissions: 'high', emissionsKg: 980 })
+    // Alone, the re-fetched offer is always "average" relative to itself.
+    vi.mocked(fetchOffer).mockResolvedValue({ ...card, emissions: 'average' })
+    render(<OfferDialog flight={card} passengerCount={1} onClose={vi.fn()} onResearch={vi.fn()} />)
+
+    const line = await screen.findByText(/Emissões/)
+    expect(plain(line.textContent)).toBe('Emissões acima da média · 980 kg CO₂')
+  })
+
+  it('does not report a price change that is invisible once formatted (BRL has no cents)', async () => {
+    vi.mocked(fetchOffer).mockResolvedValue({ ...searched, price: 3500.2, totalPrice: 7000.4 })
+    renderDialog()
+
+    await screen.findByText(/total · 2 passageiros/)
+    expect(screen.queryByText(/O preço mudou/)).not.toBeInTheDocument()
+  })
+
+  it('reports a currency change even for the same amount', async () => {
+    vi.mocked(fetchOffer).mockResolvedValue({ ...searched, currency: 'USD' })
+    renderDialog()
+
+    const changed = await screen.findByText(/O preço mudou/)
+    expect(plain(changed.textContent)).toBe('O preço mudou desde a busca (antes R$ 7.000).')
   })
 
   it('shows the refreshed price and "O preço mudou" when it differs from the search', async () => {

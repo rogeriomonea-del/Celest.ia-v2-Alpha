@@ -14,7 +14,7 @@ import {
 import { AirlineLogo } from './AirlineLogo'
 import { Badge } from './Badge'
 import { formatDuration, formatMoney } from '../utils/format'
-import type { Flight, FlightSlice } from '../types'
+import type { Flight, FlightSlice, Money } from '../types'
 
 interface FlightCardProps {
   flight: Flight
@@ -73,10 +73,36 @@ function stopsLabel(slice: FlightSlice): string {
 
 const SLICE_TITLES = ['Ida', 'Volta']
 
+/**
+ * Label for a refund/change condition: free only when the fee is known to be 0;
+ * a positive fee is spelled out; an unknown fee is flagged. null = omit.
+ */
+function conditionLabel(
+  allowed: boolean | null,
+  penalty: Money | null,
+  labels: { free: string; withFee: string; denied: string },
+): string | null {
+  if (allowed === null) return null
+  if (!allowed) return labels.denied
+  if (penalty === null) return `${labels.free} (taxa a confirmar)`
+  if (penalty.amount === 0) return labels.free
+  return `${labels.withFee} ${formatMoney(penalty.amount, penalty.currency)}`
+}
+
 /** Segments and layovers of every slice, plus baggage, emissions and conditions. */
 export function OfferDetails({ flight }: { flight: Flight }) {
   const { checkedBags, carryOn } = flight.baggage
-  const { refundable, changeable } = flight.conditions
+  const { refundable, changeable, refundPenalty, changePenalty } = flight.conditions
+  const refundLabel = conditionLabel(refundable, refundPenalty, {
+    free: 'Reembolsável',
+    withFee: 'Reembolsável com multa de',
+    denied: 'Não reembolsável',
+  })
+  const changeLabel = conditionLabel(changeable, changePenalty, {
+    free: 'Remarcável',
+    withFee: 'Remarcação com taxa de',
+    denied: 'Não remarcável',
+  })
   return (
     <div className="space-y-4 text-sm">
       {flight.slices.map((slice, sliceIndex) => (
@@ -123,13 +149,15 @@ export function OfferDetails({ flight }: { flight: Flight }) {
               ? '1 bagagem despachada incluída'
               : `${checkedBags} bagagens despachadas incluídas`}
         </span>
-        <span className="inline-flex items-center gap-1.5">
-          <Leaf className="h-4 w-4 text-slate-400" aria-hidden="true" />
-          Emissões {flight.emissions === 'low' ? 'abaixo da' : flight.emissions === 'high' ? 'acima da' : 'na'}{' '}
-          média{flight.emissionsKg !== null ? ` · ${flight.emissionsKg} kg CO₂` : ''}
-        </span>
-        {refundable !== null && <span>{refundable ? 'Reembolsável' : 'Não reembolsável'}</span>}
-        {changeable === true && <span>Remarcável</span>}
+        {flight.emissionsKg !== null && (
+          <span className="inline-flex items-center gap-1.5">
+            <Leaf className="h-4 w-4 text-slate-400" aria-hidden="true" />
+            Emissões {flight.emissions === 'low' ? 'abaixo da' : flight.emissions === 'high' ? 'acima da' : 'na'}{' '}
+            média · {flight.emissionsKg} kg CO₂
+          </span>
+        )}
+        {refundLabel && <span>{refundLabel}</span>}
+        {changeLabel && <span>{changeLabel}</span>}
       </div>
     </div>
   )
