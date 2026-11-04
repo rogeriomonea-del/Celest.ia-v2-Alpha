@@ -73,6 +73,14 @@ function storePendingSave(params: SearchParams) {
   }
 }
 
+function clearPendingSave() {
+  try {
+    window.sessionStorage.removeItem(PENDING_SAVE_KEY)
+  } catch {
+    // Storage unavailable: nothing to clear.
+  }
+}
+
 /** Reads and removes the pending save. Returns null when absent or invalid. */
 function takePendingSave(): SearchParams | null {
   try {
@@ -134,8 +142,9 @@ export default function App() {
   const controllerRef = useRef<AbortController | null>(null)
   // Bumped on every search, so a save that resolves late can tell it is stale.
   const searchSeqRef = useRef(0)
-  const { user } = useAuth()
+  const { user, loginOpen } = useAuth()
   const userId = user?.id ?? null
+  const wasLoginOpenRef = useRef(false)
   const { save } = useSavedSearches()
   const loading = status === 'loading'
 
@@ -144,6 +153,8 @@ export default function App() {
     const controller = new AbortController()
     controllerRef.current = controller
     searchSeqRef.current += 1
+    // A new search abandons any save that was waiting for login.
+    clearPendingSave()
     setParams(nextParams)
     setSearchedParams(nextParams)
     setSavedId(null)
@@ -206,6 +217,12 @@ export default function App() {
     if (!userId) storePendingSave(searchedParams)
     await saveSearch(searchedParams, userId !== null)
   }
+
+  // Login dialog dismissed without signing in: the pending save is abandoned.
+  useEffect(() => {
+    if (wasLoginOpenRef.current && !loginOpen && !userId) clearPendingSave()
+    wasLoginOpenRef.current = loginOpen
+  }, [loginOpen, userId])
 
   // Back from login with a pending save: restore that search, run it and save it.
   useEffect(() => {

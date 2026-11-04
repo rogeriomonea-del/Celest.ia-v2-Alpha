@@ -10,13 +10,14 @@ import type { SavedSearch } from './features/savedSearches/types'
 import type { SearchParams } from './types'
 
 const mocks = vi.hoisted(() => ({
+  loginOpen: false,
   save: vi.fn(),
   saved: [] as { label: string; search: unknown }[],
   user: null as { id: string } | null,
 }))
 
 vi.mock('./auth/context', () => ({
-  useAuth: () => ({ user: mocks.user }),
+  useAuth: () => ({ user: mocks.user, loginOpen: mocks.loginOpen }),
 }))
 
 vi.mock('./lib/api', async (importOriginal) => ({
@@ -74,6 +75,7 @@ async function searchAndWait() {
 }
 
 beforeEach(() => {
+  mocks.loginOpen = false
   mocks.saved = []
   mocks.user = null
   window.sessionStorage.clear()
@@ -376,6 +378,28 @@ describe('App pending save across the login redirect', () => {
     expect(searchFlights).toHaveBeenCalledWith(expected, expect.any(AbortSignal))
     expect(mocks.save).toHaveBeenCalledWith(expected)
     expect(screen.getByRole('combobox', { name: 'Destino' })).toHaveValue('Madri (MAD)')
+  })
+
+  it('closing the login dialog without signing in drops the pending save', () => {
+    window.sessionStorage.setItem(PENDING_SAVE_KEY, JSON.stringify(stored(10)))
+    mocks.loginOpen = true
+    const { rerender } = render(<App />)
+    mocks.loginOpen = false
+    rerender(<App />)
+    expect(window.sessionStorage.getItem(PENDING_SAVE_KEY)).toBeNull()
+
+    // A later sign-in must not replay the abandoned search or save it.
+    mocks.user = { id: 'user-1' }
+    rerender(<App />)
+    expect(searchFlights).not.toHaveBeenCalled()
+    expect(mocks.save).not.toHaveBeenCalled()
+  })
+
+  it('running a different search drops the pending save', async () => {
+    window.sessionStorage.setItem(PENDING_SAVE_KEY, JSON.stringify(stored(10)))
+    render(<App />)
+    await searchAndWait()
+    expect(window.sessionStorage.getItem(PENDING_SAVE_KEY)).toBeNull()
   })
 
   it('a pending search whose date has passed only restores the route and shows the hint', () => {
