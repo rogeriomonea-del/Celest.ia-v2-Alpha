@@ -20,8 +20,9 @@ export async function GET(request: Request): Promise<Response> {
     return errorResponse('invalid_request', 'Identificador de oferta inválido.', 400)
   }
   try {
-    const [offer] = mapOffers([await getOffer(id)])
-    const body: OfferResponse = { offer, liveMode: false }
+    const duffelOffer = await getOffer(id)
+    const [offer] = mapOffers([duffelOffer])
+    const body: OfferResponse = { offer, liveMode: duffelOffer.live_mode === true }
     return json(body, 200, NO_STORE)
   } catch (err) {
     return handleError(err, { offerLookup: true })

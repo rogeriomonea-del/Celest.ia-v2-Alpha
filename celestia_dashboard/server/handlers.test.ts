@@ -213,6 +213,16 @@ describe('POST /api/flights/search', () => {
     })
   })
 
+  it.each([
+    [true, true],
+    [false, false],
+    [undefined, false],
+  ])('reports liveMode from the offer request live_mode (%s -> %s)', async (liveMode, expected) => {
+    fetchMock.mockResolvedValue(duffelJson({ data: { id: 'orq_1', live_mode: liveMode, offers: [fixture.oneWayDirect] } }, 201))
+    const body = (await (await searchPOST(searchRequest(validSearch))).json()) as SearchResponse
+    expect(body.liveMode).toBe(expected)
+  })
+
   it('sends a single slice for one-way searches and never leaks the token', async () => {
     fetchMock.mockResolvedValue(duffelJson({ data: { id: 'orq_1', offers: [fixture.oneWayDirect] } }, 201))
     const res = await searchPOST(searchRequest({ ...validSearch, returnDate: null, cabin: 'business' }))
@@ -315,6 +325,17 @@ describe('GET /api/offers/[id]', () => {
     expect(body.offer.id).toBe(offer.id)
     expect(body.offer.price).toBe(3333.33)
     expect(String(fetchMock.mock.calls[0][0])).toBe(`https://api.duffel.com/air/offers/${offer.id}`)
+  })
+
+  it.each([
+    [true, true],
+    [false, false],
+    [undefined, false],
+  ])('reports liveMode from the offer live_mode (%s -> %s)', async (liveMode, expected) => {
+    const offer = { ...fixture.oneWayDirect, live_mode: liveMode }
+    fetchMock.mockResolvedValue(duffelJson({ data: offer }))
+    const body = (await (await offerGET(offerRequest(offer.id))).json()) as OfferResponse
+    expect(body.liveMode).toBe(expected)
   })
 
   it('reads the id from the path when no query param is present', async () => {

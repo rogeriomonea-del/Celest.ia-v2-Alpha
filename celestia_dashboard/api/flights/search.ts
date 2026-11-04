@@ -12,7 +12,8 @@ export async function POST(request: Request): Promise<Response> {
     const parsed = searchRequestSchema.safeParse(await parseJsonBody(request))
     if (!parsed.success) return validationErrorResponse(parsed.error)
 
-    const all = mapOffers(await createOfferRequest(parsed.data)).sort(
+    const result = await createOfferRequest(parsed.data)
+    const all = mapOffers(result.offers).sort(
       (a, b) => a.totalPrice - b.totalPrice,
     )
     const offers = all.slice(0, MAX_OFFERS)
@@ -20,7 +21,7 @@ export async function POST(request: Request): Promise<Response> {
       offers,
       totalOffers: all.length,
       truncated: all.length > offers.length,
-      liveMode: false,
+      liveMode: result.liveMode,
       searchedAt: new Date().toISOString(),
     }
     return json(body, 200, NO_STORE)
