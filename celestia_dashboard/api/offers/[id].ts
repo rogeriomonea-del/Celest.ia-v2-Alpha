@@ -21,7 +21,7 @@ export async function GET(request: Request): Promise<Response> {
   }
   try {
     const [offer] = mapOffers([await getOffer(id)])
-    const body: OfferResponse = { offer }
+    const body: OfferResponse = { offer, liveMode: false }
     return json(body, 200, NO_STORE)
   } catch (err) {
     return handleError(err, { offerLookup: true })

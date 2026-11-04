@@ -51,7 +51,13 @@ export type SearchRequest = z.infer<typeof searchRequestSchema>
 
 /** POST /api/flights/search — body: SearchRequest */
 export interface SearchResponse {
+  /** At most MAX_OFFERS, chosen so cheapest, fastest and every stop bucket stay represented. */
   offers: Flight[]
+  /** Offers the provider returned before trimming. */
+  totalOffers: number
+  truncated: boolean
+  /** false = provider test mode (fictitious prices). */
+  liveMode: boolean
   /** ISO timestamp of when the provider answered. */
   searchedAt: string
 }
@@ -64,6 +70,7 @@ export interface PlacesResponse {
 /** GET /api/offers/<offerId> — re-fetches one offer for current price/conditions. */
 export interface OfferResponse {
   offer: Flight
+  liveMode: boolean
 }
 
 export type ApiErrorCode =

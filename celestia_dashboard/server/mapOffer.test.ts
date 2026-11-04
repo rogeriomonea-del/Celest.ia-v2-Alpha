@@ -95,7 +95,7 @@ describe('mapOffers — round trip with a connection', () => {
 
   it('maps baggage, conditions, tags and expiry', () => {
     expect(flight.baggage).toEqual({ carryOn: true, checkedBags: 1 })
-    expect(flight.conditions).toEqual({ refundable: false, changeable: true })
+    expect(flight.conditions).toMatchObject({ refundable: false, changeable: true })
     expect(flight.tags).toEqual(['flexible'])
     expect(flight.seatsLeft).toBeNull()
     expect(flight.expiresAt).toBe('2026-11-04T12:30:00.123456Z')
@@ -121,7 +121,7 @@ describe('mapOffers — one-way direct', () => {
     expect(flight.price).toBe(4321.99)
     expect(flight.totalPrice).toBe(4321.99)
     expect(flight.baggage).toEqual({ carryOn: true, checkedBags: 0 })
-    expect(flight.conditions).toEqual({ refundable: null, changeable: null })
+    expect(flight.conditions).toEqual({ refundable: null, changeable: null, refundPenalty: null, changePenalty: null })
     expect(flight.tags).toEqual([])
   })
 

@@ -82,19 +82,19 @@ describe('FlightCard', () => {
     }
 
     it('are hidden when the provider does not know them', () => {
-      const details = openDetails(makeFlight({ conditions: { refundable: null, changeable: null } }))
+      const details = openDetails(makeFlight({ conditions: { refundable: null, changeable: null, refundPenalty: null, changePenalty: null } }))
       expect(within(details).queryByText(/reembolsável/i)).not.toBeInTheDocument()
       expect(within(details).queryByText('Remarcável')).not.toBeInTheDocument()
     })
 
     it('show refundable and changeable when known', () => {
-      const details = openDetails(makeFlight({ conditions: { refundable: true, changeable: true } }))
+      const details = openDetails(makeFlight({ conditions: { refundable: true, changeable: true, refundPenalty: null, changePenalty: null } }))
       expect(within(details).getByText('Reembolsável')).toBeInTheDocument()
       expect(within(details).getByText('Remarcável')).toBeInTheDocument()
     })
 
     it('show "Não reembolsável" and no change label when not refundable nor changeable', () => {
-      const details = openDetails(makeFlight({ conditions: { refundable: false, changeable: false } }))
+      const details = openDetails(makeFlight({ conditions: { refundable: false, changeable: false, refundPenalty: null, changePenalty: null } }))
       expect(within(details).getByText('Não reembolsável')).toBeInTheDocument()
       expect(within(details).queryByText('Remarcável')).not.toBeInTheDocument()
     })

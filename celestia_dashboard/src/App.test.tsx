@@ -70,7 +70,7 @@ async function searchAndWait() {
 
 beforeEach(() => {
   mocks.saved = []
-  vi.mocked(searchFlights).mockResolvedValue({ offers, searchedAt: '2026-11-04T12:00:00Z' })
+  vi.mocked(searchFlights).mockResolvedValue({ offers, totalOffers: offers.length, truncated: false, liveMode: true, searchedAt: '2026-11-04T12:00:00Z' })
 })
 
 afterEach(() => {
@@ -129,7 +129,7 @@ describe('App search flow', () => {
   })
 
   it('shows the zero-offers state', async () => {
-    vi.mocked(searchFlights).mockResolvedValue({ offers: [], searchedAt: '2026-11-04T12:00:00Z' })
+    vi.mocked(searchFlights).mockResolvedValue({ offers: [], totalOffers: 0, truncated: false, liveMode: true, searchedAt: '2026-11-04T12:00:00Z' })
     render(<App />)
     fireEvent.click(searchButton())
 

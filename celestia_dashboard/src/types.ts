@@ -78,7 +78,19 @@ export interface Flight {
   emissionsKg: number | null
   /** ISO timestamp after which the offer can no longer be booked. */
   expiresAt: string
-  conditions: { refundable: boolean | null; changeable: boolean | null }
+  conditions: {
+    refundable: boolean | null
+    changeable: boolean | null
+    /** Fee charged to refund/change when allowed; null = allowed but fee unknown, or not allowed. */
+    refundPenalty: Money | null
+    changePenalty: Money | null
+  }
+}
+
+export interface Money {
+  amount: number
+  /** ISO 4217 */
+  currency: string
 }
 
 export interface PassengerCounts {

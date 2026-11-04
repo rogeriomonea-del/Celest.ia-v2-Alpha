@@ -160,7 +160,7 @@ function mapOffer(offer: DuffelOffer): Flight {
     emissions: 'average',
     emissionsKg: emissionsKgOf(offer),
     expiresAt: offer.expires_at,
-    conditions: { refundable, changeable },
+    conditions: { refundable, changeable, refundPenalty: null, changePenalty: null },
   }
 }
 

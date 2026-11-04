@@ -30,7 +30,7 @@ describe('OfferDialog', () => {
   it('re-fetches the offer and shows the current price and conditions', async () => {
     vi.mocked(fetchOffer).mockResolvedValue({
       ...searched,
-      conditions: { refundable: false, changeable: true },
+      conditions: { refundable: false, changeable: true, refundPenalty: null, changePenalty: null },
     })
     renderDialog()
 

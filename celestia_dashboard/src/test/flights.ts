@@ -57,7 +57,7 @@ export function makeFlight(overrides: Partial<Flight> = {}): Flight {
     emissions: 'average',
     emissionsKg: null,
     expiresAt: '2026-12-01T15:30:00Z',
-    conditions: { refundable: null, changeable: null },
+    conditions: { refundable: null, changeable: null, refundPenalty: null, changePenalty: null },
     ...overrides,
   }
 }

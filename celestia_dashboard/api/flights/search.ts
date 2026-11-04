@@ -12,10 +12,17 @@ export async function POST(request: Request): Promise<Response> {
     const parsed = searchRequestSchema.safeParse(await parseJsonBody(request))
     if (!parsed.success) return validationErrorResponse(parsed.error)
 
-    const offers = mapOffers(await createOfferRequest(parsed.data))
-      .sort((a, b) => a.totalPrice - b.totalPrice)
-      .slice(0, MAX_OFFERS)
-    const body: SearchResponse = { offers, searchedAt: new Date().toISOString() }
+    const all = mapOffers(await createOfferRequest(parsed.data)).sort(
+      (a, b) => a.totalPrice - b.totalPrice,
+    )
+    const offers = all.slice(0, MAX_OFFERS)
+    const body: SearchResponse = {
+      offers,
+      totalOffers: all.length,
+      truncated: all.length > offers.length,
+      liveMode: false,
+      searchedAt: new Date().toISOString(),
+    }
     return json(body, 200, NO_STORE)
   } catch (err) {
     return handleError(err)
