@@ -6,6 +6,7 @@ import { GET as placesGET } from '../api/places.js'
 import { GET as offerGET } from '../api/offers/[id].js'
 import type { DuffelOffer } from './duffel.js'
 import { SEARCH_TIMEOUT_MS, SUPPLIER_TIMEOUT_MS } from './duffel.js'
+import { MESSAGES } from './http.js'
 
 const TOKEN = 'duffel_test_dummy_token_for_unit_tests'
 const fixture = JSON.parse(readFileSync(new URL('./__fixtures__/duffel-offers.json', import.meta.url), 'utf8')) as {
@@ -46,6 +47,12 @@ function searchRequest(body: unknown): Request {
 async function errorOf(response: Response): Promise<ApiErrorBody['error']> {
   const body = (await response.json()) as ApiErrorBody
   return body.error
+}
+
+function expectCredentialRejectedLogged(status: number) {
+  const logged = vi.mocked(console.error).mock.calls.map((args) => args.map(String).join(' '))
+  expect(logged.some((line) => line.includes('Duffel credential rejected') && line.includes(String(status)))).toBe(true)
+  expect(logged.join('\n')).not.toContain(TOKEN)
 }
 
 beforeEach(() => {
@@ -98,6 +105,14 @@ describe('POST /api/flights/search', () => {
     const error = await errorOf(res)
     expect(error.code).toBe('invalid_request')
     expect(error.message).not.toContain('Something went wrong')
+  })
+
+  it.each([401, 403])('maps a Duffel %i (bad/revoked token) to 503 provider_not_configured', async (status) => {
+    fetchMock.mockResolvedValue(duffelJson(duffelErrorBody('unauthorized', 'authentication_error'), status))
+    const res = await searchPOST(searchRequest(validSearch))
+    expect(res.status).toBe(503)
+    expect(await errorOf(res)).toEqual({ code: 'provider_not_configured', message: MESSAGES.notConfigured })
+    expectCredentialRejectedLogged(status)
   })
 
   it('maps a Duffel 5xx to 502 provider_error', async () => {
@@ -303,10 +318,11 @@ describe('GET /api/offers/[id]', () => {
     expect((await errorOf(res)).code).toBe('not_found')
   })
 
-  it('maps a Duffel 401 (bad token) to 500 internal', async () => {
-    fetchMock.mockResolvedValue(duffelJson(duffelErrorBody('unauthorized', 'authentication_error'), 401))
+  it.each([401, 403])('maps a Duffel %i (bad/revoked token) to 503 provider_not_configured', async (status) => {
+    fetchMock.mockResolvedValue(duffelJson(duffelErrorBody('unauthorized', 'authentication_error'), status))
     const res = await offerGET(offerRequest('off_0000AkfTrwXBHrv0fn6YhC'))
-    expect(res.status).toBe(500)
-    expect((await errorOf(res)).code).toBe('internal')
+    expect(res.status).toBe(503)
+    expect(await errorOf(res)).toEqual({ code: 'provider_not_configured', message: MESSAGES.notConfigured })
+    expectCredentialRejectedLogged(status)
   })
 })

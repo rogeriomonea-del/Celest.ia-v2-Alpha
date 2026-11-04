@@ -83,6 +83,11 @@ export function handleError(err: unknown, options: { offerLookup?: boolean } = {
   }
 
   const status = err.status ?? 0
+  // Bad or revoked token: same outcome for users as a missing one.
+  if (status === 401 || status === 403) {
+    console.error(`[duffel] Duffel credential rejected (HTTP ${status}): check DUFFEL_ACCESS_TOKEN`)
+    return errorResponse('provider_not_configured', MESSAGES.notConfigured, 503)
+  }
   if (options.offerLookup && err.code && OFFER_GONE_CODES.has(err.code)) {
     return errorResponse('offer_expired', MESSAGES.offerExpired, 410)
   }
