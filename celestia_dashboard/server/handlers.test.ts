@@ -85,6 +85,25 @@ describe('POST /api/flights/search', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
+  it.each([
+    ['an empty body', {}, 'Informe a origem'],
+    ['a missing departDate', { ...validSearch, departDate: undefined }, 'Informe a data de ida'],
+    ['a bad cabin', { ...validSearch, cabin: 'first' }, 'Classe de cabine inválida'],
+    ['a missing cabin', { ...validSearch, cabin: undefined }, 'Classe de cabine inválida'],
+    ['missing passengers', { ...validSearch, passengers: undefined }, 'Informe os passageiros'],
+    ['a string adult count', { ...validSearch, passengers: { adults: '2', children: 0, infants: 0 } }, 'Número de adultos inválido'],
+    ['zero adults', { ...validSearch, passengers: { adults: 0, children: 0, infants: 0 } }, 'Pelo menos 1 adulto'],
+    ['too many children', { ...validSearch, passengers: { adults: 1, children: 9, infants: 0 } }, 'Máximo de 9 passageiros'],
+    ['a numeric origin', { ...validSearch, origin: 123 }, 'Código IATA inválido'],
+    ['a JSON array', [], 'Dados da busca inválidos.'],
+    ['JSON null', null, 'Dados da busca inválidos.'],
+  ])('returns a pt-BR 400 message for %s', async (_label, body, message) => {
+    const res = await searchPOST(searchRequest(body))
+    expect(res.status).toBe(400)
+    expect(await errorOf(res)).toEqual({ code: 'invalid_request', message })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
   it('returns 400 invalid_request for a non-JSON body', async () => {
     const res = await searchPOST(searchRequest('{not json'))
     expect(res.status).toBe(400)
