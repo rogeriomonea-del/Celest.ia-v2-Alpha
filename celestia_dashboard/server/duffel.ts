@@ -71,6 +71,10 @@ export interface DuffelSlice {
 
 export interface DuffelCondition {
   allowed: boolean
+  /** Decimal string, e.g. "450.00"; null when the fee is unknown or the action is not allowed. */
+  penalty_amount?: string | null
+  /** ISO 4217; null whenever penalty_amount is null. */
+  penalty_currency?: string | null
 }
 
 export interface DuffelOffer {

@@ -1,6 +1,6 @@
 /** Duffel offer -> Flight (src/types.ts). Pure functions, no I/O. */
-import type { Airline, Flight, FlightSegment, FlightSlice, FlightStop, FlightTag } from '../src/types.js'
-import type { DuffelAirline, DuffelAirport, DuffelOffer, DuffelSegment, DuffelSlice } from './duffel.js'
+import type { Airline, Flight, FlightSegment, FlightSlice, FlightStop, FlightTag, Money } from '../src/types.js'
+import type { DuffelAirline, DuffelAirport, DuffelCondition, DuffelOffer, DuffelSegment, DuffelSlice } from './duffel.js'
 
 /** Fallback logo gradients (Tailwind classes; tailwind.config scans server/). */
 export const LOGO_GRADIENTS = [
@@ -130,6 +130,15 @@ function emissionsKgOf(offer: DuffelOffer): number | null {
   return Number.isFinite(kg) ? kg : null
 }
 
+/** Fee for an allowed refund/change; null when not allowed or the provider gives no amount/currency. */
+function penaltyOf(condition: DuffelCondition | null): Money | null {
+  if (condition?.allowed !== true) return null
+  const { penalty_amount: amount, penalty_currency: currency } = condition
+  if (amount == null || amount === '' || !currency) return null
+  const value = Number(amount)
+  return Number.isFinite(value) ? { amount: value, currency } : null
+}
+
 /** Lap infants (under 2, no seat) are sent to Duffel with an age; they do not count as a seat. */
 function seatedPassengerCount(offer: DuffelOffer): number {
   const seated = offer.passengers.filter((p) => !(typeof p.age === 'number' && p.age < 2)).length
@@ -142,9 +151,14 @@ function mapOffer(offer: DuffelOffer): Flight {
   const outbound = slices[0]
   const totalPrice = Number(offer.total_amount)
   const passengerCount = seatedPassengerCount(offer)
-  const refundable = offer.conditions?.refund_before_departure?.allowed ?? null
-  const changeable = offer.conditions?.change_before_departure?.allowed ?? null
-  const tags: FlightTag[] = changeable === true ? ['flexible'] : []
+  const refund = offer.conditions?.refund_before_departure ?? null
+  const change = offer.conditions?.change_before_departure ?? null
+  const refundable = refund?.allowed ?? null
+  const changeable = change?.allowed ?? null
+  const refundPenalty = penaltyOf(refund)
+  const changePenalty = penaltyOf(change)
+  // 'flexible' only for a change we know is free; an allowed change with a fee (or unknown fee) is not.
+  const tags: FlightTag[] = changeable === true && changePenalty !== null && changePenalty.amount === 0 ? ['flexible'] : []
 
   return {
     id: offer.id,
@@ -166,7 +180,7 @@ function mapOffer(offer: DuffelOffer): Flight {
     emissions: 'average',
     emissionsKg: emissionsKgOf(offer),
     expiresAt: offer.expires_at,
-    conditions: { refundable, changeable, refundPenalty: null, changePenalty: null },
+    conditions: { refundable, changeable, refundPenalty, changePenalty },
   }
 }
 
