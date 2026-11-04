@@ -17,9 +17,9 @@
 
 Definido em `celestia_dashboard/src/shared/api.ts` (tipos + validação zod usada pelos dois lados).
 
-- `POST /api/flights/search` → `SearchResponse { offers: Flight[], searchedAt }`
+- `POST /api/flights/search` → `SearchResponse { offers: Flight[], totalOffers, truncated, liveMode, searchedAt }` (até 60 ofertas, preservando as mais baratas, as mais rápidas, cada faixa de escalas e cada companhia)
 - `GET /api/places?q=` → `PlacesResponse { places: Airport[] }`
-- `GET /api/offers/:id` → `OfferResponse { offer: Flight }`
+- `GET /api/offers/:id` → `OfferResponse { offer: Flight, liveMode }`
 - Erros: `ApiErrorBody { error: { code, message } }` com mensagem pt-BR.
 
 ## Variáveis de ambiente
@@ -33,8 +33,8 @@ Definido em `celestia_dashboard/src/shared/api.ts` (tipos + validação zod usad
 ## Fases
 
 1. Base: contrato, tipos, vitest, configs. ✅
-2. Em paralelo: (A) API Duffel · (B) Auth + buscas salvas · (D) infra (CI, headers, README).
-3. (C) Front ligado na API real, mock removido, "Ver oferta" real.
+2. ✅ Em paralelo: (A) API Duffel · (B) Auth + buscas salvas · (D) infra (CI, headers, README).
+3. ✅ (C) Front ligado na API real, mock removido, "Ver oferta" real.
 4. Revisão independente + correções.
 5. Configuração externa (dono da conta) → deploy.
 
