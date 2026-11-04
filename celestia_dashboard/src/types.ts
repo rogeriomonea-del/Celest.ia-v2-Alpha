@@ -6,10 +6,13 @@ export interface Airport {
 }
 
 export interface Airline {
+  /** IATA carrier code, e.g. "LA". */
   code: string
   name: string
-  /** Tailwind gradient classes used by the placeholder logo. */
+  /** Tailwind gradient classes used when no logo image is available. */
   logoGradient: string
+  /** Carrier logo (square symbol) from the flight provider, if any. */
+  logoUrl: string | null
 }
 
 export interface FlightStop {
@@ -20,21 +23,62 @@ export interface FlightStop {
 
 export type FlightTag = 'eco' | 'wifi' | 'best-rated' | 'flexible'
 
+export interface FlightSegment {
+  carrier: Airline
+  /** e.g. "LA 8084" */
+  flightNumber: string
+  originCode: string
+  destinationCode: string
+  /** Local date-time at the airport, ISO without offset: "2026-12-01T22:05:00". */
+  departingAt: string
+  arrivingAt: string
+  durationMin: number
+  aircraft: string | null
+}
+
+/** One direction of travel (outbound or return). */
+export interface FlightSlice {
+  departure: { time: string; airportCode: string; date: string }
+  arrival: { time: string; airportCode: string; dayOffset: number }
+  durationMin: number
+  stops: FlightStop[]
+  segments: FlightSegment[]
+}
+
+/**
+ * A bookable offer. The top-level departure/arrival/durationMin/stops mirror
+ * the OUTBOUND slice (slices[0]) so cards, filters and sorting can read them
+ * directly; `slices` carries every direction.
+ */
 export interface Flight {
+  /** Provider offer id (e.g. Duffel "off_..."). */
   id: string
+  /** Owner airline of the offer. */
   airline: Airline
   flightNumber: string
   departure: { time: string; airportCode: string }
   arrival: { time: string; airportCode: string; dayOffset: number }
+  /** Outbound slice duration. */
   durationMin: number
+  /** Sum of all slice durations (used for "fastest"/"best" sorting). */
+  totalDurationMin: number
   stops: FlightStop[]
-  /** Total price per passenger, in BRL. */
+  slices: FlightSlice[]
+  /** Price per passenger (totalPrice / passenger count), in `currency`. */
   price: number
-  currency: 'BRL'
+  /** Total price for all passengers, in `currency`. */
+  totalPrice: number
+  /** ISO 4217 code, e.g. "BRL", "USD". */
+  currency: string
   seatsLeft: number | null
   tags: FlightTag[]
   baggage: { carryOn: boolean; checkedBags: number }
+  /** Relative to the other offers in the same result set. */
   emissions: 'low' | 'average' | 'high'
+  emissionsKg: number | null
+  /** ISO timestamp after which the offer can no longer be booked. */
+  expiresAt: string
+  conditions: { refundable: boolean | null; changeable: boolean | null }
 }
 
 export interface PassengerCounts {

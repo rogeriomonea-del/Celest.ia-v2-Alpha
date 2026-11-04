@@ -2,15 +2,15 @@ import { findAirport } from './airports'
 import type { Airline, Flight, FlightStop, FlightTag } from '../types'
 
 export const AIRLINES: Record<string, Airline> = {
-  LA: { code: 'LA', name: 'LATAM Airlines', logoGradient: 'from-rose-600 to-red-800' },
-  AD: { code: 'AD', name: 'Azul Linhas Aéreas', logoGradient: 'from-sky-500 to-blue-700' },
-  G3: { code: 'G3', name: 'GOL Linhas Aéreas', logoGradient: 'from-orange-500 to-amber-600' },
-  TP: { code: 'TP', name: 'TAP Air Portugal', logoGradient: 'from-emerald-500 to-green-700' },
-  IB: { code: 'IB', name: 'Iberia', logoGradient: 'from-red-500 to-yellow-500' },
-  AF: { code: 'AF', name: 'Air France', logoGradient: 'from-indigo-600 to-blue-900' },
-  LH: { code: 'LH', name: 'Lufthansa', logoGradient: 'from-amber-400 to-yellow-600' },
-  KL: { code: 'KL', name: 'KLM', logoGradient: 'from-cyan-500 to-sky-700' },
-  CM: { code: 'CM', name: 'Copa Airlines', logoGradient: 'from-blue-600 to-indigo-800' },
+  LA: { code: 'LA', name: 'LATAM Airlines', logoUrl: null, logoGradient: 'from-rose-600 to-red-800' },
+  AD: { code: 'AD', name: 'Azul Linhas Aéreas', logoUrl: null, logoGradient: 'from-sky-500 to-blue-700' },
+  G3: { code: 'G3', name: 'GOL Linhas Aéreas', logoUrl: null, logoGradient: 'from-orange-500 to-amber-600' },
+  TP: { code: 'TP', name: 'TAP Air Portugal', logoUrl: null, logoGradient: 'from-emerald-500 to-green-700' },
+  IB: { code: 'IB', name: 'Iberia', logoUrl: null, logoGradient: 'from-red-500 to-yellow-500' },
+  AF: { code: 'AF', name: 'Air France', logoUrl: null, logoGradient: 'from-indigo-600 to-blue-900' },
+  LH: { code: 'LH', name: 'Lufthansa', logoUrl: null, logoGradient: 'from-amber-400 to-yellow-600' },
+  KL: { code: 'KL', name: 'KLM', logoUrl: null, logoGradient: 'from-cyan-500 to-sky-700' },
+  CM: { code: 'CM', name: 'Copa Airlines', logoUrl: null, logoGradient: 'from-blue-600 to-indigo-800' },
 }
 
 interface FlightTemplate {
@@ -287,6 +287,7 @@ function resolveStops(
 }
 
 /**
+ * TEMPORARY: replaced by the real /api/flights/search in the frontend-wiring phase.
  * Builds the mock result set for a route. Simulates what a real GDS/meta
  * search API would return: the same inventory templates re-keyed to the
  * searched origin/destination pair.
@@ -304,8 +305,14 @@ export function buildFlights(originCode: string, destinationCode: string): Fligh
     },
     durationMin: template.durationMin,
     stops: resolveStops(template.stops, originCode, destinationCode),
+    totalDurationMin: template.durationMin,
+    slices: [],
     price: template.price,
+    totalPrice: template.price,
     currency: 'BRL',
+    emissionsKg: null,
+    expiresAt: '',
+    conditions: { refundable: null, changeable: null },
     seatsLeft: template.seatsLeft,
     tags: template.tags,
     baggage: template.baggage,
