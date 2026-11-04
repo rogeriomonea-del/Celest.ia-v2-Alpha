@@ -1,11 +1,18 @@
-const brlFormatter = new Intl.NumberFormat('pt-BR', {
-  style: 'currency',
-  currency: 'BRL',
-  maximumFractionDigits: 0,
-})
+const moneyFormatters = new Map<string, Intl.NumberFormat>()
 
-export function formatBRL(value: number): string {
-  return brlFormatter.format(value)
+/** pt-BR currency format; BRL without cents, other currencies with their default digits. */
+export function formatMoney(amount: number, currency: string): string {
+  const code = currency.toUpperCase()
+  let formatter = moneyFormatters.get(code)
+  if (!formatter) {
+    formatter = new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: code,
+      ...(code === 'BRL' ? { minimumFractionDigits: 0, maximumFractionDigits: 0 } : {}),
+    })
+    moneyFormatters.set(code, formatter)
+  }
+  return formatter.format(amount)
 }
 
 export function formatDuration(totalMin: number): string {
