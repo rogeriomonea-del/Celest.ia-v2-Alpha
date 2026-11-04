@@ -121,7 +121,7 @@ describe('LoginDialog', () => {
 })
 
 describe('AuthProvider OAuth redirect handling', () => {
-  it('surfaces error_description in the dialog and strips the error params', async () => {
+  it('maps a known error to a fixed message, never the URL description, and strips the error params', async () => {
     window.history.replaceState(
       null,
       '',
@@ -132,9 +132,39 @@ describe('AuthProvider OAuth redirect handling', () => {
         <span />
       </AuthProvider>,
     )
-    expect(await screen.findByRole('alert')).toHaveTextContent('Acesso negado pelo usuário')
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent('O acesso foi negado ou o login foi cancelado. Tente novamente.')
+    expect(alert).not.toHaveTextContent('Acesso negado pelo usuário')
     expect(screen.getByRole('dialog')).toBeInTheDocument()
     expect(window.location.search).toBe('?q=1')
+  })
+
+  it('prefers a known error_code over the generic error value', async () => {
+    window.history.replaceState(null, '', '/#error=invalid_request&error_code=bad_oauth_state')
+    render(
+      <AuthProvider>
+        <span />
+      </AuthProvider>,
+    )
+    expect(await screen.findByRole('alert')).toHaveTextContent('O login expirou ou foi interrompido. Tente novamente.')
+    expect(window.location.hash).toBe('')
+  })
+
+  it('shows the generic message for an unknown error and never echoes error_description', async () => {
+    window.history.replaceState(
+      null,
+      '',
+      '/?error=whatever&error_description=Sua+conta+foi+bloqueada.+Ligue+0800-000-0000',
+    )
+    render(
+      <AuthProvider>
+        <span />
+      </AuthProvider>,
+    )
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent('Não foi possível concluir o login. Tente novamente.')
+    expect(screen.queryByText(/0800/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/whatever/)).not.toBeInTheDocument()
   })
 
   it('strips a leftover ?code= and reports a failed callback when no session results', async () => {
