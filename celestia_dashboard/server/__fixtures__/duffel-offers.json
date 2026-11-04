@@ -1,0 +1,1076 @@
+{
+  "roundTripWithConnection": {
+    "id": "off_0000AkfTrwXBHrv0fn6YhC",
+    "live_mode": false,
+    "partial": false,
+    "created_at": "2026-11-04T12:00:00.123456Z",
+    "updated_at": "2026-11-04T12:00:00.123456Z",
+    "expires_at": "2026-11-04T12:30:00.123456Z",
+    "owner": {
+      "id": "arl_00009VME7DCOaPRQvNhcNu",
+      "name": "TAP Air Portugal",
+      "iata_code": "TP",
+      "logo_symbol_url": "https://assets.duffel.com/img/airlines/for-light-background/full-color-logo/TP.svg",
+      "logo_lockup_url": "https://assets.duffel.com/img/airlines/for-light-background/full-color-lockup/TP.svg",
+      "conditions_of_carriage_url": "https://www.flytap.com/en-us/legal-information/conditions-of-carriage"
+    },
+    "total_amount": "10000.00",
+    "total_currency": "BRL",
+    "base_amount": "8120.00",
+    "base_currency": "BRL",
+    "tax_amount": "1880.00",
+    "tax_currency": "BRL",
+    "total_emissions_kg": "1650",
+    "passenger_identity_documents_required": false,
+    "supported_passenger_identity_document_types": [
+      "passport"
+    ],
+    "supported_loyalty_programmes": [
+      "TP"
+    ],
+    "private_fares": [],
+    "payment_requirements": {
+      "requires_instant_payment": false,
+      "price_guarantee_expires_at": "2026-11-06T12:00:00Z",
+      "payment_required_by": "2026-11-07T12:00:00Z"
+    },
+    "available_services": null,
+    "conditions": {
+      "refund_before_departure": {
+        "allowed": false,
+        "penalty_amount": null,
+        "penalty_currency": null
+      },
+      "change_before_departure": {
+        "allowed": true,
+        "penalty_amount": "450.00",
+        "penalty_currency": "BRL"
+      }
+    },
+    "passengers": [
+      {
+        "id": "pas_0000AkfTqUQ5iW5PzzpHCi",
+        "type": "adult",
+        "age": null,
+        "given_name": null,
+        "family_name": null,
+        "fare_type": null,
+        "loyalty_programme_accounts": []
+      },
+      {
+        "id": "pas_0000AkfTqUQ5iW5PzzpHCj",
+        "type": "adult",
+        "age": null,
+        "given_name": null,
+        "family_name": null,
+        "fare_type": null,
+        "loyalty_programme_accounts": []
+      },
+      {
+        "id": "pas_0000AkfTqUQ5iW5PzzpHCk",
+        "type": null,
+        "age": 8,
+        "given_name": null,
+        "family_name": null,
+        "fare_type": null,
+        "loyalty_programme_accounts": []
+      }
+    ],
+    "slices": [
+      {
+        "id": "sli_0000AkfTrwWQ0wuwCbGJw1",
+        "origin_type": "airport",
+        "origin": {
+          "type": "airport",
+          "id": "arp_gru_br",
+          "name": "São Paulo/Guarulhos–Governador André Franco Montoro International Airport",
+          "iata_code": "GRU",
+          "icao_code": "SBGR",
+          "iata_country_code": "BR",
+          "iata_city_code": "SAO",
+          "city_name": "São Paulo",
+          "time_zone": "America/Sao_Paulo",
+          "latitude": -23.432075,
+          "longitude": -46.469511,
+          "city": {
+            "type": "city",
+            "id": "cit_sao_br",
+            "name": "São Paulo",
+            "iata_code": "SAO",
+            "iata_country_code": "BR"
+          }
+        },
+        "destination_type": "airport",
+        "destination": {
+          "type": "airport",
+          "id": "arp_mad_es",
+          "name": "Adolfo Suárez Madrid–Barajas Airport",
+          "iata_code": "MAD",
+          "icao_code": "LEMD",
+          "iata_country_code": "ES",
+          "iata_city_code": "MAD",
+          "city_name": "Madrid",
+          "time_zone": "Europe/Madrid",
+          "latitude": 40.471926,
+          "longitude": -3.56264,
+          "city": null
+        },
+        "duration": "PT13H45M",
+        "fare_brand_name": "Classic",
+        "comparison_key": "BmlCnw==",
+        "ngs_shelf": 2,
+        "conditions": {
+          "change_before_departure": {
+            "allowed": true,
+            "penalty_amount": "225.00",
+            "penalty_currency": "BRL"
+          },
+          "refund_before_departure": null,
+          "advance_seat_selection": true,
+          "priority_boarding": false,
+          "priority_check_in": false
+        },
+        "segments": [
+          {
+            "id": "seg_0000AkfTrwWQ0wuwCbGJx0",
+            "origin": {
+              "type": "airport",
+              "id": "arp_gru_br",
+              "name": "São Paulo/Guarulhos–Governador André Franco Montoro International Airport",
+              "iata_code": "GRU",
+              "icao_code": "SBGR",
+              "iata_country_code": "BR",
+              "iata_city_code": "SAO",
+              "city_name": "São Paulo",
+              "time_zone": "America/Sao_Paulo",
+              "latitude": -23.432075,
+              "longitude": -46.469511,
+              "city": {
+                "type": "city",
+                "id": "cit_sao_br",
+                "name": "São Paulo",
+                "iata_code": "SAO",
+                "iata_country_code": "BR"
+              }
+            },
+            "destination": {
+              "type": "airport",
+              "id": "arp_lis_pt",
+              "name": "Humberto Delgado Airport",
+              "iata_code": "LIS",
+              "icao_code": "LPPT",
+              "iata_country_code": "PT",
+              "iata_city_code": "LIS",
+              "city_name": "Lisbon",
+              "time_zone": "Europe/Lisbon",
+              "latitude": 38.774042,
+              "longitude": -9.134119,
+              "city": null
+            },
+            "origin_terminal": "1",
+            "destination_terminal": "1",
+            "departing_at": "2026-12-01T22:05:00",
+            "arriving_at": "2026-12-02T11:50:00",
+            "duration": "PT10H45M",
+            "distance": "7930.4",
+            "aircraft": {
+              "id": "arc_00009UhD4ongolulWd9339",
+              "iata_code": "339",
+              "name": "Airbus A330-900"
+            },
+            "marketing_carrier": {
+              "id": "arl_00009VME7DCOaPRQvNhcNu",
+              "name": "TAP Air Portugal",
+              "iata_code": "TP",
+              "logo_symbol_url": "https://assets.duffel.com/img/airlines/for-light-background/full-color-logo/TP.svg",
+              "logo_lockup_url": "https://assets.duffel.com/img/airlines/for-light-background/full-color-lockup/TP.svg",
+              "conditions_of_carriage_url": "https://www.flytap.com/en-us/legal-information/conditions-of-carriage"
+            },
+            "marketing_carrier_flight_number": "82",
+            "operating_carrier": {
+              "id": "arl_00009VME7DCOaPRQvNhcNu",
+              "name": "TAP Air Portugal",
+              "iata_code": "TP",
+              "logo_symbol_url": "https://assets.duffel.com/img/airlines/for-light-background/full-color-logo/TP.svg",
+              "logo_lockup_url": "https://assets.duffel.com/img/airlines/for-light-background/full-color-lockup/TP.svg",
+              "conditions_of_carriage_url": "https://www.flytap.com/en-us/legal-information/conditions-of-carriage"
+            },
+            "operating_carrier_flight_number": "82",
+            "stops": [],
+            "passengers": [
+              {
+                "passenger_id": "pas_0000AkfTqUQ5iW5PzzpHCi",
+                "cabin_class": "economy",
+                "cabin_class_marketing_name": "Economy",
+                "fare_basis_code": "OLXBR",
+                "cabin": {
+                  "name": "economy",
+                  "marketing_name": "Economy",
+                  "amenities": {
+                    "wifi": {
+                      "available": true,
+                      "cost": "paid"
+                    },
+                    "seat": {
+                      "pitch": "31",
+                      "legroom": "standard"
+                    },
+                    "power": {
+                      "available": true
+                    }
+                  }
+                },
+                "baggages": [
+                  {
+                    "type": "checked",
+                    "quantity": 1
+                  },
+                  {
+                    "type": "carry_on",
+                    "quantity": 1
+                  }
+                ]
+              },
+              {
+                "passenger_id": "pas_0000AkfTqUQ5iW5PzzpHCj",
+                "cabin_class": "economy",
+                "cabin_class_marketing_name": "Economy",
+                "fare_basis_code": "OLXBR",
+                "cabin": {
+                  "name": "economy",
+                  "marketing_name": "Economy",
+                  "amenities": {
+                    "wifi": {
+                      "available": true,
+                      "cost": "paid"
+                    },
+                    "seat": {
+                      "pitch": "31",
+                      "legroom": "standard"
+                    },
+                    "power": {
+                      "available": true
+                    }
+                  }
+                },
+                "baggages": [
+                  {
+                    "type": "checked",
+                    "quantity": 1
+                  },
+                  {
+                    "type": "carry_on",
+                    "quantity": 1
+                  }
+                ]
+              },
+              {
+                "passenger_id": "pas_0000AkfTqUQ5iW5PzzpHCk",
+                "cabin_class": "economy",
+                "cabin_class_marketing_name": "Economy",
+                "fare_basis_code": "OLXBR",
+                "cabin": {
+                  "name": "economy",
+                  "marketing_name": "Economy",
+                  "amenities": {
+                    "wifi": {
+                      "available": true,
+                      "cost": "paid"
+                    },
+                    "seat": {
+                      "pitch": "31",
+                      "legroom": "standard"
+                    },
+                    "power": {
+                      "available": true
+                    }
+                  }
+                },
+                "baggages": [
+                  {
+                    "type": "checked",
+                    "quantity": 1
+                  },
+                  {
+                    "type": "carry_on",
+                    "quantity": 1
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "seg_0000AkfTrwWQ0wuwCbGJx1",
+            "origin": {
+              "type": "airport",
+              "id": "arp_lis_pt",
+              "name": "Humberto Delgado Airport",
+              "iata_code": "LIS",
+              "icao_code": "LPPT",
+              "iata_country_code": "PT",
+              "iata_city_code": "LIS",
+              "city_name": "Lisbon",
+              "time_zone": "Europe/Lisbon",
+              "latitude": 38.774042,
+              "longitude": -9.134119,
+              "city": null
+            },
+            "destination": {
+              "type": "airport",
+              "id": "arp_mad_es",
+              "name": "Adolfo Suárez Madrid–Barajas Airport",
+              "iata_code": "MAD",
+              "icao_code": "LEMD",
+              "iata_country_code": "ES",
+              "iata_city_code": "MAD",
+              "city_name": "Madrid",
+              "time_zone": "Europe/Madrid",
+              "latitude": 40.471926,
+              "longitude": -3.56264,
+              "city": null
+            },
+            "origin_terminal": "1",
+            "destination_terminal": "1",
+            "departing_at": "2026-12-02T13:30:00",
+            "arriving_at": "2026-12-02T15:50:00",
+            "duration": "PT1H20M",
+            "distance": "512.6",
+            "aircraft": {
+              "id": "arc_00009UhD4ongolulWd932N",
+              "iata_code": "32N",
+              "name": "Airbus A320neo"
+            },
+            "marketing_carrier": {
+              "id": "arl_00009VME7DCOaPRQvNhcNu",
+              "name": "TAP Air Portugal",
+              "iata_code": "TP",
+              "logo_symbol_url": "https://assets.duffel.com/img/airlines/for-light-background/full-color-logo/TP.svg",
+              "logo_lockup_url": "https://assets.duffel.com/img/airlines/for-light-background/full-color-lockup/TP.svg",
+              "conditions_of_carriage_url": "https://www.flytap.com/en-us/legal-information/conditions-of-carriage"
+            },
+            "marketing_carrier_flight_number": "1026",
+            "operating_carrier": {
+              "id": "arl_00009VME7DCOaPRQvNhcNu",
+              "name": "TAP Air Portugal",
+              "iata_code": "TP",
+              "logo_symbol_url": "https://assets.duffel.com/img/airlines/for-light-background/full-color-logo/TP.svg",
+              "logo_lockup_url": "https://assets.duffel.com/img/airlines/for-light-background/full-color-lockup/TP.svg",
+              "conditions_of_carriage_url": "https://www.flytap.com/en-us/legal-information/conditions-of-carriage"
+            },
+            "operating_carrier_flight_number": "1026",
+            "stops": [],
+            "passengers": [
+              {
+                "passenger_id": "pas_0000AkfTqUQ5iW5PzzpHCi",
+                "cabin_class": "economy",
+                "cabin_class_marketing_name": "Economy",
+                "fare_basis_code": "OLXBR",
+                "cabin": {
+                  "name": "economy",
+                  "marketing_name": "Economy",
+                  "amenities": {
+                    "wifi": {
+                      "available": true,
+                      "cost": "paid"
+                    },
+                    "seat": {
+                      "pitch": "31",
+                      "legroom": "standard"
+                    },
+                    "power": {
+                      "available": true
+                    }
+                  }
+                },
+                "baggages": [
+                  {
+                    "type": "checked",
+                    "quantity": 1
+                  },
+                  {
+                    "type": "carry_on",
+                    "quantity": 1
+                  }
+                ]
+              },
+              {
+                "passenger_id": "pas_0000AkfTqUQ5iW5PzzpHCj",
+                "cabin_class": "economy",
+                "cabin_class_marketing_name": "Economy",
+                "fare_basis_code": "OLXBR",
+                "cabin": {
+                  "name": "economy",
+                  "marketing_name": "Economy",
+                  "amenities": {
+                    "wifi": {
+                      "available": true,
+                      "cost": "paid"
+                    },
+                    "seat": {
+                      "pitch": "31",
+                      "legroom": "standard"
+                    },
+                    "power": {
+                      "available": true
+                    }
+                  }
+                },
+                "baggages": [
+                  {
+                    "type": "checked",
+                    "quantity": 1
+                  },
+                  {
+                    "type": "carry_on",
+                    "quantity": 1
+                  }
+                ]
+              },
+              {
+                "passenger_id": "pas_0000AkfTqUQ5iW5PzzpHCk",
+                "cabin_class": "economy",
+                "cabin_class_marketing_name": "Economy",
+                "fare_basis_code": "OLXBR",
+                "cabin": {
+                  "name": "economy",
+                  "marketing_name": "Economy",
+                  "amenities": {
+                    "wifi": {
+                      "available": true,
+                      "cost": "paid"
+                    },
+                    "seat": {
+                      "pitch": "31",
+                      "legroom": "standard"
+                    },
+                    "power": {
+                      "available": true
+                    }
+                  }
+                },
+                "baggages": [
+                  {
+                    "type": "checked",
+                    "quantity": 1
+                  },
+                  {
+                    "type": "carry_on",
+                    "quantity": 1
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "sli_0000AkfTrwWQ0wuwCbGJw2",
+        "origin_type": "airport",
+        "origin": {
+          "type": "airport",
+          "id": "arp_mad_es",
+          "name": "Adolfo Suárez Madrid–Barajas Airport",
+          "iata_code": "MAD",
+          "icao_code": "LEMD",
+          "iata_country_code": "ES",
+          "iata_city_code": "MAD",
+          "city_name": "Madrid",
+          "time_zone": "Europe/Madrid",
+          "latitude": 40.471926,
+          "longitude": -3.56264,
+          "city": null
+        },
+        "destination_type": "airport",
+        "destination": {
+          "type": "airport",
+          "id": "arp_gru_br",
+          "name": "São Paulo/Guarulhos–Governador André Franco Montoro International Airport",
+          "iata_code": "GRU",
+          "icao_code": "SBGR",
+          "iata_country_code": "BR",
+          "iata_city_code": "SAO",
+          "city_name": "São Paulo",
+          "time_zone": "America/Sao_Paulo",
+          "latitude": -23.432075,
+          "longitude": -46.469511,
+          "city": {
+            "type": "city",
+            "id": "cit_sao_br",
+            "name": "São Paulo",
+            "iata_code": "SAO",
+            "iata_country_code": "BR"
+          }
+        },
+        "duration": "PT14H35M",
+        "fare_brand_name": "Classic",
+        "comparison_key": "Cm2Dnw==",
+        "ngs_shelf": 2,
+        "conditions": {
+          "change_before_departure": {
+            "allowed": true,
+            "penalty_amount": "225.00",
+            "penalty_currency": "BRL"
+          },
+          "refund_before_departure": null,
+          "advance_seat_selection": true,
+          "priority_boarding": false,
+          "priority_check_in": false
+        },
+        "segments": [
+          {
+            "id": "seg_0000AkfTrwWQ0wuwCbGJx2",
+            "origin": {
+              "type": "airport",
+              "id": "arp_mad_es",
+              "name": "Adolfo Suárez Madrid–Barajas Airport",
+              "iata_code": "MAD",
+              "icao_code": "LEMD",
+              "iata_country_code": "ES",
+              "iata_city_code": "MAD",
+              "city_name": "Madrid",
+              "time_zone": "Europe/Madrid",
+              "latitude": 40.471926,
+              "longitude": -3.56264,
+              "city": null
+            },
+            "destination": {
+              "type": "airport",
+              "id": "arp_lis_pt",
+              "name": "Humberto Delgado Airport",
+              "iata_code": "LIS",
+              "icao_code": "LPPT",
+              "iata_country_code": "PT",
+              "iata_city_code": "LIS",
+              "city_name": "Lisbon",
+              "time_zone": "Europe/Lisbon",
+              "latitude": 38.774042,
+              "longitude": -9.134119,
+              "city": null
+            },
+            "origin_terminal": "1",
+            "destination_terminal": "1",
+            "departing_at": "2026-12-15T07:10:00",
+            "arriving_at": "2026-12-15T07:35:00",
+            "duration": "PT1H25M",
+            "distance": "512.6",
+            "aircraft": {
+              "id": "arc_00009UhD4ongolulWd932N",
+              "iata_code": "32N",
+              "name": "Airbus A320neo"
+            },
+            "marketing_carrier": {
+              "id": "arl_00009VME7DCOaPRQvNhcNu",
+              "name": "TAP Air Portugal",
+              "iata_code": "TP",
+              "logo_symbol_url": "https://assets.duffel.com/img/airlines/for-light-background/full-color-logo/TP.svg",
+              "logo_lockup_url": "https://assets.duffel.com/img/airlines/for-light-background/full-color-lockup/TP.svg",
+              "conditions_of_carriage_url": "https://www.flytap.com/en-us/legal-information/conditions-of-carriage"
+            },
+            "marketing_carrier_flight_number": "1027",
+            "operating_carrier": {
+              "id": "arl_00009VME7DCOaPRQvNhcNu",
+              "name": "TAP Air Portugal",
+              "iata_code": "TP",
+              "logo_symbol_url": "https://assets.duffel.com/img/airlines/for-light-background/full-color-logo/TP.svg",
+              "logo_lockup_url": "https://assets.duffel.com/img/airlines/for-light-background/full-color-lockup/TP.svg",
+              "conditions_of_carriage_url": "https://www.flytap.com/en-us/legal-information/conditions-of-carriage"
+            },
+            "operating_carrier_flight_number": "1027",
+            "stops": [],
+            "passengers": [
+              {
+                "passenger_id": "pas_0000AkfTqUQ5iW5PzzpHCi",
+                "cabin_class": "economy",
+                "cabin_class_marketing_name": "Economy",
+                "fare_basis_code": "OLXBR",
+                "cabin": {
+                  "name": "economy",
+                  "marketing_name": "Economy",
+                  "amenities": {
+                    "wifi": {
+                      "available": true,
+                      "cost": "paid"
+                    },
+                    "seat": {
+                      "pitch": "31",
+                      "legroom": "standard"
+                    },
+                    "power": {
+                      "available": true
+                    }
+                  }
+                },
+                "baggages": [
+                  {
+                    "type": "checked",
+                    "quantity": 1
+                  },
+                  {
+                    "type": "carry_on",
+                    "quantity": 1
+                  }
+                ]
+              },
+              {
+                "passenger_id": "pas_0000AkfTqUQ5iW5PzzpHCj",
+                "cabin_class": "economy",
+                "cabin_class_marketing_name": "Economy",
+                "fare_basis_code": "OLXBR",
+                "cabin": {
+                  "name": "economy",
+                  "marketing_name": "Economy",
+                  "amenities": {
+                    "wifi": {
+                      "available": true,
+                      "cost": "paid"
+                    },
+                    "seat": {
+                      "pitch": "31",
+                      "legroom": "standard"
+                    },
+                    "power": {
+                      "available": true
+                    }
+                  }
+                },
+                "baggages": [
+                  {
+                    "type": "checked",
+                    "quantity": 1
+                  },
+                  {
+                    "type": "carry_on",
+                    "quantity": 1
+                  }
+                ]
+              },
+              {
+                "passenger_id": "pas_0000AkfTqUQ5iW5PzzpHCk",
+                "cabin_class": "economy",
+                "cabin_class_marketing_name": "Economy",
+                "fare_basis_code": "OLXBR",
+                "cabin": {
+                  "name": "economy",
+                  "marketing_name": "Economy",
+                  "amenities": {
+                    "wifi": {
+                      "available": true,
+                      "cost": "paid"
+                    },
+                    "seat": {
+                      "pitch": "31",
+                      "legroom": "standard"
+                    },
+                    "power": {
+                      "available": true
+                    }
+                  }
+                },
+                "baggages": [
+                  {
+                    "type": "checked",
+                    "quantity": 1
+                  },
+                  {
+                    "type": "carry_on",
+                    "quantity": 1
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "seg_0000AkfTrwWQ0wuwCbGJx3",
+            "origin": {
+              "type": "airport",
+              "id": "arp_lis_pt",
+              "name": "Humberto Delgado Airport",
+              "iata_code": "LIS",
+              "icao_code": "LPPT",
+              "iata_country_code": "PT",
+              "iata_city_code": "LIS",
+              "city_name": "Lisbon",
+              "time_zone": "Europe/Lisbon",
+              "latitude": 38.774042,
+              "longitude": -9.134119,
+              "city": null
+            },
+            "destination": {
+              "type": "airport",
+              "id": "arp_gru_br",
+              "name": "São Paulo/Guarulhos–Governador André Franco Montoro International Airport",
+              "iata_code": "GRU",
+              "icao_code": "SBGR",
+              "iata_country_code": "BR",
+              "iata_city_code": "SAO",
+              "city_name": "São Paulo",
+              "time_zone": "America/Sao_Paulo",
+              "latitude": -23.432075,
+              "longitude": -46.469511,
+              "city": {
+                "type": "city",
+                "id": "cit_sao_br",
+                "name": "São Paulo",
+                "iata_code": "SAO",
+                "iata_country_code": "BR"
+              }
+            },
+            "origin_terminal": "1",
+            "destination_terminal": "1",
+            "departing_at": "2026-12-15T10:20:00",
+            "arriving_at": "2026-12-15T17:45:00",
+            "duration": "PT10H25M",
+            "distance": "7930.4",
+            "aircraft": {
+              "id": "arc_00009UhD4ongolulWd9339",
+              "iata_code": "339",
+              "name": "Airbus A330-900"
+            },
+            "marketing_carrier": {
+              "id": "arl_00009VME7DCOaPRQvNhcNu",
+              "name": "TAP Air Portugal",
+              "iata_code": "TP",
+              "logo_symbol_url": "https://assets.duffel.com/img/airlines/for-light-background/full-color-logo/TP.svg",
+              "logo_lockup_url": "https://assets.duffel.com/img/airlines/for-light-background/full-color-lockup/TP.svg",
+              "conditions_of_carriage_url": "https://www.flytap.com/en-us/legal-information/conditions-of-carriage"
+            },
+            "marketing_carrier_flight_number": "81",
+            "operating_carrier": {
+              "id": "arl_00009VME7DCOaPRQvNhcNu",
+              "name": "TAP Air Portugal",
+              "iata_code": "TP",
+              "logo_symbol_url": "https://assets.duffel.com/img/airlines/for-light-background/full-color-logo/TP.svg",
+              "logo_lockup_url": "https://assets.duffel.com/img/airlines/for-light-background/full-color-lockup/TP.svg",
+              "conditions_of_carriage_url": "https://www.flytap.com/en-us/legal-information/conditions-of-carriage"
+            },
+            "operating_carrier_flight_number": "81",
+            "stops": [],
+            "passengers": [
+              {
+                "passenger_id": "pas_0000AkfTqUQ5iW5PzzpHCi",
+                "cabin_class": "economy",
+                "cabin_class_marketing_name": "Economy",
+                "fare_basis_code": "OLXBR",
+                "cabin": {
+                  "name": "economy",
+                  "marketing_name": "Economy",
+                  "amenities": {
+                    "wifi": {
+                      "available": true,
+                      "cost": "paid"
+                    },
+                    "seat": {
+                      "pitch": "31",
+                      "legroom": "standard"
+                    },
+                    "power": {
+                      "available": true
+                    }
+                  }
+                },
+                "baggages": [
+                  {
+                    "type": "checked",
+                    "quantity": 1
+                  },
+                  {
+                    "type": "carry_on",
+                    "quantity": 1
+                  }
+                ]
+              },
+              {
+                "passenger_id": "pas_0000AkfTqUQ5iW5PzzpHCj",
+                "cabin_class": "economy",
+                "cabin_class_marketing_name": "Economy",
+                "fare_basis_code": "OLXBR",
+                "cabin": {
+                  "name": "economy",
+                  "marketing_name": "Economy",
+                  "amenities": {
+                    "wifi": {
+                      "available": true,
+                      "cost": "paid"
+                    },
+                    "seat": {
+                      "pitch": "31",
+                      "legroom": "standard"
+                    },
+                    "power": {
+                      "available": true
+                    }
+                  }
+                },
+                "baggages": [
+                  {
+                    "type": "checked",
+                    "quantity": 1
+                  },
+                  {
+                    "type": "carry_on",
+                    "quantity": 1
+                  }
+                ]
+              },
+              {
+                "passenger_id": "pas_0000AkfTqUQ5iW5PzzpHCk",
+                "cabin_class": "economy",
+                "cabin_class_marketing_name": "Economy",
+                "fare_basis_code": "OLXBR",
+                "cabin": {
+                  "name": "economy",
+                  "marketing_name": "Economy",
+                  "amenities": {
+                    "wifi": {
+                      "available": true,
+                      "cost": "paid"
+                    },
+                    "seat": {
+                      "pitch": "31",
+                      "legroom": "standard"
+                    },
+                    "power": {
+                      "available": true
+                    }
+                  }
+                },
+                "baggages": [
+                  {
+                    "type": "checked",
+                    "quantity": 1
+                  },
+                  {
+                    "type": "carry_on",
+                    "quantity": 1
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "oneWayDirect": {
+    "id": "off_0000AkfU2xN1cQ8lXpS5fB",
+    "live_mode": false,
+    "partial": false,
+    "created_at": "2026-11-04T12:00:00.123456Z",
+    "updated_at": "2026-11-04T12:00:00.123456Z",
+    "expires_at": "2026-11-04T12:25:00.000000Z",
+    "owner": {
+      "id": "arl_00009VME7DBKeMags5CliQ",
+      "name": "LATAM Airlines",
+      "iata_code": "LA",
+      "logo_symbol_url": "https://assets.duffel.com/img/airlines/for-light-background/full-color-logo/LA.svg",
+      "logo_lockup_url": "https://assets.duffel.com/img/airlines/for-light-background/full-color-lockup/LA.svg",
+      "conditions_of_carriage_url": null
+    },
+    "total_amount": "4321.99",
+    "total_currency": "BRL",
+    "base_amount": "3600.00",
+    "base_currency": "BRL",
+    "tax_amount": "721.99",
+    "tax_currency": "BRL",
+    "total_emissions_kg": "780",
+    "passenger_identity_documents_required": false,
+    "supported_passenger_identity_document_types": [
+      "passport"
+    ],
+    "supported_loyalty_programmes": [],
+    "private_fares": [],
+    "payment_requirements": {
+      "requires_instant_payment": true,
+      "price_guarantee_expires_at": null,
+      "payment_required_by": null
+    },
+    "available_services": null,
+    "conditions": {
+      "refund_before_departure": null,
+      "change_before_departure": null
+    },
+    "passengers": [
+      {
+        "id": "pas_0000AkfU2xN1cQ8lXpS5fA",
+        "type": "adult",
+        "age": null,
+        "given_name": null,
+        "family_name": null,
+        "fare_type": null,
+        "loyalty_programme_accounts": []
+      }
+    ],
+    "slices": [
+      {
+        "id": "sli_0000AkfU2xN1cQ8lXpS5fC",
+        "origin_type": "airport",
+        "origin": {
+          "type": "airport",
+          "id": "arp_gru_br",
+          "name": "São Paulo/Guarulhos–Governador André Franco Montoro International Airport",
+          "iata_code": "GRU",
+          "icao_code": "SBGR",
+          "iata_country_code": "BR",
+          "iata_city_code": "SAO",
+          "city_name": "São Paulo",
+          "time_zone": "America/Sao_Paulo",
+          "latitude": -23.432075,
+          "longitude": -46.469511,
+          "city": {
+            "type": "city",
+            "id": "cit_sao_br",
+            "name": "São Paulo",
+            "iata_code": "SAO",
+            "iata_country_code": "BR"
+          }
+        },
+        "destination_type": "airport",
+        "destination": {
+          "type": "airport",
+          "id": "arp_lhr_gb",
+          "name": "Heathrow Airport",
+          "iata_code": "LHR",
+          "icao_code": "EGLL",
+          "iata_country_code": "GB",
+          "iata_city_code": "LON",
+          "city_name": "London",
+          "time_zone": "Europe/London",
+          "latitude": 51.470311,
+          "longitude": -0.458118,
+          "city": {
+            "type": "city",
+            "id": "cit_lon_gb",
+            "name": "London",
+            "iata_code": "LON",
+            "iata_country_code": "GB"
+          }
+        },
+        "duration": "PT12H50M",
+        "fare_brand_name": "Light",
+        "comparison_key": "Dm3Enw==",
+        "ngs_shelf": 1,
+        "conditions": {
+          "change_before_departure": {
+            "allowed": false,
+            "penalty_amount": null,
+            "penalty_currency": null
+          },
+          "refund_before_departure": null,
+          "advance_seat_selection": true,
+          "priority_boarding": false,
+          "priority_check_in": false
+        },
+        "segments": [
+          {
+            "id": "seg_0000AkfTrwWQ0wuwCbGJx4",
+            "origin": {
+              "type": "airport",
+              "id": "arp_gru_br",
+              "name": "São Paulo/Guarulhos–Governador André Franco Montoro International Airport",
+              "iata_code": "GRU",
+              "icao_code": "SBGR",
+              "iata_country_code": "BR",
+              "iata_city_code": "SAO",
+              "city_name": "São Paulo",
+              "time_zone": "America/Sao_Paulo",
+              "latitude": -23.432075,
+              "longitude": -46.469511,
+              "city": {
+                "type": "city",
+                "id": "cit_sao_br",
+                "name": "São Paulo",
+                "iata_code": "SAO",
+                "iata_country_code": "BR"
+              }
+            },
+            "destination": {
+              "type": "airport",
+              "id": "arp_lhr_gb",
+              "name": "Heathrow Airport",
+              "iata_code": "LHR",
+              "icao_code": "EGLL",
+              "iata_country_code": "GB",
+              "iata_city_code": "LON",
+              "city_name": "London",
+              "time_zone": "Europe/London",
+              "latitude": 51.470311,
+              "longitude": -0.458118,
+              "city": {
+                "type": "city",
+                "id": "cit_lon_gb",
+                "name": "London",
+                "iata_code": "LON",
+                "iata_country_code": "GB"
+              }
+            },
+            "origin_terminal": "1",
+            "destination_terminal": "1",
+            "departing_at": "2026-12-01T23:40:00",
+            "arriving_at": "2026-12-02T15:30:00",
+            "duration": "PT12H50M",
+            "distance": "9474.1",
+            "aircraft": {
+              "id": "arc_00009UhD4ongolulWd9789",
+              "iata_code": "789",
+              "name": "Boeing 787-9"
+            },
+            "marketing_carrier": {
+              "id": "arl_00009VME7DBKeMags5CliQ",
+              "name": "LATAM Airlines",
+              "iata_code": "LA",
+              "logo_symbol_url": "https://assets.duffel.com/img/airlines/for-light-background/full-color-logo/LA.svg",
+              "logo_lockup_url": "https://assets.duffel.com/img/airlines/for-light-background/full-color-lockup/LA.svg",
+              "conditions_of_carriage_url": null
+            },
+            "marketing_carrier_flight_number": "8084",
+            "operating_carrier": {
+              "id": "arl_00009VME7DBKeMags5CliQ",
+              "name": "LATAM Airlines",
+              "iata_code": "LA",
+              "logo_symbol_url": "https://assets.duffel.com/img/airlines/for-light-background/full-color-logo/LA.svg",
+              "logo_lockup_url": "https://assets.duffel.com/img/airlines/for-light-background/full-color-lockup/LA.svg",
+              "conditions_of_carriage_url": null
+            },
+            "operating_carrier_flight_number": "8084",
+            "stops": [],
+            "passengers": [
+              {
+                "passenger_id": "pas_0000AkfU2xN1cQ8lXpS5fA",
+                "cabin_class": "economy",
+                "cabin_class_marketing_name": "Economy",
+                "fare_basis_code": "OLXBR",
+                "cabin": {
+                  "name": "economy",
+                  "marketing_name": "Economy",
+                  "amenities": {
+                    "wifi": {
+                      "available": true,
+                      "cost": "paid"
+                    },
+                    "seat": {
+                      "pitch": "31",
+                      "legroom": "standard"
+                    },
+                    "power": {
+                      "available": true
+                    }
+                  }
+                },
+                "baggages": [
+                  {
+                    "type": "carry_on",
+                    "quantity": 1
+                  },
+                  {
+                    "type": "checked",
+                    "quantity": 0
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}
