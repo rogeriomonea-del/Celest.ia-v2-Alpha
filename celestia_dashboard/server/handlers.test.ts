@@ -184,6 +184,8 @@ describe('POST /api/flights/search', () => {
     const prices = body.offers.map((o) => o.totalPrice)
     expect(prices).toEqual([...prices].sort((a, b) => a - b))
     expect(prices[0]).toBe(13100)
+    expect(body.totalOffers).toBe(70)
+    expect(body.truncated).toBe(true)
     expect(Number.isNaN(Date.parse(body.searchedAt))).toBe(false)
 
     expect(fetchMock).toHaveBeenCalledTimes(1)
@@ -211,6 +213,25 @@ describe('POST /api/flights/search', () => {
         max_connections: 2,
       },
     })
+  })
+
+  it('keeps an expensive nonstop offer that is beyond the 60 cheapest', async () => {
+    const base = fixture.roundTripWithConnection
+    const connecting = Array.from({ length: 70 }, (_, i) => ({ ...base, id: `off_c${String(i).padStart(4, '0')}`, total_amount: (5000 + i).toFixed(2) }))
+    const direct = { ...fixture.oneWayDirect, id: 'off_direct0001', total_amount: '99999.00' }
+    fetchMock.mockResolvedValue(duffelJson({ data: { id: 'orq_1', offers: [...connecting, direct] } }, 201))
+    const body = (await (await searchPOST(searchRequest(validSearch))).json()) as SearchResponse
+    expect(body.offers).toHaveLength(60)
+    expect(body.offers.map((o) => o.id)).toContain('off_direct0001')
+    expect(body.offers.find((o) => o.id === 'off_direct0001')?.stops).toEqual([])
+    expect(body.totalOffers).toBe(71)
+    expect(body.truncated).toBe(true)
+  })
+
+  it('reports no truncation when every offer fits', async () => {
+    fetchMock.mockResolvedValue(duffelJson({ data: { id: 'orq_1', offers: [fixture.oneWayDirect] } }, 201))
+    const body = (await (await searchPOST(searchRequest(validSearch))).json()) as SearchResponse
+    expect(body).toMatchObject({ totalOffers: 1, truncated: false })
   })
 
   it.each([

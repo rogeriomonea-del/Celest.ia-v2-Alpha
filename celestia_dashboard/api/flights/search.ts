@@ -3,8 +3,7 @@ import type { SearchResponse } from '../../src/shared/api.js'
 import { createOfferRequest } from '../../server/duffel.js'
 import { handleError, json, methodNotAllowed, NO_STORE, parseJsonBody, validationErrorResponse } from '../../server/http.js'
 import { mapOffers } from '../../server/mapOffer.js'
-
-export const MAX_OFFERS = 60
+import { selectOffers } from '../../server/selectOffers.js'
 
 /** POST /api/flights/search — body: SearchRequest -> SearchResponse. */
 export async function POST(request: Request): Promise<Response> {
@@ -13,10 +12,9 @@ export async function POST(request: Request): Promise<Response> {
     if (!parsed.success) return validationErrorResponse(parsed.error)
 
     const result = await createOfferRequest(parsed.data)
-    const all = mapOffers(result.offers).sort(
-      (a, b) => a.totalPrice - b.totalPrice,
-    )
-    const offers = all.slice(0, MAX_OFFERS)
+    // Emissions buckets are ranked over every offer, before trimming.
+    const all = mapOffers(result.offers)
+    const offers = selectOffers(all)
     const body: SearchResponse = {
       offers,
       totalOffers: all.length,
