@@ -1,5 +1,6 @@
 /** Response helpers and error mapping for the api/ functions. User-facing messages are pt-BR. */
-import type { ZodError } from 'zod'
+import { defaultErrorMap } from 'zod'
+import type { ZodError, ZodIssue } from 'zod'
 import type { ApiErrorBody, ApiErrorCode } from '../src/shared/api.js'
 import { DuffelError } from './duffel.js'
 
@@ -8,6 +9,7 @@ export const NO_STORE = { 'Cache-Control': 'no-store' }
 export const MESSAGES = {
   notConfigured: 'A busca de voos está temporariamente indisponível. Tente novamente mais tarde.',
   invalidBody: 'Requisição inválida: envie um JSON válido.',
+  invalidSearch: 'Dados da busca inválidos.',
   providerRejected: 'Não foi possível buscar com esses dados. Revise origem, destino, datas e passageiros.',
   offerExpired: 'Esta oferta expirou ou não está mais disponível. Faça uma nova busca.',
   notFound: 'Não encontramos o que você procurou. Faça uma nova busca.',
@@ -50,9 +52,19 @@ export async function parseJsonBody(request: Request): Promise<unknown> {
   }
 }
 
-/** 400 with the first zod issue's message (already pt-BR in the shared schema). */
+/** True when zod's built-in English message was used, i.e. the schema gave no pt-BR message for this issue. */
+function isZodDefaultMessage(issue: ZodIssue): boolean {
+  return defaultErrorMap(issue, { defaultError: issue.message, data: undefined }).message === issue.message
+}
+
+/**
+ * 400 with the first zod issue's message (pt-BR in the shared schema). Falls back to a
+ * generic pt-BR message when the issue carries zod's default English text.
+ */
 export function validationErrorResponse(error: ZodError): Response {
-  return errorResponse('invalid_request', error.issues[0]?.message ?? MESSAGES.invalidBody, 400)
+  const issue = error.issues[0]
+  const message = issue && !isZodDefaultMessage(issue) ? issue.message : MESSAGES.invalidSearch
+  return errorResponse('invalid_request', message, 400)
 }
 
 /** Handler for HTTP methods a route does not support. */
@@ -83,6 +95,11 @@ export function handleError(err: unknown, options: { offerLookup?: boolean } = {
   }
 
   const status = err.status ?? 0
+  // Bad or revoked token: same outcome for users as a missing one.
+  if (status === 401 || status === 403) {
+    console.error(`[duffel] Duffel credential rejected (HTTP ${status}): check DUFFEL_ACCESS_TOKEN`)
+    return errorResponse('provider_not_configured', MESSAGES.notConfigured, 503)
+  }
   if (options.offerLookup && err.code && OFFER_GONE_CODES.has(err.code)) {
     return errorResponse('offer_expired', MESSAGES.offerExpired, 410)
   }

@@ -6,6 +6,7 @@ import { GET as placesGET } from '../api/places.js'
 import { GET as offerGET } from '../api/offers/[id].js'
 import type { DuffelOffer } from './duffel.js'
 import { SEARCH_TIMEOUT_MS, SUPPLIER_TIMEOUT_MS } from './duffel.js'
+import { MESSAGES } from './http.js'
 
 const TOKEN = 'duffel_test_dummy_token_for_unit_tests'
 const fixture = JSON.parse(readFileSync(new URL('./__fixtures__/duffel-offers.json', import.meta.url), 'utf8')) as {
@@ -48,6 +49,12 @@ async function errorOf(response: Response): Promise<ApiErrorBody['error']> {
   return body.error
 }
 
+function expectCredentialRejectedLogged(status: number) {
+  const logged = vi.mocked(console.error).mock.calls.map((args) => args.map(String).join(' '))
+  expect(logged.some((line) => line.includes('Duffel credential rejected') && line.includes(String(status)))).toBe(true)
+  expect(logged.join('\n')).not.toContain(TOKEN)
+}
+
 beforeEach(() => {
   vi.stubGlobal('fetch', fetchMock)
   vi.stubEnv('DUFFEL_ACCESS_TOKEN', TOKEN)
@@ -78,6 +85,25 @@ describe('POST /api/flights/search', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
+  it.each([
+    ['an empty body', {}, 'Informe a origem'],
+    ['a missing departDate', { ...validSearch, departDate: undefined }, 'Informe a data de ida'],
+    ['a bad cabin', { ...validSearch, cabin: 'first' }, 'Classe de cabine inválida'],
+    ['a missing cabin', { ...validSearch, cabin: undefined }, 'Classe de cabine inválida'],
+    ['missing passengers', { ...validSearch, passengers: undefined }, 'Informe os passageiros'],
+    ['a string adult count', { ...validSearch, passengers: { adults: '2', children: 0, infants: 0 } }, 'Número de adultos inválido'],
+    ['zero adults', { ...validSearch, passengers: { adults: 0, children: 0, infants: 0 } }, 'Pelo menos 1 adulto'],
+    ['too many children', { ...validSearch, passengers: { adults: 1, children: 9, infants: 0 } }, 'Máximo de 9 passageiros'],
+    ['a numeric origin', { ...validSearch, origin: 123 }, 'Código IATA inválido'],
+    ['a JSON array', [], 'Dados da busca inválidos.'],
+    ['JSON null', null, 'Dados da busca inválidos.'],
+  ])('returns a pt-BR 400 message for %s', async (_label, body, message) => {
+    const res = await searchPOST(searchRequest(body))
+    expect(res.status).toBe(400)
+    expect(await errorOf(res)).toEqual({ code: 'invalid_request', message })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
   it('returns 400 invalid_request for a non-JSON body', async () => {
     const res = await searchPOST(searchRequest('{not json'))
     expect(res.status).toBe(400)
@@ -98,6 +124,14 @@ describe('POST /api/flights/search', () => {
     const error = await errorOf(res)
     expect(error.code).toBe('invalid_request')
     expect(error.message).not.toContain('Something went wrong')
+  })
+
+  it.each([401, 403])('maps a Duffel %i (bad/revoked token) to 503 provider_not_configured', async (status) => {
+    fetchMock.mockResolvedValue(duffelJson(duffelErrorBody('unauthorized', 'authentication_error'), status))
+    const res = await searchPOST(searchRequest(validSearch))
+    expect(res.status).toBe(503)
+    expect(await errorOf(res)).toEqual({ code: 'provider_not_configured', message: MESSAGES.notConfigured })
+    expectCredentialRejectedLogged(status)
   })
 
   it('maps a Duffel 5xx to 502 provider_error', async () => {
@@ -150,6 +184,8 @@ describe('POST /api/flights/search', () => {
     const prices = body.offers.map((o) => o.totalPrice)
     expect(prices).toEqual([...prices].sort((a, b) => a - b))
     expect(prices[0]).toBe(13100)
+    expect(body.totalOffers).toBe(70)
+    expect(body.truncated).toBe(true)
     expect(Number.isNaN(Date.parse(body.searchedAt))).toBe(false)
 
     expect(fetchMock).toHaveBeenCalledTimes(1)
@@ -177,6 +213,35 @@ describe('POST /api/flights/search', () => {
         max_connections: 2,
       },
     })
+  })
+
+  it('keeps an expensive nonstop offer that is beyond the 60 cheapest', async () => {
+    const base = fixture.roundTripWithConnection
+    const connecting = Array.from({ length: 70 }, (_, i) => ({ ...base, id: `off_c${String(i).padStart(4, '0')}`, total_amount: (5000 + i).toFixed(2) }))
+    const direct = { ...fixture.oneWayDirect, id: 'off_direct0001', total_amount: '99999.00' }
+    fetchMock.mockResolvedValue(duffelJson({ data: { id: 'orq_1', offers: [...connecting, direct] } }, 201))
+    const body = (await (await searchPOST(searchRequest(validSearch))).json()) as SearchResponse
+    expect(body.offers).toHaveLength(60)
+    expect(body.offers.map((o) => o.id)).toContain('off_direct0001')
+    expect(body.offers.find((o) => o.id === 'off_direct0001')?.stops).toEqual([])
+    expect(body.totalOffers).toBe(71)
+    expect(body.truncated).toBe(true)
+  })
+
+  it('reports no truncation when every offer fits', async () => {
+    fetchMock.mockResolvedValue(duffelJson({ data: { id: 'orq_1', offers: [fixture.oneWayDirect] } }, 201))
+    const body = (await (await searchPOST(searchRequest(validSearch))).json()) as SearchResponse
+    expect(body).toMatchObject({ totalOffers: 1, truncated: false })
+  })
+
+  it.each([
+    [true, true],
+    [false, false],
+    [undefined, false],
+  ])('reports liveMode from the offer request live_mode (%s -> %s)', async (liveMode, expected) => {
+    fetchMock.mockResolvedValue(duffelJson({ data: { id: 'orq_1', live_mode: liveMode, offers: [fixture.oneWayDirect] } }, 201))
+    const body = (await (await searchPOST(searchRequest(validSearch))).json()) as SearchResponse
+    expect(body.liveMode).toBe(expected)
   })
 
   it('sends a single slice for one-way searches and never leaks the token', async () => {
@@ -283,6 +348,30 @@ describe('GET /api/offers/[id]', () => {
     expect(String(fetchMock.mock.calls[0][0])).toBe(`https://api.duffel.com/air/offers/${offer.id}`)
   })
 
+  it.each([
+    [true, true],
+    [false, false],
+    [undefined, false],
+  ])('reports liveMode from the offer live_mode (%s -> %s)', async (liveMode, expected) => {
+    const offer = { ...fixture.oneWayDirect, live_mode: liveMode }
+    fetchMock.mockResolvedValue(duffelJson({ data: offer }))
+    const body = (await (await offerGET(offerRequest(offer.id))).json()) as OfferResponse
+    expect(body.liveMode).toBe(expected)
+  })
+
+  it.each([
+    [null, null],
+    ['1650', 1650],
+  ])("maps emissionsKg (%s) and leaves the single-offer bucket at 'average'", async (kg, expectedKg) => {
+    const offer = { ...fixture.roundTripWithConnection, total_emissions_kg: kg }
+    fetchMock.mockResolvedValue(duffelJson({ data: offer }))
+    const res = await offerGET(offerRequest(offer.id))
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as OfferResponse
+    expect(body.offer.emissionsKg).toBe(expectedKg)
+    expect(body.offer.emissions).toBe('average')
+  })
+
   it('reads the id from the path when no query param is present', async () => {
     fetchMock.mockResolvedValue(duffelJson({ data: fixture.oneWayDirect }))
     const res = await offerGET(new Request(`https://celestia.test/api/offers/${fixture.oneWayDirect.id}`))
@@ -303,10 +392,11 @@ describe('GET /api/offers/[id]', () => {
     expect((await errorOf(res)).code).toBe('not_found')
   })
 
-  it('maps a Duffel 401 (bad token) to 500 internal', async () => {
-    fetchMock.mockResolvedValue(duffelJson(duffelErrorBody('unauthorized', 'authentication_error'), 401))
+  it.each([401, 403])('maps a Duffel %i (bad/revoked token) to 503 provider_not_configured', async (status) => {
+    fetchMock.mockResolvedValue(duffelJson(duffelErrorBody('unauthorized', 'authentication_error'), status))
     const res = await offerGET(offerRequest('off_0000AkfTrwXBHrv0fn6YhC'))
-    expect(res.status).toBe(500)
-    expect((await errorOf(res)).code).toBe('internal')
+    expect(res.status).toBe(503)
+    expect(await errorOf(res)).toEqual({ code: 'provider_not_configured', message: MESSAGES.notConfigured })
+    expectCredentialRejectedLogged(status)
   })
 })

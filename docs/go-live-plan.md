@@ -4,12 +4,12 @@
 
 | Tema | Decisão | Por quê |
 |---|---|---|
-| Fonte de voos | **Duffel API** (REST, `Duffel-Version: v2`) via funções serverless | Amadeus Self-Service foi desligado em 17/07/2026; Duffel tem ofertas reais, modo teste gratuito (`duffel_test_…`) e cobra só por pedido emitido. Scrapers (`scrapers.py`) não são viáveis (sites JS + anti-bot + ToS). |
+| Fonte de voos | **Duffel API** (REST, `Duffel-Version: v2`) via funções serverless | Amadeus Self-Service foi desligado em 17/07/2026; Duffel tem ofertas reais, modo teste gratuito (`duffel_test_…`) e cobra principalmente por pedido emitido (ver ressalva sobre buscas abaixo). Scrapers (`scrapers.py`) não são viáveis (sites JS + anti-bot + ToS). |
 | Login | **Supabase Auth** com OAuth **Google** e **Apple** | SDK no browser, sem servidor de sessão; Postgres com RLS para dados por usuário. |
 | Dados por usuário | Tabela `saved_searches` no Supabase, RLS `auth.uid() = user_id` | Dá função concreta ao login sem backend extra. |
 | Backend | Funções Vercel em `celestia_dashboard/api/*` (Node, ESM), lógica em `celestia_dashboard/server/*` | Mesmo deploy do front; chave Duffel fica só no servidor. |
 | Projeto Vercel canônico | `celestiadashboard` (Root Directory = `celestia_dashboard`) | As funções `api/` precisam estar na raiz do projeto Vercel. |
-| Busca | Pública (sem login). Salvar busca exige login. | Menos atrito; Duffel não cobra por busca. |
+| Busca | Pública (sem login). Salvar busca exige login. | Menos atrito. **Atenção:** a Duffel pode cobrar por buscas em excesso em relação ao número de pedidos emitidos — confirmar na página de preços da Duffel antes do go-live; o rate limit (abaixo) limita o custo. |
 | Reserva | **Fora da v1.** "Ver oferta" re-consulta a oferta (preço atual, condições, validade). | Emissão envolve pagamento/PCI — fase 2 (Duffel Links ou Orders API). |
 | Milhas | **Fora da v1.** | Precisa de fonte de disponibilidade award (ex.: seats.aero) — fase 2. |
 
@@ -45,4 +45,5 @@ Definido em `celestia_dashboard/src/shared/api.ts` (tipos + validação zod usad
 3. **Google OAuth**: Google Cloud Console → OAuth client (Web) → redirect `https://<projeto>.supabase.co/auth/v1/callback` → colar client id/secret em Supabase → Auth → Providers → Google.
 4. **Apple**: Apple Developer (US$ 99/ano) → Services ID + chave Sign in with Apple → mesmo callback → Supabase → Providers → Apple.
 5. **Supabase → Auth → URL Configuration**: Site URL = domínio de produção; adicionar domínios de preview em Redirect URLs.
-6. **Vercel**: desativar a "Vercel Authentication" (SSO) do deploy de produção ou usar domínio próprio; escolher um único projeto (recomendado `celestiadashboard`).
+6. **Rate limiting**: na Vercel → Firewall, criar uma regra de rate limit (ex.: 10 req/min por IP) para `/api/flights/search` e `/api/offers/*`, respondendo 429. Protege a cota/custo da Duffel contra abuso, já que a busca é pública.
+7. **Vercel**: desativar a "Vercel Authentication" (SSO) do deploy de produção ou usar domínio próprio; escolher um único projeto (recomendado `celestiadashboard`).

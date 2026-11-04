@@ -71,10 +71,16 @@ export interface DuffelSlice {
 
 export interface DuffelCondition {
   allowed: boolean
+  /** Decimal string, e.g. "450.00"; null when the fee is unknown or the action is not allowed. */
+  penalty_amount?: string | null
+  /** ISO 4217; null whenever penalty_amount is null. */
+  penalty_currency?: string | null
 }
 
 export interface DuffelOffer {
   id: string
+  /** true = live (real) offer; false = test mode. */
+  live_mode?: boolean
   owner: DuffelAirline
   slices: DuffelSlice[]
   passengers: { id: string; type: string | null; age?: number | null }[]
@@ -90,7 +96,15 @@ export interface DuffelOffer {
 
 export interface DuffelOfferRequest {
   id: string
+  /** true = created with a live token; false = test mode. */
+  live_mode?: boolean
   offers: DuffelOffer[]
+}
+
+export interface OfferSearchResult {
+  offers: DuffelOffer[]
+  /** true only when Duffel says the request is live; false when test mode or unknown. */
+  liveMode: boolean
 }
 
 export interface DuffelPlace {
@@ -233,14 +247,14 @@ export function buildOfferRequestBody(req: SearchRequest) {
   return { slices, passengers, cabin_class: CABIN_CLASS[req.cabin], max_connections: 2 }
 }
 
-/** POST /air/offer_requests?return_offers=true — returns the offers found. */
-export async function createOfferRequest(req: SearchRequest): Promise<DuffelOffer[]> {
+/** POST /air/offer_requests?return_offers=true — returns the offers found and the provider mode. */
+export async function createOfferRequest(req: SearchRequest): Promise<OfferSearchResult> {
   const result = await duffelRequest<DuffelOfferRequest>('POST', '/air/offer_requests', {
     query: { return_offers: 'true', supplier_timeout: String(SUPPLIER_TIMEOUT_MS) },
     body: buildOfferRequestBody(req),
     timeoutMs: SEARCH_TIMEOUT_MS,
   })
-  return result.offers ?? []
+  return { offers: result.offers ?? [], liveMode: result.live_mode === true }
 }
 
 /** GET /air/offers/{id} — current price and conditions of one offer. */

@@ -1,7 +1,7 @@
 import type { OfferResponse } from '../../src/shared/api.js'
 import { getOffer } from '../../server/duffel.js'
 import { errorResponse, handleError, json, methodNotAllowed, NO_STORE } from '../../server/http.js'
-import { mapOffers } from '../../server/mapOffer.js'
+import { mapSingleOffer } from '../../server/mapOffer.js'
 
 const OFFER_ID = /^off_[A-Za-z0-9]+$/
 
@@ -20,8 +20,10 @@ export async function GET(request: Request): Promise<Response> {
     return errorResponse('invalid_request', 'Identificador de oferta inválido.', 400)
   }
   try {
-    const [offer] = mapOffers([await getOffer(id)])
-    const body: OfferResponse = { offer, liveMode: false }
+    const duffelOffer = await getOffer(id)
+    // emissions stays 'average' here (no result set to rank against); emissionsKg is mapped.
+    const offer = mapSingleOffer(duffelOffer)
+    const body: OfferResponse = { offer, liveMode: duffelOffer.live_mode === true }
     return json(body, 200, NO_STORE)
   } catch (err) {
     return handleError(err, { offerLookup: true })

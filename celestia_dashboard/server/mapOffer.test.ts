@@ -95,8 +95,14 @@ describe('mapOffers — round trip with a connection', () => {
 
   it('maps baggage, conditions, tags and expiry', () => {
     expect(flight.baggage).toEqual({ carryOn: true, checkedBags: 1 })
-    expect(flight.conditions).toMatchObject({ refundable: false, changeable: true })
-    expect(flight.tags).toEqual(['flexible'])
+    expect(flight.conditions).toEqual({
+      refundable: false,
+      changeable: true,
+      refundPenalty: null,
+      changePenalty: { amount: 450, currency: 'BRL' },
+    })
+    // Changeable for a 450 BRL fee is not "flexible".
+    expect(flight.tags).toEqual([])
     expect(flight.seatsLeft).toBeNull()
     expect(flight.expiresAt).toBe('2026-11-04T12:30:00.123456Z')
     expect(flight.emissionsKg).toBe(1650)
@@ -125,9 +131,51 @@ describe('mapOffers — one-way direct', () => {
     expect(flight.tags).toEqual([])
   })
 
+  it('divides by seated passengers only: a lap infant does not count (1 adult + 1 infant)', () => {
+    const withInfant: DuffelOffer = {
+      ...oneWay,
+      total_amount: '1100.00',
+      passengers: [...oneWay.passengers, { id: 'pas_infant', type: null, age: 1 }],
+    }
+    const [flight] = mapOffers([withInfant])
+    expect(flight.totalPrice).toBe(1100)
+    expect(flight.price).toBe(1100)
+  })
+
   it('falls back to segment durations when the slice duration is null', () => {
     const noDuration = { ...oneWay, slices: [{ ...oneWay.slices[0], duration: null }] }
     expect(mapOffers([noDuration])[0].durationMin).toBe(770)
+  })
+})
+
+describe('mapOffers — refund/change penalties and the flexible tag', () => {
+  const withConditions = (conditions: DuffelOffer['conditions']): DuffelOffer => ({ ...roundTrip, conditions })
+
+  it('tags flexible only for a free change and maps both penalties', () => {
+    const [flight] = mapOffers([
+      withConditions({
+        refund_before_departure: { allowed: true, penalty_amount: '120.50', penalty_currency: 'USD' },
+        change_before_departure: { allowed: true, penalty_amount: '0.00', penalty_currency: 'USD' },
+      }),
+    ])
+    expect(flight.conditions).toEqual({
+      refundable: true,
+      changeable: true,
+      refundPenalty: { amount: 120.5, currency: 'USD' },
+      changePenalty: { amount: 0, currency: 'USD' },
+    })
+    expect(flight.tags).toEqual(['flexible'])
+  })
+
+  it('is not flexible when the change fee is unknown, and drops penalties for disallowed actions', () => {
+    const [flight] = mapOffers([
+      withConditions({
+        refund_before_departure: { allowed: false, penalty_amount: '99.00', penalty_currency: 'BRL' },
+        change_before_departure: { allowed: true, penalty_amount: null, penalty_currency: null },
+      }),
+    ])
+    expect(flight.conditions).toEqual({ refundable: false, changeable: true, refundPenalty: null, changePenalty: null })
+    expect(flight.tags).toEqual([])
   })
 })
 
