@@ -263,6 +263,21 @@ describe('searchAwards (seats.aero)', () => {
     expect(fares.at(-1)?.miles).toBe(80_000)
   })
 
+  it('caps per direction after the seat filter, so 2 passengers find the seated award past the cheapest single-seat ones', async () => {
+    const trips = [
+      ...Array.from({ length: MAX_AWARDS_PER_DIRECTION }, (_, i) =>
+        trip({ MileageCost: 10_000 + i * 100, RemainingSeats: 1, FlightNumbers: `CM${i}` }),
+      ),
+      trip({ MileageCost: 90_000, RemainingSeats: 4, FlightNumbers: 'CM999' }),
+    ]
+    fetchMock.mockResolvedValue(ok([row({ AvailabilityTrips: trips })]))
+    expect((await searchAwards(lookup({ passengers: 2 }), options())).map((f) => f.miles)).toEqual([90_000])
+    // The direction is cached once and shared: a 1-passenger lookup gets its own cheapest 50.
+    const solo = await searchAwards(lookup({ passengers: 1 }), options())
+    expect(solo.map((f) => f.miles)).toEqual(Array.from({ length: MAX_AWARDS_PER_DIRECTION }, (_, i) => 10_000 + i * 100))
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
   it(`caches at most ${AWARD_CACHE_MAX_ENTRIES} directions, evicting the oldest`, async () => {
     fetchMock.mockImplementation(async () => ok([]))
     const day = (i: number) => new Date(Date.UTC(2024, 0, 1) + i * 86_400_000).toISOString().slice(0, 10)
