@@ -2,6 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import App, { PENDING_SAVE_KEY } from './App'
+import { MILES_PREFS_KEY } from './features/miles/useMilesPrefs'
 import { ApiError, fetchOffer, searchFlights } from './lib/api'
 import { findAirport } from './data/airports'
 import { LATAM, makeFlight, TAP } from './test/flights'
@@ -444,6 +445,72 @@ describe('App pending save across the login redirect', () => {
     mocks.user = { id: 'user-1' }
     cleanup()
     render(<App />)
+    expect(screen.getByText('Pronto para buscar')).toBeInTheDocument()
+  })
+})
+
+describe('App miles module', () => {
+  const smilesPrefs = { enabled: true, program: 'smiles', milheiroBrl: 20, balance: 30000 }
+  const milesSummary = {
+    program: 'smiles',
+    programName: 'Smiles (GOL)',
+    milheiroBrl: 20,
+    awardSource: null,
+    awardsSearched: false,
+    awardsNote: 'Consulta de award não configurada.',
+  }
+  const milesTrigger = () => screen.getByRole('button', { name: /^Milhas/ })
+
+  beforeEach(() => {
+    window.localStorage.clear()
+    vi.mocked(searchFlights).mockResolvedValue({ offers, totalOffers: 2, truncated: false, liveMode: true, searchedAt: '2026-11-04T12:00:00Z', miles: milesSummary })
+  })
+
+  it('searches with the stored miles prefs and shows the awards note once', async () => {
+    window.localStorage.setItem(MILES_PREFS_KEY, JSON.stringify(smilesPrefs))
+    render(<App />)
+    expect(milesTrigger()).toHaveTextContent('Milhas: Smiles (GOL) · R$ 20')
+    await searchAndWait()
+
+    expect(vi.mocked(searchFlights).mock.calls[0][2]).toEqual(smilesPrefs)
+    const notes = screen.getAllByRole('note')
+    expect(notes).toHaveLength(1)
+    expect(notes[0]).toHaveTextContent('Awards: Consulta de award não configurada.')
+  })
+
+  it('hides the awards note while the miles module is disabled', async () => {
+    render(<App />)
+    await searchAndWait()
+    expect(vi.mocked(searchFlights).mock.calls[0]).toHaveLength(2)
+    expect(screen.queryByRole('note')).not.toBeInTheDocument()
+  })
+
+  it('"Aplicar" saves the prefs and re-runs the current search with them', async () => {
+    render(<App />)
+    await searchAndWait()
+    expect(searchFlights).toHaveBeenCalledTimes(1)
+
+    fireEvent.click(milesTrigger())
+    fireEvent.click(screen.getByRole('switch', { name: 'Comparar com milhas' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Aplicar' }))
+
+    await screen.findByRole('note')
+    expect(searchFlights).toHaveBeenCalledTimes(2)
+    const [first, second] = vi.mocked(searchFlights).mock.calls
+    expect(second[0]).toEqual(first[0])
+    expect(second[2]).toEqual({ enabled: true, program: 'latampass', milheiroBrl: null, balance: 0 })
+    expect(JSON.parse(window.localStorage.getItem(MILES_PREFS_KEY)!)).toEqual(second[2])
+    expect(milesTrigger()).toHaveTextContent('Milhas: LATAM Pass · R$ 29')
+  })
+
+  it('"Aplicar" before any search only saves the prefs', () => {
+    render(<App />)
+    fireEvent.click(milesTrigger())
+    fireEvent.click(screen.getByRole('switch', { name: 'Comparar com milhas' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Aplicar' }))
+
+    expect(searchFlights).not.toHaveBeenCalled()
+    expect(JSON.parse(window.localStorage.getItem(MILES_PREFS_KEY)!)).toMatchObject({ enabled: true })
     expect(screen.getByText('Pronto para buscar')).toBeInTheDocument()
   })
 })

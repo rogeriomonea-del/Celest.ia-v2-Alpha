@@ -138,6 +138,29 @@ describe('searchFlights', () => {
     expect(err).toBe(abort)
   })
 
+  it('sends the miles settings when the miles module is enabled', async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ offers: [], searchedAt: '2026-11-04T12:00:00Z', miles: null }))
+
+    await searchFlights(roundtrip, undefined, { enabled: true, program: 'smiles', milheiroBrl: null, balance: 42000 })
+
+    const body = JSON.parse(String(lastCall().init.body))
+    expect(body.miles).toEqual({ program: 'smiles', milheiroBrl: null, balance: 42000 })
+    expect(body.origin).toBe('GRU')
+  })
+
+  it('omits miles when the module is disabled or there are no prefs', async () => {
+    fetchMock.mockImplementation(async () => jsonResponse({ offers: [], searchedAt: '2026-11-04T12:00:00Z', miles: null }))
+
+    await searchFlights(roundtrip, undefined, { enabled: false, program: 'smiles', milheiroBrl: 20, balance: 1 })
+    expect(JSON.parse(String(lastCall().init.body))).not.toHaveProperty('miles')
+
+    await searchFlights(roundtrip, undefined, null)
+    expect(JSON.parse(String(lastCall().init.body))).not.toHaveProperty('miles')
+
+    await searchFlights(roundtrip)
+    expect(JSON.parse(String(lastCall().init.body))).not.toHaveProperty('miles')
+  })
+
   it('rejects without calling the API when there is no departure date', async () => {
     await expect(searchFlights({ ...roundtrip, departDate: null })).rejects.toThrow(
       'A data de ida é obrigatória',

@@ -7,6 +7,7 @@ import type {
   SearchRequest,
   SearchResponse,
 } from '../shared/api'
+import type { MilesPrefs } from '../features/miles/useMilesPrefs'
 import type { Airport, Flight, SearchParams } from '../types'
 import { toISODate } from '../utils/dates'
 
@@ -70,11 +71,20 @@ export function toSearchRequest(params: SearchParams): SearchRequest {
   }
 }
 
-export async function searchFlights(params: SearchParams, signal?: AbortSignal): Promise<SearchResponse> {
+/** `miles` is sent only when the user enabled the miles module. */
+export async function searchFlights(
+  params: SearchParams,
+  signal?: AbortSignal,
+  miles: MilesPrefs | null = null,
+): Promise<SearchResponse> {
+  const body: SearchRequest = toSearchRequest(params)
+  if (miles?.enabled) {
+    body.miles = { program: miles.program, milheiroBrl: miles.milheiroBrl, balance: miles.balance }
+  }
   return request<SearchResponse>('/api/flights/search', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(toSearchRequest(params)),
+    body: JSON.stringify(body),
     signal,
   })
 }

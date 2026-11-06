@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import {
   AlertCircle,
+  BadgePercent,
   Briefcase,
   ChevronDown,
   Leaf,
@@ -13,6 +14,7 @@ import {
 } from 'lucide-react'
 import { AirlineLogo } from './AirlineLogo'
 import { Badge } from './Badge'
+import { awardBeatsCash, MilesPriceLines, PurchaseOptionsList } from './MilesInfo'
 import { formatDuration, formatMoney } from '../utils/format'
 import type { Flight, FlightSlice, Money } from '../types'
 
@@ -167,8 +169,9 @@ export function FlightCard({ flight, passengerCount, isCheapest, isFastest, onVi
   const returnSlice = flight.slices[1]
   const [expanded, setExpanded] = useState(false)
 
+  const milesWin = flight.miles !== null && awardBeatsCash(flight.miles)
   const hasBadges =
-    isCheapest || isFastest || flight.stops.length === 0 || flight.seatsLeft !== null
+    isCheapest || isFastest || flight.stops.length === 0 || flight.seatsLeft !== null || milesWin
 
   return (
     <article className="animate-fade-up rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition-shadow hover:shadow-md sm:p-5">
@@ -188,6 +191,11 @@ export function FlightCard({ flight, passengerCount, isCheapest, isFastest, onVi
           {flight.seatsLeft !== null && (
             <Badge tone="red" icon={AlertCircle}>
               Poucos lugares · restam {flight.seatsLeft}
+            </Badge>
+          )}
+          {milesWin && (
+            <Badge tone="emerald" icon={BadgePercent}>
+              Vale com milhas
             </Badge>
           )}
         </div>
@@ -231,6 +239,7 @@ export function FlightCard({ flight, passengerCount, isCheapest, isFastest, onVi
                 Total {formatMoney(flight.totalPrice, flight.currency)} · {passengerCount} passageiros
               </p>
             )}
+            {flight.miles && <MilesPriceLines miles={flight.miles} />}
           </div>
           <button
             type="button"
@@ -302,6 +311,11 @@ export function FlightCard({ flight, passengerCount, isCheapest, isFastest, onVi
       {expanded && (
         <div className="mt-4 rounded-xl bg-slate-50 p-4">
           <OfferDetails flight={flight} />
+          {flight.miles && (
+            <div className="mt-4 border-t border-slate-200 pt-3">
+              <PurchaseOptionsList miles={flight.miles} />
+            </div>
+          )}
         </div>
       )}
     </article>
