@@ -26,6 +26,7 @@ export async function POST(request: Request): Promise<Response> {
         programName: program.name,
         milheiroBrl: req.miles.milheiroBrl ?? program.defaultMilheiroBrl,
         balance: req.miles.balance,
+        passengers: req.passengers.adults + req.passengers.children,
       }
     }
 

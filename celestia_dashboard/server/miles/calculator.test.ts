@@ -4,7 +4,7 @@ import { makeFlight } from '../../src/test/flights.js'
 import { valueOffer } from './calculator.js'
 import type { MilesSettings } from './calculator.js'
 
-const smiles: MilesSettings = { program: 'smiles', programName: 'Smiles (GOL)', milheiroBrl: 22, balance: 100_000 }
+const smiles: MilesSettings = { program: 'smiles', programName: 'Smiles (GOL)', milheiroBrl: 22, balance: 100_000, passengers: 1 }
 
 const brlOffer = (price: number) => makeFlight({ id: `off_${price}`, price, totalPrice: price * 2, currency: 'BRL' })
 
@@ -116,6 +116,15 @@ describe('valueOffer', () => {
     expect(result.options.find((o) => o.strategy === 'award')?.notes).toContain('Saldo insuficiente: faltam 47.655 milhas')
   })
 
+  it('compares the balance with the miles for every seated passenger', () => {
+    const notes = (balance: number, passengers: number) =>
+      valueOffer(brlOffer(2200), { ...smiles, balance, passengers }, award(), 'economy').options.find((o) => o.strategy === 'award')?.notes
+    // 60,000 x 3 - 100,000
+    expect(notes(100_000, 3)).toContain('Saldo insuficiente: faltam 80.000 milhas para 3 passageiros')
+    expect(notes(180_000, 3)?.join(' ')).not.toContain('Saldo insuficiente')
+    expect(notes(12_345, 1)).toContain('Saldo insuficiente: faltam 47.655 milhas')
+  })
+
   it('has no balance note when the balance covers the award exactly', () => {
     const result = valueOffer(brlOffer(2200), { ...smiles, balance: 60_000 }, award(), 'economy')
     expect(result.options.find((o) => o.strategy === 'award')?.notes.join(' ')).not.toContain('Saldo insuficiente')
@@ -126,12 +135,15 @@ describe('valueOffer', () => {
     expect(result.options.find((o) => o.strategy === 'award')?.notes).toContain('Voos podem diferir da oferta')
   })
 
-  it('treats missing taxes as zero BRL with a note', () => {
-    const result = valueOffer(brlOffer(2200), smiles, award({ taxes: null }), 'economy')
+  it('does not value an award with unknown taxes: shown as R$ 0, no total, breakeven or verdict, ranked last', () => {
+    // Without taxes 60 x 22 = 1320 would undercut the 1400 cash fare; unknown taxes must not win that way.
+    const result = valueOffer(brlOffer(1400), smiles, award({ taxes: null }), 'economy')
     const option = result.options.find((o) => o.strategy === 'award')
     expect(option?.cash).toEqual({ amount: 0, currency: 'BRL' })
-    expect(option?.effectiveTotalBrl).toBe(1320)
-    expect(option?.notes[0]).toBe('Taxas não informadas pelo provedor')
+    expect(option?.effectiveTotalBrl).toBeNull()
+    expect(option?.breakevenMilheiroBrl).toBeNull()
+    expect(option?.notes).toEqual(['Taxas não informadas pelo provedor'])
+    expect(result.options.map((o) => o.strategy)).toEqual(['cash', 'award'])
   })
 
   it('does not value an award whose taxes are in another currency', () => {

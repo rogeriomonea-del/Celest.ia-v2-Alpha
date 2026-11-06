@@ -8,6 +8,8 @@ export interface MilesSettings {
   /** BRL per 1,000 miles; null = unknown, so nothing is valued. */
   milheiroBrl: number | null
   balance: number
+  /** Seated passengers (adults + children); each needs the award's miles. */
+  passengers: number
 }
 
 const round2 = (value: number) => Math.round(value * 100) / 100
@@ -37,10 +39,11 @@ function cashOption(offer: Flight, cabin: CabinClass): PurchaseOption {
 
 function awardOption(award: AwardFare, settings: MilesSettings, cash: PurchaseOption): PurchaseOption {
   const notes: string[] = []
+  // Unknown taxes are shown as R$ 0 but never valued as zero: the award then has no effective total or breakeven.
   const taxes = award.taxes ? { amount: round2(award.taxes.amount), currency: award.taxes.currency } : { amount: 0, currency: 'BRL' }
   if (!award.taxes) notes.push('Taxas não informadas pelo provedor')
 
-  const taxesBrl = brlAmount(taxes)
+  const taxesBrl = award.taxes ? brlAmount(taxes) : null
   const milheiro = award.program === settings.program ? settings.milheiroBrl : null
   const effectiveTotalBrl =
     taxesBrl !== null && milheiro !== null ? round2(taxesBrl + (award.miles / 1000) * milheiro) : null
@@ -53,8 +56,10 @@ function awardOption(award: AwardFare, settings: MilesSettings, cash: PurchaseOp
   if (milheiro !== null && breakeven !== null && milheiro <= breakeven) {
     notes.push(`Vale a pena com milheiro <= ${brl(breakeven)}`)
   }
-  if (award.program === settings.program && settings.balance < award.miles) {
-    notes.push(`Saldo insuficiente: faltam ${milesText(award.miles - settings.balance)} milhas`)
+  const milesNeeded = award.miles * settings.passengers
+  if (award.program === settings.program && settings.balance < milesNeeded) {
+    const forWhom = settings.passengers > 1 ? ` para ${settings.passengers} passageiros` : ''
+    notes.push(`Saldo insuficiente: faltam ${milesText(milesNeeded - settings.balance)} milhas${forWhom}`)
   }
   if (!award.matchesItinerary) notes.push('Voos podem diferir da oferta')
   if (effectiveTotalBrl !== null && milheiro !== null) {

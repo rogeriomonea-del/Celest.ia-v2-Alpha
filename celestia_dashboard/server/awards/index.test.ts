@@ -3,9 +3,12 @@ import type { SearchRequest } from '../../src/shared/api.js'
 import type { AwardFare } from '../../src/types.js'
 import type { MilesSettings } from '../miles/calculator.js'
 import { AWARD_NOTES, lookupAwards } from './index.js'
-import { searchAwards } from './seatsAero.js'
+import { SeatsAeroError, searchAwards } from './seatsAero.js'
 
-vi.mock('./seatsAero.js', () => ({ searchAwards: vi.fn() }))
+vi.mock('./seatsAero.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./seatsAero.js')>()),
+  searchAwards: vi.fn(),
+}))
 const searchAwardsMock = vi.mocked(searchAwards)
 
 const KEY = 'seats_aero_dummy_key_for_unit_tests'
@@ -18,8 +21,8 @@ const req: SearchRequest = {
   passengers: { adults: 1, children: 0, infants: 0 },
   cabin: 'business',
 }
-const smiles: MilesSettings = { program: 'smiles', programName: 'Smiles (GOL)', milheiroBrl: 22, balance: 0 }
-const latam: MilesSettings = { program: 'latampass', programName: 'LATAM Pass', milheiroBrl: 29, balance: 0 }
+const smiles: MilesSettings = { program: 'smiles', programName: 'Smiles (GOL)', milheiroBrl: 22, balance: 0, passengers: 1 }
+const latam: MilesSettings = { program: 'latampass', programName: 'LATAM Pass', milheiroBrl: 29, balance: 0, passengers: 1 }
 
 const fare = (cabin: AwardFare['cabin'], miles: number): AwardFare => ({
   program: 'smiles',
@@ -77,6 +80,21 @@ describe('lookupAwards', () => {
     expect(options.apiKey).toBe(KEY)
   })
 
+  it('asks for the seated passengers and drops awards known to have fewer seats, leaving a cabin without one', async () => {
+    const family: SearchRequest = { ...req, passengers: { adults: 2, children: 1, infants: 1 } }
+    searchAwardsMock.mockResolvedValue([
+      { ...fare('business', 50_000), seatsLeft: 2 },
+      { ...fare('business', 70_000), seatsLeft: 3 },
+      { ...fare('business', 90_000), seatsLeft: null },
+      { ...fare('economy', 30_000), seatsLeft: 1 },
+    ])
+    const result = await lookupAwards(family, smiles, new AbortController().signal)
+    expect(searchAwardsMock.mock.calls[0][0].passengers).toBe(3)
+    expect(result.candidates.map((a) => a.miles)).toEqual([70_000, 90_000])
+    expect(result.awardsByCabin.business?.miles).toBe(70_000)
+    expect(result.awardsByCabin.economy).toBeUndefined()
+  })
+
   it('turns a provider error into a note, never a failure, and does not log the key', async () => {
     searchAwardsMock.mockRejectedValue(new Error(`HTTP 500 for key ${KEY}`))
     const result = await lookupAwards(req, smiles, new AbortController().signal)
@@ -84,6 +102,14 @@ describe('lookupAwards', () => {
     const logged = vi.mocked(console.error).mock.calls.map((args) => args.map(String).join(' ')).join('\n')
     expect(logged).toContain('[awards]')
     expect(logged).not.toContain(KEY)
+  })
+
+  it('reports the daily limit for a 429 and the generic note for other provider errors', async () => {
+    searchAwardsMock.mockRejectedValueOnce(new SeatsAeroError('seats.aero /search -> 429: limite de consultas atingido', 429))
+    expect((await lookupAwards(req, smiles, new AbortController().signal)).awardsNote).toBe(AWARD_NOTES.dailyLimit)
+    expect(AWARD_NOTES.dailyLimit).toBe('Limite diário de consultas de award atingido.')
+    searchAwardsMock.mockRejectedValueOnce(new SeatsAeroError('seats.aero /search -> 401: chave inválida', 401))
+    expect((await lookupAwards(req, smiles, new AbortController().signal)).awardsNote).toBe(AWARD_NOTES.failed)
   })
 
   it('gives up on a provider that hangs once the timeout elapses, aborting its signal', async () => {

@@ -1,7 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { findMilesProgram } from '../../src/shared/miles.js'
 import type { AwardLookup } from './index.js'
-import { AWARD_CACHE_TTL_MS, clearAwardCache, SeatsAeroError, searchAwards } from './seatsAero.js'
+import {
+  AUTH_FAILURE_BLOCK_MS,
+  AWARD_CACHE_MAX_ENTRIES,
+  AWARD_CACHE_TTL_MS,
+  clearAwardCache,
+  MAX_AWARDS_PER_DIRECTION,
+  MAX_ROUND_TRIP_PAIRS,
+  SeatsAeroError,
+  searchAwards,
+} from './seatsAero.js'
 
 const KEY = 'seats_aero_dummy_key_for_unit_tests'
 const fetchMock = vi.fn<typeof fetch>()
@@ -14,6 +23,7 @@ const lookup = (over: Partial<AwardLookup> = {}): AwardLookup => ({
   date: '2024-05-01',
   returnDate: null,
   program: connectmiles,
+  passengers: 1,
   ...over,
 })
 
@@ -190,14 +200,78 @@ describe('searchAwards (seats.aero)', () => {
     expect(`${error.message} ${error.bodySnippet}`).not.toContain(KEY)
   })
 
-  it('throws "limite de consultas atingido" on 429 and errors on a non-JSON body, caching neither', async () => {
-    fetchMock.mockResolvedValueOnce(new Response('slow down', { status: 429 }))
-    await expect(searchAwards(lookup(), options())).rejects.toThrow('limite de consultas atingido')
+  it('errors on a 500 and on a non-JSON body without caching either, so the next lookup calls again', async () => {
+    fetchMock.mockResolvedValueOnce(new Response('boom', { status: 500 }))
+    await expect(searchAwards(lookup(), options())).rejects.toThrow('erro do provedor')
     fetchMock.mockResolvedValueOnce(new Response('<html>', { status: 200 }))
     await expect(searchAwards(lookup(), options())).rejects.toBeInstanceOf(SeatsAeroError)
     fetchMock.mockResolvedValueOnce(ok([row()]))
     expect(await searchAwards(lookup(), options())).toHaveLength(1)
     expect(fetchMock).toHaveBeenCalledTimes(3)
+  })
+
+  it('after a 429 makes no call, for any route, until the next UTC midnight', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-11-06T15:00:00Z'))
+    fetchMock.mockResolvedValueOnce(new Response('slow down', { status: 429 }))
+    await expect(searchAwards(lookup(), options())).rejects.toThrow('limite de consultas atingido')
+
+    vi.setSystemTime(new Date('2026-11-06T23:59:59Z'))
+    const again = await searchAwards(lookup({ destination: 'MAD' }), options()).catch((e: unknown) => e)
+    expect(again).toBeInstanceOf(SeatsAeroError)
+    expect((again as SeatsAeroError).status).toBe(429)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+
+    vi.setSystemTime(new Date('2026-11-07T00:00:00Z'))
+    fetchMock.mockResolvedValueOnce(ok([row()]))
+    expect(await searchAwards(lookup(), options())).toHaveLength(1)
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('after a 401 makes no call for 60 minutes', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    fetchMock.mockResolvedValueOnce(new Response('unauthorized', { status: 401 }))
+    await expect(searchAwards(lookup(), options())).rejects.toThrow('chave inválida')
+
+    vi.advanceTimersByTime(AUTH_FAILURE_BLOCK_MS - 1)
+    const again = await searchAwards(lookup(), options()).catch((e: unknown) => e)
+    expect((again as SeatsAeroError).status).toBe(401)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+
+    vi.advanceTimersByTime(1)
+    fetchMock.mockResolvedValueOnce(ok([row()]))
+    expect(await searchAwards(lookup(), options())).toHaveLength(1)
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('shares one call between concurrent identical lookups', async () => {
+    fetchMock.mockImplementation(async () => ok([row()]))
+    const [first, second] = await Promise.all([searchAwards(lookup(), options()), searchAwards(lookup(), options())])
+    expect(first.map((f) => f.miles)).toEqual([70000])
+    expect(second.map((f) => f.miles)).toEqual([70000])
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps only the cheapest awards per direction', async () => {
+    const trips = Array.from({ length: MAX_AWARDS_PER_DIRECTION + 20 }, (_, i) =>
+      trip({ MileageCost: 100_000 - i * 1000, FlightNumbers: `CM${i}` }),
+    )
+    fetchMock.mockResolvedValue(ok([row({ AvailabilityTrips: trips })]))
+    const fares = await searchAwards(lookup(), options())
+    expect(fares).toHaveLength(MAX_AWARDS_PER_DIRECTION)
+    expect(fares[0].miles).toBe(31_000)
+    expect(fares.at(-1)?.miles).toBe(80_000)
+  })
+
+  it(`caches at most ${AWARD_CACHE_MAX_ENTRIES} directions, evicting the oldest`, async () => {
+    fetchMock.mockImplementation(async () => ok([]))
+    const day = (i: number) => new Date(Date.UTC(2024, 0, 1) + i * 86_400_000).toISOString().slice(0, 10)
+    for (let i = 0; i <= AWARD_CACHE_MAX_ENTRIES; i++) await searchAwards(lookup({ date: day(i) }), options())
+    expect(fetchMock).toHaveBeenCalledTimes(AWARD_CACHE_MAX_ENTRIES + 1)
+    await searchAwards(lookup({ date: day(AWARD_CACHE_MAX_ENTRIES) }), options())
+    expect(fetchMock).toHaveBeenCalledTimes(AWARD_CACHE_MAX_ENTRIES + 1)
+    await searchAwards(lookup({ date: day(0) }), options())
+    expect(fetchMock).toHaveBeenCalledTimes(AWARD_CACHE_MAX_ENTRIES + 2)
   })
 
   it('answers a repeated lookup from the cache until the TTL expires', async () => {
@@ -273,6 +347,61 @@ describe('searchAwards (seats.aero)', () => {
     it('has no award when one direction has none', async () => {
       fetchMock.mockResolvedValue(ok([out()]))
       expect(await searchAwards(rt, options())).toEqual([])
+    })
+
+    it('caches each direction, so a one-way lookup reuses a leg fetched for a round trip', async () => {
+      fetchMock.mockResolvedValue(ok([out(), ret()]))
+      await searchAwards(rt, options())
+      const outbound = await searchAwards(lookup({ origin: 'GRU', destination: 'PTY', date: '2024-05-01' }), options())
+      const inbound = await searchAwards(lookup({ origin: 'PTY', destination: 'GRU', date: '2024-05-10' }), options())
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+      expect(outbound.map((f) => f.miles)).toEqual([70000])
+      expect(inbound.map((f) => f.miles)).toEqual([70000])
+    })
+
+    it('fetches only the missing direction when the other is cached', async () => {
+      fetchMock.mockResolvedValueOnce(ok([out()]))
+      await searchAwards(lookup({ origin: 'GRU', destination: 'PTY', date: '2024-05-01' }), options())
+      fetchMock.mockResolvedValueOnce(ok([ret()]))
+      expect((await searchAwards(rt, options())).map((f) => f.miles)).toEqual([140000])
+      expect(fetchMock).toHaveBeenCalledTimes(2)
+      const sent = new URL(String(fetchMock.mock.calls[1][0])).searchParams
+      expect([sent.get('origin_airport'), sent.get('start_date'), sent.get('end_date')]).toEqual(['PTY', '2024-05-10', '2024-05-10'])
+    })
+
+    it('keeps the leg that succeeded when the other fails', async () => {
+      const far = { ...rt, returnDate: '2024-07-01' }
+      fetchMock.mockImplementation(async (url) =>
+        new URL(String(url)).searchParams.get('origin_airport') === 'GRU' ? ok([out()]) : new Response('boom', { status: 500 }),
+      )
+      await expect(searchAwards(far, options())).rejects.toBeInstanceOf(SeatsAeroError)
+      fetchMock.mockReset()
+      fetchMock.mockResolvedValue(ok([ret({ Date: '2024-07-01' })]))
+      expect((await searchAwards(far, options())).map((f) => f.miles)).toEqual([140000])
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+      expect(new URL(String(fetchMock.mock.calls[0][0])).searchParams.get('origin_airport')).toBe('PTY')
+    })
+
+    it('drops a leg known to have too few seats before pairing, even when the other leg has no seat count', async () => {
+      fetchMock.mockResolvedValue(
+        ok([
+          out({ AvailabilityTrips: [trip({ MileageCost: 30000, RemainingSeats: 1 }), trip({ MileageCost: 50000, RemainingSeats: 2 })] }),
+          ret({ AvailabilityTrips: [trip({ MileageCost: 20000, RemainingSeats: 0 })] }),
+        ]),
+      )
+      expect((await searchAwards({ ...rt, passengers: 2 }, options())).map((f) => f.miles)).toEqual([70000])
+      expect((await searchAwards({ ...rt, passengers: 1 }, options())).map((f) => f.miles)).toEqual([50000, 70000])
+    })
+
+    it(`returns at most ${MAX_ROUND_TRIP_PAIRS} pairs, cheapest first`, async () => {
+      const trips = (prefix: string) =>
+        Array.from({ length: MAX_AWARDS_PER_DIRECTION }, (_, i) => trip({ MileageCost: 10_000 + i * 1000, FlightNumbers: `${prefix}${i}` }))
+      fetchMock.mockResolvedValue(ok([out({ AvailabilityTrips: trips('CM') }), ret({ AvailabilityTrips: trips('TK') })]))
+      const fares = await searchAwards(rt, options())
+      expect(fares).toHaveLength(MAX_ROUND_TRIP_PAIRS)
+      expect(fares[0].miles).toBe(20_000)
+      const miles = fares.map((f) => f.miles)
+      expect(miles).toEqual([...miles].sort((a, b) => a - b))
     })
 
     it('makes one call per direction when the dates are more than 30 days apart', async () => {
