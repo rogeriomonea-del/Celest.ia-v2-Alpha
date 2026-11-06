@@ -222,7 +222,11 @@ function faresFor(rows: SeatsAeroAvailability[], direction: Direction, lookup: A
   return fares
 }
 
-/** Outbound + return as one round-trip award. */
+/**
+ * Outbound + return as one round-trip award. Taxes in two different currencies cannot be
+ * summed, so they stay null (unknown); the calculator then leaves the award unvalued instead
+ * of counting the taxes as R$ 0.
+ */
 export function combineAwards(out: AwardFare, ret: AwardFare): AwardFare {
   const taxes =
     out.taxes && ret.taxes && out.taxes.currency === ret.taxes.currency

@@ -37,10 +37,11 @@ function cashOption(offer: Flight, cabin: CabinClass): PurchaseOption {
 
 function awardOption(award: AwardFare, settings: MilesSettings, cash: PurchaseOption): PurchaseOption {
   const notes: string[] = []
+  // Unknown taxes are shown as R$ 0 but never valued as zero: the award then has no effective total or breakeven.
   const taxes = award.taxes ? { amount: round2(award.taxes.amount), currency: award.taxes.currency } : { amount: 0, currency: 'BRL' }
   if (!award.taxes) notes.push('Taxas não informadas pelo provedor')
 
-  const taxesBrl = brlAmount(taxes)
+  const taxesBrl = award.taxes ? brlAmount(taxes) : null
   const milheiro = award.program === settings.program ? settings.milheiroBrl : null
   const effectiveTotalBrl =
     taxesBrl !== null && milheiro !== null ? round2(taxesBrl + (award.miles / 1000) * milheiro) : null
