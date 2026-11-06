@@ -7,13 +7,14 @@ import type { Flight, FlightMiles, PurchaseOption } from '../types'
 
 const plain = (text: string | null) => (text ?? '').replace(/\s/g, ' ')
 
-function renderCard(flight: Flight, passengerCount = 1, onViewOffer = vi.fn()) {
+function renderCard(flight: Flight, passengerCount = 1, onViewOffer = vi.fn(), milheiro: number | null = 29) {
   render(
     <FlightCard
       flight={flight}
       passengerCount={passengerCount}
       isCheapest={false}
       isFastest={false}
+      milheiro={milheiro}
       onViewOffer={onViewOffer}
     />,
   )
@@ -164,24 +165,39 @@ describe('FlightCard miles', () => {
     expect(screen.queryByText('Vale com milhas')).not.toBeInTheDocument()
   })
 
-  it('shows the fare in miles with the milheiro used in its title', () => {
-    renderCard(makeFlight({ miles: makeMiles({ equivalentMiles: 52900 }) }))
+  /** Miles as the server values a fare whose award is in another program: no option carries a milheiro. */
+  function noOptionMilheiro(overrides: Partial<FlightMiles> = {}): FlightMiles {
+    const base = makeMiles(overrides)
+    return { ...base, options: base.options.map((option) => ({ ...option, milheiroBrl: null })) }
+  }
+
+  it('shows the fare in miles with the search milheiro in its title', () => {
+    renderCard(makeFlight({ miles: noOptionMilheiro({ equivalentMiles: 52900 }) }), 1, vi.fn(), 22)
     const line = screen.getByText('≈ 52.900 milhas')
-    expect(plain(line.getAttribute('title'))).toBe('ao milheiro de R$ 29')
+    expect(plain(line.getAttribute('title'))).toBe('ao milheiro de R$ 22')
   })
 
-  it('asks for the milheiro when the fare could not be valued for lack of one', () => {
-    const base = makeMiles()
-    renderCard(
-      makeFlight({
-        miles: {
-          ...base,
-          equivalentMiles: null,
-          options: base.options.map((option) => ({ ...option, milheiroBrl: null, effectiveTotalBrl: null })),
-        },
-      }),
-    )
-    expect(screen.getByText(/informe o milheiro/)).toBeInTheDocument()
+  it('asks for the milheiro when the search had none', () => {
+    const base = makeMiles({ equivalentMiles: null })
+    const miles = { ...base, options: base.options.map((option) => ({ ...option, milheiroBrl: null, effectiveTotalBrl: null })) }
+    renderCard(makeFlight({ miles }), 1, vi.fn(), null)
+    expect(screen.getByText('Em milhas: informe o milheiro')).toBeInTheDocument()
+    expect(screen.queryByText(/≈/)).not.toBeInTheDocument()
+  })
+
+  it('says a non-BRL fare is not converted, instead of asking for a milheiro the user already set', () => {
+    const base = noOptionMilheiro({ equivalentMiles: null })
+    const miles = {
+      ...base,
+      options: base.options.map((option) =>
+        option.strategy === 'cash'
+          ? { ...option, cash: { amount: 650, currency: 'USD' }, effectiveTotalBrl: null }
+          : { ...option, effectiveTotalBrl: null },
+      ),
+    }
+    renderCard(makeFlight({ price: 650, totalPrice: 650, currency: 'USD', miles }), 1, vi.fn(), 29)
+    expect(screen.getByText('Em milhas: tarifa em USD, sem conversão')).toBeInTheDocument()
+    expect(screen.queryByText(/informe o milheiro/)).not.toBeInTheDocument()
     expect(screen.queryByText(/≈/)).not.toBeInTheDocument()
   })
 
@@ -220,6 +236,13 @@ describe('FlightCard miles', () => {
 
     // Unknown effective cost (no milheiro): no claim either way.
     renderCard(makeFlight({ miles: withTotals(null, 3500) }))
+    expect(screen.queryByText('Vale com milhas')).not.toBeInTheDocument()
+  })
+
+  it('does not badge "Vale com milhas" for a cheaper award that may be on other flights', () => {
+    const miles = withTotals(1920, 3500)
+    renderCard(makeFlight({ miles: { ...miles, award: { ...miles.award!, matchesItinerary: false } } }))
+    expect(screen.getByText(/voos podem diferir/)).toBeInTheDocument()
     expect(screen.queryByText('Vale com milhas')).not.toBeInTheDocument()
   })
 

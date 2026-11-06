@@ -3,7 +3,7 @@ import { Coins } from 'lucide-react'
 import { useClickOutside } from '../hooks/useClickOutside'
 import { effectiveMilheiro, type MilesPrefs } from '../features/miles/useMilesPrefs'
 import { findMilesProgram, MILES_PROGRAMS } from '../shared/miles'
-import { formatMilheiro } from '../utils/format'
+import { formatMilheiro, formatMiles } from '../utils/format'
 
 interface MilesControlProps {
   prefs: MilesPrefs
@@ -45,10 +45,16 @@ function parseDraft(draft: Draft): MilesPrefs | string {
     if (!Number.isFinite(value) || value <= 0 || value > MAX_MILHEIRO) return 'Milheiro inválido'
     milheiroBrl = value
   }
-  const balanceText = draft.balance.trim()
-  const balance = balanceText === '' ? 0 : Number(balanceText)
-  if (!Number.isInteger(balance) || balance < 0 || balance > MAX_BALANCE) return 'Saldo de milhas inválido'
+  const balance = parseBalance(draft.balance)
+  if (balance === null || balance > MAX_BALANCE) return 'Saldo de milhas inválido'
   return { enabled: draft.enabled, program: draft.program, milheiroBrl, balance }
+}
+
+/** pt-BR balance text ("60.000", "60 000", "60000") -> miles; '' -> 0; anything else -> null. */
+function parseBalance(text: string): number | null {
+  const digits = text.replace(/[.\s]/g, '')
+  if (digits === '') return 0
+  return /^\d+$/.test(digits) ? Number(digits) : null
 }
 
 /** Trigger text: "Milhas: LATAM Pass · R$ 29" when enabled. */
@@ -108,6 +114,10 @@ export function MilesControl({ prefs, onApply }: MilesControlProps) {
     }))
   }
 
+  const parsedBalance = parseBalance(draft.balance)
+  const balancePreview =
+    parsedBalance === null || draft.balance.trim() === '' ? '' : `${formatMiles(parsedBalance)} milhas`
+
   const apply = () => {
     const parsed = parseDraft(draft)
     if (typeof parsed === 'string') {
@@ -140,7 +150,7 @@ export function MilesControl({ prefs, onApply }: MilesControlProps) {
           id={panelId}
           role="dialog"
           aria-label="Preferências de milhas"
-          className="absolute left-0 top-full z-30 mt-2 w-[min(20rem,calc(100vw-3rem))] animate-pop space-y-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-xl shadow-slate-900/10"
+          className="absolute left-0 top-full z-30 sm:left-auto sm:right-0 mt-2 w-[min(20rem,calc(100vw-3rem))] animate-pop space-y-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-xl shadow-slate-900/10"
         >
           <div className="flex items-center justify-between">
             <span id={`${panelId}-switch`} className="text-sm font-semibold text-slate-900">
@@ -202,17 +212,22 @@ export function MilesControl({ prefs, onApply }: MilesControlProps) {
             <label htmlFor={balanceId} className="mb-1 block text-xs font-semibold text-slate-600">
               Saldo de milhas
             </label>
-            <input
-              id={balanceId}
-              type="number"
-              inputMode="numeric"
-              min={0}
-              step={1}
-              placeholder="0"
-              value={draft.balance}
-              onChange={(event) => setDraft((current) => ({ ...current, balance: event.target.value }))}
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900"
-            />
+            <div className="flex items-center gap-2">
+              <input
+                id={balanceId}
+                type="text"
+                inputMode="numeric"
+                autoComplete="off"
+                placeholder="0"
+                aria-describedby={`${balanceId}-parsed`}
+                value={draft.balance}
+                onChange={(event) => setDraft((current) => ({ ...current, balance: event.target.value }))}
+                className="min-w-0 flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900"
+              />
+              <span id={`${balanceId}-parsed`} className="shrink-0 text-xs text-slate-500">
+                {balancePreview}
+              </span>
+            </div>
           </div>
 
           <p className="text-xs text-slate-500">Milheiro = quanto você paga por 1.000 milhas (compra/transferência).</p>

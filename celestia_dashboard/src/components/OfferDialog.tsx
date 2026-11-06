@@ -10,6 +10,8 @@ interface OfferDialogProps {
   /** Offer as shown on the card; re-fetched on open for the current price. */
   flight: Flight
   passengerCount: number
+  /** Milheiro the search valued the card's miles at; null when none was set. */
+  milheiro: number | null
   onClose: () => void
   /** Re-runs the current search (used when the offer expired). */
   onResearch: () => void
@@ -27,7 +29,7 @@ const FOCUSABLE =
 const timeFormatter = new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit' })
 
 /** Modal with the refreshed offer. Mirrors LoginDialog's focus/Escape handling. */
-export function OfferDialog({ flight, passengerCount, onClose, onResearch }: OfferDialogProps) {
+export function OfferDialog({ flight, passengerCount, milheiro, onClose, onResearch }: OfferDialogProps) {
   const titleId = useId()
   const dialogRef = useRef<HTMLDivElement>(null)
   const closeRef = useRef<HTMLButtonElement>(null)
@@ -83,6 +85,10 @@ export function OfferDialog({ flight, passengerCount, onClose, onResearch }: Off
   }
 
   const money = (value: number, currency: string) => formatMoney(value, currency)
+  // Compare what the user sees: BRL is shown without cents.
+  const priceChanged =
+    state.kind === 'ready' &&
+    money(state.offer.totalPrice, state.offer.currency) !== money(flight.totalPrice, flight.currency)
 
   return (
     <div
@@ -149,8 +155,7 @@ export function OfferDialog({ flight, passengerCount, onClose, onResearch }: Off
                 <p className="text-sm text-slate-600">
                   {money(state.offer.price, state.offer.currency)} por pessoa
                 </p>
-                {/* Compare what the user sees: BRL is shown without cents. */}
-                {money(state.offer.totalPrice, state.offer.currency) !== money(flight.totalPrice, flight.currency) && (
+                {priceChanged && (
                   <p className="mt-1 text-sm font-medium text-amber-700">
                     O preço mudou desde a busca (antes {money(flight.totalPrice, flight.currency)}).
                   </p>
@@ -161,8 +166,14 @@ export function OfferDialog({ flight, passengerCount, onClose, onResearch }: Off
               </div>
               {/* The emissions bucket is relative to the search results, so keep the card's. */}
               <OfferDetails flight={{ ...state.offer, emissions: flight.emissions }} />
-              {/* The re-fetched offer carries no miles: keep the card's valuation. */}
-              {flight.miles && <MilesBlock miles={flight.miles} />}
+              {/* The re-fetched offer carries no miles: keep the card's valuation, flagged when the price moved. */}
+              {flight.miles && (
+                <MilesBlock
+                  miles={flight.miles}
+                  milheiro={milheiro}
+                  label={priceChanged ? 'Valores da busca (preço mudou)' : undefined}
+                />
+              )}
               <p className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-600">Reserva online em breve.</p>
             </div>
           )}

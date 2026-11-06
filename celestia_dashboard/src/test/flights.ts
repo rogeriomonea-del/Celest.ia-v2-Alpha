@@ -101,7 +101,8 @@ export function makeMiles(overrides: Partial<FlightMiles> = {}): FlightMiles {
         cash: { amount: 3500, currency: 'BRL' },
         miles: 0,
         program: null,
-        milheiroBrl: 29,
+        // Like the server's calculator: the cash option spends no miles, so it carries no milheiro.
+        milheiroBrl: null,
         effectiveTotalBrl: 3500,
         breakevenMilheiroBrl: null,
         notes: [],
