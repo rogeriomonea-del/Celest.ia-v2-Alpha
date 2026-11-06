@@ -6,15 +6,16 @@ buscas, entra com Google ou Apple.
 - **Busca de voos real** via [Duffel](https://duffel.com) (aeroportos, ofertas e preços).
 - **Login Google/Apple** via Supabase Auth.
 - **Buscas salvas** em Postgres (Supabase) com RLS por usuário.
-- Fora da v1: reserva/pagamento e programas de milhas.
+- **Módulo de milhas**: equivalente em milhas pelo milheiro do programa, award real via seats.aero (Smiles, TudoAzul, ConnectMiles e internacionais), custo efetivo e milheiro de equilíbrio.
+- Fora da v1: reserva/pagamento.
 
 ## Arquitetura
 
 ```text
 Navegador (SPA Vite + React)
    |
-   |-- /api/*  --> Funções Vercel (celestia_dashboard/api) --> Duffel API
-   |                 (token DUFFEL_ACCESS_TOKEN só no servidor)
+   |-- /api/*  --> Funções Vercel (celestia_dashboard/api) --> Duffel API (ofertas)
+   |                 (tokens só no servidor)           `--> seats.aero API (awards)
    |
    `-- Supabase Auth (Google/Apple) e Supabase DB (saved_searches, RLS)
 ```
@@ -37,10 +38,11 @@ O `vercel.json` da raiz do repositório pertence a um segundo projeto Vercel,
 ├── celestia_dashboard/
 │   ├── src/                 # SPA (React + TS + Tailwind); src/shared = contrato HTTP (zod)
 │   ├── api/                 # funções Vercel (/api/*)
-│   ├── server/              # lógica de servidor (cliente Duffel, validação)
+│   ├── server/              # lógica de servidor (Duffel, seats.aero, milhas, validação)
+│   ├── supabase/migrations/ # SQL (saved_searches + RLS + limites)
 │   ├── vercel.json          # build, funções e cabeçalhos de segurança (CSP)
 │   └── .env.example
-├── supabase/migrations/     # SQL (saved_searches + RLS)
+├── engine/                  # motor Python multi-agente do dono (guardado, desligado; ver engine/README.md)
 ├── docs/go-live-plan.md     # decisões e checklist de go-live
 ├── tests/                   # testes dos protótipos Python
 ├── research_planner.py      # protótipo legado
