@@ -7,6 +7,7 @@ environment variables). See ``.env.example`` for the full catalogue.
 
 from __future__ import annotations
 
+import logging
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -251,6 +252,14 @@ def load_settings() -> Settings:
         mock_mode=_env("CELESTIA_MOCK", "") in {"1", "true", "yes"},
     )
     for program in list(settings.milheiro_brl):
-        override = _env_float(f"MILHEIRO_{program.upper()}", settings.milheiro_brl[program])
+        name = f"MILHEIRO_{program.upper()}"
+        override = _env_float(name, settings.milheiro_brl[program])
+        if override <= 0:
+            # milheiro <= 0 quebraria toda busca: volta ao padrão e avisa
+            logging.getLogger(__name__).warning(
+                "%s=%s inválido (deve ser > 0); usando o padrão R$ %.2f",
+                name, _env(name), settings.milheiro_brl[program],
+            )
+            continue
         settings.milheiro_brl[program] = override
     return settings

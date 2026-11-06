@@ -37,6 +37,7 @@ from .models import (
     PurchaseOption,
     SearchReport,
     SearchRequest,
+    offer_identity,
 )
 
 _PRESETS = {"1w", "2w", "3w", "1m", "custom"}
@@ -246,7 +247,8 @@ def _airline_label(offer: FlightOffer, settings: Settings) -> str:
 def _flight_json(offer: FlightOffer, settings: Settings, milheiro: float) -> dict:
     raw = offer.raw or {}
     return {
-        "id": offer.itinerary_key() + f":{offer.cabin.value}",
+        # mesma chave da auditoria: placeholders ("CM ?") não geram ids repetidos
+        "id": f"{offer_identity(offer)}:{offer.cabin.value}",
         "carrier": offer.carrier,
         "airlineLabel": _airline_label(offer, settings),
         "flightNumbers": list(offer.flight_numbers),

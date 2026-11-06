@@ -26,6 +26,7 @@ from ..models import (
     SearchReport,
     SearchRequest,
     SearchStats,
+    offer_identity,
 )
 from ..routes import RouteCatalog
 from ..storage import record_carriers, record_report
@@ -282,18 +283,9 @@ class Orchestrator(Agent):
         order: list[str] = []
         dropped = 0
         for offer in offers:
-            key = f"{offer.itinerary_key()}:{offer.cabin.value}"
-            numbers = "/".join(offer.flight_numbers)
-            pair = f"{offer.origin}-{offer.destination}"
-            if not numbers or "?" in numbers or numbers == pair:
-                # sem número de voo real o itinerary_key é um placeholder
-                # idêntico para voos distintos ("CM ?" ou o fallback "GRU-MCO"
-                # do metasearch): discrimina por horário+preço
-                raw = offer.raw or {}
-                key += (
-                    f":{raw.get('departure_time') or ''}"
-                    f":{offer.price_cash_brl or ''}:{offer.price_miles or ''}"
-                )
+            # mesma chave do MilesMathAgent e do id da API (placeholders
+            # "CM ?"/"GRU-MCO" discriminados por horário+preço)
+            key = f"{offer_identity(offer)}:{offer.cabin.value}"
             cash_ok = offer.price_cash_brl is None or offer.price_cash_brl > 0
             miles_ok = offer.price_miles is None or offer.price_miles > 0
             if not (cash_ok and miles_ok):

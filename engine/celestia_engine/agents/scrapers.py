@@ -17,11 +17,13 @@ sistema aprende qual fluxo vale mais a pena para cada site.
 
 from __future__ import annotations
 
+import asyncio
 import time
 from datetime import date
 
 from ..models import Cabin, FlightOffer, Route
 from ..providers import firecrawl, firecrawl_interact
+from ..providers.firecrawl import _SITE_META as _URL_META
 from ..providers.airline_scraper import scrape_airline
 from ..providers.base import ProviderError, ProviderNotConfigured
 from ..providers.mock import mock_offers
@@ -40,13 +42,24 @@ async def _strategy_firecrawl_interact(agent, route, depart):
     )
 
 
+def _cabins_for(agent) -> tuple[Cabin, ...]:
+    """Só templates com ``{cabin}`` (LATAM) mudam de página por cabine. Os
+    demais (Copa/GOL/Azul) abrem sempre a mesma busca padrão — econômica —,
+    então uma 2ª passada rasparia a MESMA página e rotularia econômica como
+    executiva. Para eles: uma passada só, marcada ECONOMY."""
+    template = getattr(agent.ctx.settings, _URL_META[agent.site][3], "")
+    if "{cabin}" in template:
+        return (Cabin.ECONOMY, Cabin.BUSINESS)
+    return (Cabin.ECONOMY,)
+
+
 async def _per_cabin(agent, route, depart, fetch) -> list[FlightOffer]:
     """Roda o fetch por cabine SEM perder o que já veio: se a executiva
     falhar depois de a econômica responder, as ofertas da econômica ficam.
     Só falha quando NENHUMA cabine trouxe nada."""
     offers: list[FlightOffer] = []
     errors: list[str] = []
-    for cabin in (Cabin.ECONOMY, Cabin.BUSINESS):
+    for cabin in _cabins_for(agent):
         try:
             offers.extend(await fetch(cabin))
         except ProviderNotConfigured:
@@ -129,6 +142,20 @@ class AirlineScraperAgent(Agent):
             started = time.monotonic()
             try:
                 offers = await STRATEGY_FUNCS[strategy](self, route, depart)
+            except asyncio.CancelledError:
+                # teto do subagente (wait_for) cancelou esta estratégia no meio:
+                # registra como falha por timeout antes de propagar o cancelamento
+                record_attempt(
+                    self.ctx.settings, site=self.site, strategy=strategy,
+                    success=False, offers_found=0, duration_s=time.monotonic() - started,
+                )
+                record_route_outcome(
+                    self.ctx.settings, site=self.site, strategy=strategy,
+                    route=route.key(), depart=depart.isoformat(),
+                    success=False, error="timeout",
+                )
+                self.log(f"{strategy} cancelado (timeout do subagente)")
+                raise
             except ProviderNotConfigured as error:
                 # "não configurado/desligado" é skip, NÃO falha de desempenho —
                 # não registra, para não poluir o ranking de aprendizado.

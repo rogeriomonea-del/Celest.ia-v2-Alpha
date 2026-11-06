@@ -59,8 +59,9 @@ class SearchHistoryStore:
     def __init__(self, directory: Path | str):
         self.path = Path(directory) / "searches.csv"
 
-    def record(self, report: SearchReport) -> Path:
-        """Append every quote/offer/option of the report as flat rows."""
+    def record(self, report: SearchReport) -> Path | None:
+        """Append every quote/offer/option of the report as flat rows.
+        None quando não havia nada a gravar."""
         search_id = uuid.uuid4().hex[:12]
         now = datetime.now(timezone.utc).isoformat(timespec="seconds")
         request = report.request
@@ -136,6 +137,8 @@ class SearchHistoryStore:
                 }
             )
 
+        if not rows:
+            return None
         append_rows(self.path, HISTORY_FIELDS, rows)
         return self.path
 

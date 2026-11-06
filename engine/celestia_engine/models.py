@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from enum import Enum
@@ -108,6 +109,28 @@ class FlightOffer:
         return f"{self.carrier}:{'/'.join(self.flight_numbers)}:{self.origin}-{self.destination}:{self.depart.isoformat()}"
 
 
+def has_placeholder_numbers(offer: FlightOffer) -> bool:
+    """Sem número de voo real ("CM ?" ou o fallback "GRU-MCO" do metasearch)."""
+    numbers = "/".join(offer.flight_numbers)
+    return not numbers or "?" in numbers or numbers == f"{offer.origin}-{offer.destination}"
+
+
+def offer_identity(offer: FlightOffer) -> str:
+    """Chave única do itinerário (sem cabine), usada pela auditoria, pelo
+    pareamento de cabines do MilesMathAgent e pelo id da API. Com número de
+    voo placeholder, voos distintos colidiriam: anexa um hash curto e estável
+    de horário + preços."""
+    key = offer.itinerary_key()
+    if not has_placeholder_numbers(offer):
+        return key
+    raw = offer.raw or {}
+    basis = (
+        f"{raw.get('departure_time') or ''}:{offer.price_cash_brl or ''}"
+        f":{offer.price_miles or ''}"
+    )
+    return f"{key}#{hashlib.sha256(basis.encode()).hexdigest()[:8]}"
+
+
 @dataclass
 class PurchaseOption:
     """One evaluated way of buying the trip, ready for ranking."""
@@ -122,6 +145,8 @@ class PurchaseOption:
     breakeven_milheiro_brl: float | None
     offer_key: str
     notes: list[str] = field(default_factory=list)
+    #: programa cujo milheiro foi aplicado (None quando não há milhas)
+    miles_program: str | None = None
 
 
 #: Presets de flexibilidade → raio em dias ao redor da data escolhida.

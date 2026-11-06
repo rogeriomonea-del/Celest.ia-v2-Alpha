@@ -10,9 +10,14 @@ Conceitos:
   estratégia com milhas idêntica, em custo efetivo, à melhor opção 100% em
   dinheiro. Se você consegue comprar milhas abaixo do breakeven, a estratégia
   com milhas vence.
+
+O milheiro é resolvido POR OFERTA: uma emissão LATAM usa o milheiro do LATAM
+Pass mesmo que a busca tenha sido feita com ConnectMiles.
 """
 
 from __future__ import annotations
+
+from typing import Callable
 
 from ..models import (
     Cabin,
@@ -21,6 +26,7 @@ from ..models import (
     SearchRequest,
     Strategy,
     STRATEGY_LABELS,
+    offer_identity,
 )
 
 
@@ -36,14 +42,18 @@ def _miles(value: int) -> str:
 
 
 class PurchaseCalculator:
-    def __init__(self, milheiro_brl_per_1000: float):
-        if milheiro_brl_per_1000 <= 0:
-            raise ValueError("milheiro deve ser positivo")
-        self.milheiro = milheiro_brl_per_1000
+    def __init__(self, milheiro_for: Callable[[str], float], default_program: str):
+        """``milheiro_for``: programa → R$ por 1000 milhas (Settings.milheiro_for).
+        ``default_program``: programa usado quando a oferta não declara o seu."""
+        self.milheiro_for = milheiro_for
+        self.default_program = default_program
 
     # ------------------------------------------------------------------ utils
-    def miles_value_brl(self, miles: int) -> float:
-        return round(miles / 1000 * self.milheiro, 2)
+    def program_of(self, offer: FlightOffer) -> str:
+        return (offer.miles_program or self.default_program).lower()
+
+    def miles_value_brl(self, miles: int, program: str) -> float:
+        return round(miles / 1000 * self.milheiro_for(program), 2)
 
     def _option(
         self,
@@ -55,18 +65,20 @@ class PurchaseCalculator:
         cabin_final: Cabin,
         notes: list[str],
     ) -> PurchaseOption:
-        effective = round(cash + self.miles_value_brl(miles), 2)
+        program = self.program_of(offer) if miles else None
+        effective = round(cash + (self.miles_value_brl(miles, program) if program else 0.0), 2)
         return PurchaseOption(
             strategy=strategy,
             label=STRATEGY_LABELS[strategy],
             cabin_final=cabin_final,
             cash_brl=round(cash, 2),
             miles=miles,
-            milheiro_brl=self.milheiro if miles else None,
+            milheiro_brl=self.milheiro_for(program) if program else None,
             effective_total_brl=effective,
             breakeven_milheiro_brl=None,  # filled in evaluate()
-            offer_key=offer.itinerary_key(),
+            offer_key=offer_identity(offer),
             notes=notes,
+            miles_program=program,
         )
 
     # ------------------------------------------------------------- strategies
@@ -169,27 +181,38 @@ class PurchaseCalculator:
                 current = cash_by_cabin.get(option.cabin_final)
                 if current is None or option.effective_total_brl < current:
                     cash_by_cabin[option.cabin_final] = option.effective_total_brl
-        best_cash_any = min(cash_by_cabin.values(), default=None)
+        request_program = request.program.lower()
         for option in options:
             if option.miles > 0:
-                best_cash = cash_by_cabin.get(option.cabin_final, best_cash_any)
+                program = option.miles_program or request_program
+                milheiro = self.milheiro_for(program)
+                # só a mesma cabine serve de baseline: comparar award de
+                # executiva com econômica em dinheiro distorce o breakeven
+                best_cash = cash_by_cabin.get(option.cabin_final)
                 if best_cash is not None:
                     # milheiro at which this option's effective cost == best cash
                     option.breakeven_milheiro_brl = round(
                         max(0.0, (best_cash - option.cash_brl) / option.miles * 1000), 2
                     )
-                    if self.milheiro <= (option.breakeven_milheiro_brl or 0):
+                    if milheiro <= (option.breakeven_milheiro_brl or 0):
                         option.notes.append(
                             f"vale a pena com milheiro ≤ R$ {option.breakeven_milheiro_brl:.2f}"
                         )
-                if request.miles_balance < option.miles:
+                else:
+                    option.notes.append(
+                        f"sem tarifa em dinheiro de {option.cabin_final.value} para "
+                        "comparar — milheiro de equilíbrio indisponível"
+                    )
+                # o saldo informado é do programa da busca; milhas de outro
+                # programa não podem ser julgadas por ele
+                if program == request_program and request.miles_balance < option.miles:
                     missing = option.miles - request.miles_balance
                     option.notes.append(
                         f"saldo insuficiente: faltam {_miles(missing)} milhas"
                     )
                 option.notes.append(
-                    f"equivalente em dinheiro: R$ {_brl(self.miles_value_brl(option.miles))} "
-                    f"(milheiro R$ {_brl(self.milheiro)})"
+                    f"equivalente em dinheiro: R$ {_brl(self.miles_value_brl(option.miles, program))} "
+                    f"(milheiro {program} R$ {_brl(milheiro)})"
                 )
 
         options.sort(key=lambda o: o.effective_total_brl)

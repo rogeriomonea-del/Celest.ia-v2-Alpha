@@ -36,17 +36,22 @@ class FlexDateScoutAgent(Agent):
         if self.ctx.settings.mock_mode:
             prices = _mock_calendar(request.origin, request.destination, start, end)
         else:
-            try:
-                prices = await firecrawl_interact.scan_calendar(
+            # via spawn: herda o teto SUBAGENT_TIMEOUT_S e o semáforo global;
+            # spawn devolve a exceção (inclusive timeout) como valor
+            prices = await self.ctx.spawn(
+                self.name,
+                f"calendário {request.origin}→{request.destination}",
+                lambda: firecrawl_interact.scan_calendar(
                     self.ctx.settings,
                     origin=request.origin,
                     destination=request.destination,
                     cabin=request.cabin_target,
                     start=start,
                     end=end,
-                )
-            except Exception as error:  # noqa: BLE001 - contrato: nunca lança
-                detail = str(error) or type(error).__name__
+                ),
+            )
+            if isinstance(prices, Exception):  # contrato: nunca lança
+                detail = str(prices) or type(prices).__name__
                 self.log(f"calendário indisponível ({detail}) — usando janela simétrica")
                 return _window_fallback(request, start, end)
 

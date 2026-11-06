@@ -36,6 +36,23 @@ _SITE_META = {
 _CABIN_GF = {Cabin.ECONOMY: "Econômica", Cabin.PREMIUM: "Premium", Cabin.BUSINESS: "Executiva"}
 
 
+#: passos do Interact considerados no orçamento (abrir + 3 passos + fechar).
+BUDGETED_STEPS = 3
+
+
+def interact_timeouts(settings: Settings) -> tuple[float, float]:
+    """(abrir_s, passo_s) derivados de SUBAGENT_TIMEOUT_S para que UMA execução
+    Interact caiba no teto do subagente: abrir ≤ 30s e cada um dos 3 passos
+    ≤ (teto − 40)/3 (40s = abertura + fechamento). Sem teto (0): valores
+    históricos, 40s/150s."""
+    budget = float(settings.subagent_timeout_s or 0)
+    if budget <= 0:
+        return 40.0, 150.0
+    open_s = min(30.0, budget / 4)
+    step_s = max(5.0, (budget - 40.0) / BUDGETED_STEPS)
+    return open_s, step_s
+
+
 async def _headers(settings: Settings) -> dict:
     return {"Authorization": f"Bearer {settings.firecrawl_api_key}"}
 
@@ -45,8 +62,8 @@ async def open_session(settings: Settings, url: str) -> str:
         f"{settings.firecrawl_api_base}/v2/scrape",
         json_body={"url": url},
         headers=await _headers(settings),
-        timeout_s=max(settings.http_timeout_s, 40),
-        retries=2,
+        timeout_s=interact_timeouts(settings)[0],
+        retries=1,  # retry estouraria o orçamento do subagente
     )
     # metadata pode vir ausente OU explicitamente null — dict.get(k, {}) só
     # protege o primeiro caso, então normalizamos para {} defensivamente.
@@ -62,8 +79,9 @@ async def interact(settings: Settings, scrape_id: str, prompt: str) -> str:
         f"{settings.firecrawl_api_base}/v2/scrape/{scrape_id}/interact",
         json_body={"prompt": prompt},
         headers=await _headers(settings),
-        # sessão viva preenchendo formulário real: 60s estourava (ReadTimeout)
-        timeout_s=max(settings.http_timeout_s, 150),
+        # sessão viva preenchendo formulário real: precisa de folga, mas
+        # limitada ao orçamento do subagente (ver interact_timeouts)
+        timeout_s=interact_timeouts(settings)[1],
         retries=1,
     )
     data = payload.get("data")

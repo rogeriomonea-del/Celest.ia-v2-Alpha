@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 
-from ..models import Cabin, FlightOffer, PurchaseOption, SearchRequest
+from ..models import Cabin, FlightOffer, PurchaseOption, SearchRequest, offer_identity
 from ..pricing import PurchaseCalculator
 from .base import Agent
 
@@ -20,13 +20,14 @@ class MilesMathAgent(Agent):
     def evaluate_offers(
         self, offers: list[FlightOffer], request: SearchRequest
     ) -> list[PurchaseOption]:
-        milheiro = self.ctx.settings.milheiro_for(request.program)
-        calculator = PurchaseCalculator(milheiro)
+        settings = self.ctx.settings
+        calculator = PurchaseCalculator(settings.milheiro_for, request.program)
 
-        # pair economy/business shelves of the same itinerary
+        # pair economy/business shelves of the same itinerary; offer_identity
+        # keeps placeholder numbers ("CM ?") from colliding into one slot
         by_itinerary: dict[str, dict[Cabin, FlightOffer]] = defaultdict(dict)
         for offer in offers:
-            by_itinerary[offer.itinerary_key()][offer.cabin] = offer
+            by_itinerary[offer_identity(offer)][offer.cabin] = offer
 
         options: list[PurchaseOption] = []
         for shelves in by_itinerary.values():
@@ -38,6 +39,8 @@ class MilesMathAgent(Agent):
 
         options.sort(key=lambda o: o.effective_total_brl)
         self.log(
-            f"{len(options)} opções calculadas (milheiro {request.program} = R$ {milheiro:.2f})"
+            f"{len(options)} opções calculadas (milheiro {request.program} = "
+            f"R$ {settings.milheiro_for(request.program):.2f}; ofertas de outro "
+            "programa usam o milheiro dele)"
         )
         return options
