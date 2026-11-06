@@ -21,8 +21,8 @@ const req: SearchRequest = {
   passengers: { adults: 1, children: 0, infants: 0 },
   cabin: 'business',
 }
-const smiles: MilesSettings = { program: 'smiles', programName: 'Smiles (GOL)', milheiroBrl: 22, balance: 0 }
-const latam: MilesSettings = { program: 'latampass', programName: 'LATAM Pass', milheiroBrl: 29, balance: 0 }
+const smiles: MilesSettings = { program: 'smiles', programName: 'Smiles (GOL)', milheiroBrl: 22, balance: 0, passengers: 1 }
+const latam: MilesSettings = { program: 'latampass', programName: 'LATAM Pass', milheiroBrl: 29, balance: 0, passengers: 1 }
 
 const fare = (cabin: AwardFare['cabin'], miles: number): AwardFare => ({
   program: 'smiles',
@@ -78,6 +78,21 @@ describe('lookupAwards', () => {
     expect(lookup).toMatchObject({ cabin: 'business', origin: 'GRU', destination: 'MAD', date: '2026-12-01', returnDate: null })
     expect(lookup.program.code).toBe('smiles')
     expect(options.apiKey).toBe(KEY)
+  })
+
+  it('asks for the seated passengers and drops awards known to have fewer seats, leaving a cabin without one', async () => {
+    const family: SearchRequest = { ...req, passengers: { adults: 2, children: 1, infants: 1 } }
+    searchAwardsMock.mockResolvedValue([
+      { ...fare('business', 50_000), seatsLeft: 2 },
+      { ...fare('business', 70_000), seatsLeft: 3 },
+      { ...fare('business', 90_000), seatsLeft: null },
+      { ...fare('economy', 30_000), seatsLeft: 1 },
+    ])
+    const result = await lookupAwards(family, smiles, new AbortController().signal)
+    expect(searchAwardsMock.mock.calls[0][0].passengers).toBe(3)
+    expect(result.candidates.map((a) => a.miles)).toEqual([70_000, 90_000])
+    expect(result.awardsByCabin.business?.miles).toBe(70_000)
+    expect(result.awardsByCabin.economy).toBeUndefined()
   })
 
   it('turns a provider error into a note, never a failure, and does not log the key', async () => {

@@ -23,6 +23,7 @@ const lookup = (over: Partial<AwardLookup> = {}): AwardLookup => ({
   date: '2024-05-01',
   returnDate: null,
   program: connectmiles,
+  passengers: 1,
   ...over,
 })
 
@@ -379,6 +380,17 @@ describe('searchAwards (seats.aero)', () => {
       expect((await searchAwards(far, options())).map((f) => f.miles)).toEqual([140000])
       expect(fetchMock).toHaveBeenCalledTimes(1)
       expect(new URL(String(fetchMock.mock.calls[0][0])).searchParams.get('origin_airport')).toBe('PTY')
+    })
+
+    it('drops a leg known to have too few seats before pairing, even when the other leg has no seat count', async () => {
+      fetchMock.mockResolvedValue(
+        ok([
+          out({ AvailabilityTrips: [trip({ MileageCost: 30000, RemainingSeats: 1 }), trip({ MileageCost: 50000, RemainingSeats: 2 })] }),
+          ret({ AvailabilityTrips: [trip({ MileageCost: 20000, RemainingSeats: 0 })] }),
+        ]),
+      )
+      expect((await searchAwards({ ...rt, passengers: 2 }, options())).map((f) => f.miles)).toEqual([70000])
+      expect((await searchAwards({ ...rt, passengers: 1 }, options())).map((f) => f.miles)).toEqual([50000, 70000])
     })
 
     it(`returns at most ${MAX_ROUND_TRIP_PAIRS} pairs, cheapest first`, async () => {

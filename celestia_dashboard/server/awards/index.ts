@@ -4,7 +4,7 @@ import { findMilesProgram } from '../../src/shared/miles.js'
 import type { MilesProgramInfo } from '../../src/shared/miles.js'
 import type { AwardFare, CabinClass, Flight } from '../../src/types.js'
 import type { MilesSettings } from '../miles/calculator.js'
-import { SeatsAeroError, searchAwards } from './seatsAero.js'
+import { hasSeatsFor, SeatsAeroError, searchAwards } from './seatsAero.js'
 
 export const AWARDS_TIMEOUT_MS = 8_000
 
@@ -24,6 +24,8 @@ export interface AwardLookup {
   /** Return date for a round trip (awards then cover both directions); null = one way. */
   returnDate: string | null
   program: MilesProgramInfo
+  /** Seated passengers (adults + children): awards with fewer known seats left are useless. */
+  passengers: number
 }
 
 export interface AwardLookupResult {
@@ -59,6 +61,7 @@ export async function lookupAwards(
     return { awardsByCabin: {}, candidates: [], awardSource: null, awardsSearched: false, awardsNote: AWARD_NOTES.notConfigured }
   }
 
+  const passengers = req.passengers.adults + req.passengers.children
   const lookup: AwardLookup = {
     cabin: req.cabin,
     origin: req.origin,
@@ -66,10 +69,13 @@ export async function lookupAwards(
     date: req.departDate,
     returnDate: req.returnDate,
     program,
+    passengers,
   }
   const combined = AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)])
   try {
-    const awards = await Promise.race([searchAwards(lookup, { apiKey, signal: combined }), abortion(combined)])
+    const found = await Promise.race([searchAwards(lookup, { apiKey, signal: combined }), abortion(combined)])
+    // Unknown seat counts are kept; a cabin left with no award then has none.
+    const awards = found.filter((award) => hasSeatsFor(award, passengers))
     const awardsByCabin: AwardLookupResult['awardsByCabin'] = {}
     for (const award of awards) {
       const best = awardsByCabin[award.cabin]

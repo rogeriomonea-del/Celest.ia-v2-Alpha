@@ -282,6 +282,9 @@ export function combineAwards(out: AwardFare, ret: AwardFare): AwardFare {
   }
 }
 
+/** True unless the award is known to have fewer seats left than `passengers`. */
+export const hasSeatsFor = (award: AwardFare, passengers: number) => award.seatsLeft === null || award.seatsLeft >= passengers
+
 const cheapestFirst = (fares: AwardFare[]) => [...fares].sort((a, b) => a.miles - b.miles).slice(0, MAX_AWARDS_PER_DIRECTION)
 
 function daysBetween(from: string, to: string): number {
@@ -344,12 +347,14 @@ function pairAwards(outs: AwardFare[], rets: AwardFare[]): AwardFare[] {
  * each fare pairs an outbound and a return award (the Duffel offer prices both slices).
  */
 export async function searchAwards(lookup: AwardLookup, options: SeatsAeroOptions): Promise<AwardFare[]> {
+  // Each leg is checked before pairing: a pair's seat count is unknown when either leg's is.
+  const seated = (fares: AwardFare[]) => fares.filter((fare) => hasSeatsFor(fare, lookup.passengers))
   const outbound: Direction = { origin: lookup.origin, destination: lookup.destination, date: lookup.date }
   if (!lookup.returnDate) {
     const [outs] = await directionAwards(lookup, [outbound], options)
-    return outs
+    return seated(outs)
   }
   const inbound: Direction = { origin: lookup.destination, destination: lookup.origin, date: lookup.returnDate }
   const [outs, rets] = await directionAwards(lookup, [outbound, inbound], options)
-  return pairAwards(outs, rets)
+  return pairAwards(seated(outs), seated(rets))
 }

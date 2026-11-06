@@ -286,7 +286,8 @@ describe('POST /api/flights/search with miles', () => {
     cabin,
     miles,
     taxes: { amount: 200, currency: 'BRL' },
-    seatsLeft: 2,
+    // validSearch seats 3 passengers (2 adults + 1 child).
+    seatsLeft: 9,
     direct: true,
     flightNumbers: null,
     matchesItinerary: false,
@@ -344,7 +345,8 @@ describe('POST /api/flights/search with miles', () => {
     expect(awardOption(pricey)?.breakevenMilheiroBrl).toBe(33.33)
     expect(awardOption(pricey)?.notes).toEqual([
       'Vale a pena com milheiro <= R$ 33,33',
-      'Saldo insuficiente: faltam 10.000 milhas',
+      // 60,000 miles x 3 passengers - 50,000.
+      'Saldo insuficiente: faltam 130.000 milhas para 3 passageiros',
       'Voos podem diferir da oferta',
       'Equivalente em dinheiro: R$ 1.520,00 (milheiro R$ 22,00)',
     ])
@@ -388,6 +390,21 @@ describe('POST /api/flights/search with miles', () => {
     expect(miles?.equivalentMiles).toBe(50_000)
     expect(miles?.award).toBeNull()
     expect(miles?.options.map((o) => o.strategy)).toEqual(['cash'])
+  })
+
+  it('drops awards without enough seats for the seated passengers, leaving the cabin without an award', async () => {
+    fetchMock.mockResolvedValue(duffelOk())
+    // 2 adults + 1 child are seated; the infant is not.
+    searchAwardsMock.mockResolvedValue([{ ...award('premium', 40_000), seatsLeft: 2 }, { ...award('premium', 60_000), seatsLeft: 3 }])
+    const enough = (await (await searchPOST(milesSearch({ program: 'smiles', milheiroBrl: null, balance: 0 }))).json()) as SearchResponse
+    expect(searchAwardsMock.mock.calls[0][0].passengers).toBe(3)
+    expect(byId(enough, 'off_miles_cheap')?.miles?.award?.miles).toBe(60_000)
+
+    fetchMock.mockResolvedValue(duffelOk())
+    searchAwardsMock.mockResolvedValue([{ ...award('premium', 40_000), seatsLeft: 2 }])
+    const short = (await (await searchPOST(milesSearch({ program: 'smiles', milheiroBrl: null, balance: 0 }))).json()) as SearchResponse
+    expect(byId(short, 'off_miles_cheap')?.miles).toMatchObject({ award: null })
+    expect(byId(short, 'off_miles_cheap')?.miles?.options.map((o) => o.strategy)).toEqual(['cash'])
   })
 
   it('stops calling seats.aero after a 429 and reports the daily limit on later searches', async () => {

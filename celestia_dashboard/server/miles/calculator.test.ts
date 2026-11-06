@@ -4,7 +4,7 @@ import { makeFlight } from '../../src/test/flights.js'
 import { valueOffer } from './calculator.js'
 import type { MilesSettings } from './calculator.js'
 
-const smiles: MilesSettings = { program: 'smiles', programName: 'Smiles (GOL)', milheiroBrl: 22, balance: 100_000 }
+const smiles: MilesSettings = { program: 'smiles', programName: 'Smiles (GOL)', milheiroBrl: 22, balance: 100_000, passengers: 1 }
 
 const brlOffer = (price: number) => makeFlight({ id: `off_${price}`, price, totalPrice: price * 2, currency: 'BRL' })
 
@@ -114,6 +114,15 @@ describe('valueOffer', () => {
   it('notes an insufficient balance with the missing miles in pt-BR format', () => {
     const result = valueOffer(brlOffer(2200), { ...smiles, balance: 12_345 }, award(), 'economy')
     expect(result.options.find((o) => o.strategy === 'award')?.notes).toContain('Saldo insuficiente: faltam 47.655 milhas')
+  })
+
+  it('compares the balance with the miles for every seated passenger', () => {
+    const notes = (balance: number, passengers: number) =>
+      valueOffer(brlOffer(2200), { ...smiles, balance, passengers }, award(), 'economy').options.find((o) => o.strategy === 'award')?.notes
+    // 60,000 x 3 - 100,000
+    expect(notes(100_000, 3)).toContain('Saldo insuficiente: faltam 80.000 milhas para 3 passageiros')
+    expect(notes(180_000, 3)?.join(' ')).not.toContain('Saldo insuficiente')
+    expect(notes(12_345, 1)).toContain('Saldo insuficiente: faltam 47.655 milhas')
   })
 
   it('has no balance note when the balance covers the award exactly', () => {
