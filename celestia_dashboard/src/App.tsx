@@ -483,6 +483,7 @@ export default function App() {
                           passengerCount={passengerCount}
                           isCheapest={flight.id === cheapestId}
                           isFastest={flight.id === fastestId}
+                          milheiro={milesSummary?.milheiroBrl ?? null}
                           onViewOffer={setOffer}
                         />
                       ))
@@ -501,6 +502,7 @@ export default function App() {
         <OfferDialog
           flight={offer}
           passengerCount={passengerCount}
+          milheiro={milesSummary?.milheiroBrl ?? null}
           onClose={() => setOffer(null)}
           onResearch={() => {
             setOffer(null)

@@ -23,6 +23,8 @@ interface FlightCardProps {
   passengerCount: number
   isCheapest: boolean
   isFastest: boolean
+  /** Milheiro the search valued the miles at (response miles summary); null when none was set. */
+  milheiro: number | null
   onViewOffer: (flight: Flight) => void
 }
 
@@ -165,7 +167,7 @@ export function OfferDetails({ flight }: { flight: Flight }) {
   )
 }
 
-export function FlightCard({ flight, passengerCount, isCheapest, isFastest, onViewOffer }: FlightCardProps) {
+export function FlightCard({ flight, passengerCount, isCheapest, isFastest, milheiro, onViewOffer }: FlightCardProps) {
   const returnSlice = flight.slices[1]
   const [expanded, setExpanded] = useState(false)
 
@@ -239,7 +241,7 @@ export function FlightCard({ flight, passengerCount, isCheapest, isFastest, onVi
                 Total {formatMoney(flight.totalPrice, flight.currency)} · {passengerCount} passageiros
               </p>
             )}
-            {flight.miles && <MilesPriceLines miles={flight.miles} />}
+            {flight.miles && <MilesPriceLines miles={flight.miles} milheiro={milheiro} />}
           </div>
           <button
             type="button"

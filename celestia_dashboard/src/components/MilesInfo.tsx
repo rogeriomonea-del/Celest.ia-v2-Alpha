@@ -1,13 +1,12 @@
 import { formatMilheiro, formatMiles, formatMoney } from '../utils/format'
 import type { FlightMiles, PurchaseOption } from '../types'
 
-/** Milheiro the server valued the miles at (shared by every option). */
-function valuationMilheiro(miles: FlightMiles): number | null {
-  return miles.options.find((option) => option.milheiroBrl !== null)?.milheiroBrl ?? null
-}
-
-/** true when the best award option costs less, in effective BRL, than the best cash option. */
+/**
+ * true when the award is for this exact itinerary and its option costs less, in effective BRL,
+ * than paying cash. An award that may be on other flights is no claim about this offer.
+ */
 export function awardBeatsCash(miles: FlightMiles): boolean {
+  if (miles.award?.matchesItinerary !== true) return false
   const cash = miles.options.find((option) => option.strategy === 'cash')
   const award = miles.options.find((option) => option.strategy === 'award')
   if (!cash || !award || cash.effectiveTotalBrl === null || award.effectiveTotalBrl === null) return false
@@ -18,9 +17,21 @@ function seatsLabel(seats: number): string {
   return seats === 1 ? '1 assento' : `${seats} assentos`
 }
 
+interface MilesProps {
+  miles: FlightMiles
+  /** Milheiro the search valued the miles at (the response's miles summary); null when none was set. */
+  milheiro: number | null
+}
+
+/** Why the fare has no miles equivalent: no milheiro, or a fare the server does not convert to BRL. */
+function noEquivalentText(miles: FlightMiles, milheiro: number | null): string {
+  if (milheiro === null) return 'Em milhas: informe o milheiro'
+  const currency = miles.options.find((option) => option.strategy === 'cash')?.cash.currency ?? 'outra moeda'
+  return `Em milhas: tarifa em ${currency}, sem conversão`
+}
+
 /** Short lines under the price: the fare in miles and the award found. */
-export function MilesPriceLines({ miles }: { miles: FlightMiles }) {
-  const milheiro = valuationMilheiro(miles)
+export function MilesPriceLines({ miles, milheiro }: MilesProps) {
   const { award } = miles
   return (
     <div className="mt-1 space-y-0.5 text-xs text-slate-500">
@@ -29,7 +40,7 @@ export function MilesPriceLines({ miles }: { miles: FlightMiles }) {
           ≈ {formatMiles(miles.equivalentMiles)} milhas
         </p>
       ) : (
-        milheiro === null && <p>Em milhas: informe o milheiro</p>
+        <p>{noEquivalentText(miles, milheiro)}</p>
       )}
       {award && (
         <p className="font-medium text-slate-700">
@@ -73,11 +84,12 @@ export function PurchaseOptionsList({ miles }: { miles: FlightMiles }) {
   )
 }
 
-/** Both blocks together, for the offer dialog. */
-export function MilesBlock({ miles }: { miles: FlightMiles }) {
+/** Both blocks together, for the offer dialog. `label`, when set, heads the block (e.g. stale values). */
+export function MilesBlock({ miles, milheiro, label }: MilesProps & { label?: string }) {
   return (
     <div className="space-y-3 rounded-lg border border-slate-200 p-3">
-      <MilesPriceLines miles={miles} />
+      {label && <p className="text-xs font-semibold text-amber-700">{label}</p>}
+      <MilesPriceLines miles={miles} milheiro={milheiro} />
       <PurchaseOptionsList miles={miles} />
     </div>
   )

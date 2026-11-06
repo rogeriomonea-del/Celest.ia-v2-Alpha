@@ -17,7 +17,7 @@ const searched = makeFlight({ id: 'off_42', price: 3500, totalPrice: 7000 })
 function renderDialog(props: { onClose?: () => void; onResearch?: () => void } = {}) {
   const onClose = props.onClose ?? vi.fn()
   const onResearch = props.onResearch ?? vi.fn()
-  render(<OfferDialog flight={searched} passengerCount={2} onClose={onClose} onResearch={onResearch} />)
+  render(<OfferDialog flight={searched} passengerCount={2} milheiro={29} onClose={onClose} onResearch={onResearch} />)
   return { onClose, onResearch }
 }
 
@@ -49,7 +49,7 @@ describe('OfferDialog', () => {
     const card = makeFlight({ id: 'off_7', emissions: 'high', emissionsKg: 980 })
     // Alone, the re-fetched offer is always "average" relative to itself.
     vi.mocked(fetchOffer).mockResolvedValue({ ...card, emissions: 'average' })
-    render(<OfferDialog flight={card} passengerCount={1} onClose={vi.fn()} onResearch={vi.fn()} />)
+    render(<OfferDialog flight={card} passengerCount={1} milheiro={29} onClose={vi.fn()} onResearch={vi.fn()} />)
 
     const line = await screen.findByText(/Emissões/)
     expect(plain(line.textContent)).toBe('Emissões acima da média · 980 kg CO₂')
@@ -137,11 +137,45 @@ describe('OfferDialog miles', () => {
   it("shows the card's miles valuation, since the re-fetched offer has none", async () => {
     const card = makeFlight({ id: 'off_9', miles: makeMiles({ equivalentMiles: 52900 }) })
     vi.mocked(fetchOffer).mockResolvedValue({ ...card, miles: null })
-    render(<OfferDialog flight={card} passengerCount={1} onClose={vi.fn()} onResearch={vi.fn()} />)
+    render(<OfferDialog flight={card} passengerCount={1} milheiro={29} onClose={vi.fn()} onResearch={vi.fn()} />)
 
     expect(await screen.findByText('≈ 52.900 milhas')).toBeInTheDocument()
     expect(plain(screen.getByText(/^Award/).textContent)).toBe('Award Smiles: 60.000 mi + R$ 180 · 4 assentos')
     expect(screen.getByRole('list', { name: 'Como pagar' })).toBeInTheDocument()
+    expect(screen.queryByText(/Valores da busca/)).not.toBeInTheDocument()
+  })
+
+  it('values the miles with the search milheiro passed in', async () => {
+    const base = makeMiles({ equivalentMiles: null })
+    const miles = { ...base, options: base.options.map((option) => ({ ...option, milheiroBrl: null, effectiveTotalBrl: null })) }
+    const usdMiles = {
+      ...miles,
+      options: miles.options.map((option) =>
+        option.strategy === 'cash' ? { ...option, cash: { amount: 650, currency: 'USD' } } : option,
+      ),
+    }
+    const card = makeFlight({ id: 'off_10', currency: 'USD', price: 650, totalPrice: 650, miles: usdMiles })
+    vi.mocked(fetchOffer).mockResolvedValue({ ...card, miles: null })
+    render(<OfferDialog flight={card} passengerCount={1} milheiro={29} onClose={vi.fn()} onResearch={vi.fn()} />)
+    expect(await screen.findByText('Em milhas: tarifa em USD, sem conversão')).toBeInTheDocument()
+    expect(screen.queryByText(/informe o milheiro/)).not.toBeInTheDocument()
+  })
+
+  it('labels the miles block as search values when the re-fetched price changed', async () => {
+    const card = makeFlight({ id: 'off_11', miles: makeMiles({ equivalentMiles: 52900 }) })
+    vi.mocked(fetchOffer).mockResolvedValue({ ...card, price: 3800, totalPrice: 3800, miles: null })
+    render(<OfferDialog flight={card} passengerCount={1} milheiro={29} onClose={vi.fn()} onResearch={vi.fn()} />)
+
+    expect(await screen.findByText('Valores da busca (preço mudou)')).toBeInTheDocument()
+    expect(screen.getByText('≈ 52.900 milhas')).toBeInTheDocument()
+  })
+
+  it('labels the miles block as search values when the currency changed', async () => {
+    const card = makeFlight({ id: 'off_12', miles: makeMiles() })
+    vi.mocked(fetchOffer).mockResolvedValue({ ...card, currency: 'USD', miles: null })
+    render(<OfferDialog flight={card} passengerCount={1} milheiro={29} onClose={vi.fn()} onResearch={vi.fn()} />)
+
+    expect(await screen.findByText('Valores da busca (preço mudou)')).toBeInTheDocument()
   })
 
   it('has no miles block when the card has no miles', async () => {
