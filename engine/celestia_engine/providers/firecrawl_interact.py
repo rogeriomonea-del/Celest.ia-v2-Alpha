@@ -36,21 +36,30 @@ _SITE_META = {
 _CABIN_GF = {Cabin.ECONOMY: "Econômica", Cabin.PREMIUM: "Premium", Cabin.BUSINESS: "Executiva"}
 
 
-#: passos do Interact considerados no orçamento (abrir + 3 passos + fechar).
-BUDGETED_STEPS = 3
+#: teto de UM passo do Interact (sessão viva preenchendo formulário real).
+MAX_STEP_S = 150.0
+#: teto do DELETE que encerra a sessão (best-effort).
+CLOSE_TIMEOUT_S = 15.0
 
 
 def interact_timeouts(settings: Settings) -> tuple[float, float]:
-    """(abrir_s, passo_s) derivados de SUBAGENT_TIMEOUT_S para que UMA execução
-    Interact caiba no teto do subagente: abrir ≤ 30s e cada um dos 3 passos
-    ≤ (teto − 40)/3 (40s = abertura + fechamento). Sem teto (0): valores
-    históricos, 40s/150s."""
+    """(abrir_s, passos_s) derivados de SUBAGENT_TIMEOUT_S para que UMA execução
+    Interact caiba no teto do subagente: abrir ≤ 30s, fechar ≤ CLOSE_TIMEOUT_S
+    e ``passos_s`` é o orçamento TOTAL dos passos (prazo por execução, ver
+    ``firecrawl_scripts._run_steps``) — cada passo usa
+    ``step_timeout(restante)``, então um passo lento cabe se os anteriores
+    foram rápidos. Sem teto (0): valores históricos, 40s/150s por passo."""
     budget = float(settings.subagent_timeout_s or 0)
     if budget <= 0:
-        return 40.0, 150.0
+        return 40.0, MAX_STEP_S
     open_s = min(30.0, budget / 4)
-    step_s = max(5.0, (budget - 40.0) / BUDGETED_STEPS)
-    return open_s, step_s
+    steps_budget = max(5.0, budget - open_s - CLOSE_TIMEOUT_S)
+    return open_s, steps_budget
+
+
+def step_timeout(remaining_s: float) -> float:
+    """Teto de um passo: o que resta do orçamento dos passos, até MAX_STEP_S."""
+    return min(MAX_STEP_S, remaining_s)
 
 
 async def _headers(settings: Settings) -> dict:
@@ -74,14 +83,20 @@ async def open_session(settings: Settings, url: str) -> str:
     return scrape_id
 
 
-async def interact(settings: Settings, scrape_id: str, prompt: str) -> str:
+async def interact(
+    settings: Settings, scrape_id: str, prompt: str, *, timeout_s: float | None = None
+) -> str:
+    """Um passo da sessão. ``timeout_s`` vem do prazo da execução
+    (``_run_steps``); sozinho, o passo pode usar todo o orçamento dos passos."""
+    if timeout_s is None:
+        timeout_s = step_timeout(interact_timeouts(settings)[1])
     payload = await post_json(
         f"{settings.firecrawl_api_base}/v2/scrape/{scrape_id}/interact",
         json_body={"prompt": prompt},
         headers=await _headers(settings),
         # sessão viva preenchendo formulário real: precisa de folga, mas
-        # limitada ao orçamento do subagente (ver interact_timeouts)
-        timeout_s=interact_timeouts(settings)[1],
+        # limitada ao que resta do orçamento do subagente (ver interact_timeouts)
+        timeout_s=timeout_s,
         retries=1,
     )
     data = payload.get("data")
@@ -96,7 +111,7 @@ async def close_session(settings: Settings, scrape_id: str) -> None:
     import httpx
 
     try:
-        async with httpx.AsyncClient(timeout=15) as client:
+        async with httpx.AsyncClient(timeout=CLOSE_TIMEOUT_S) as client:
             await client.delete(
                 f"{settings.firecrawl_api_base}/v2/scrape/{scrape_id}/interact",
                 headers=await _headers(settings),

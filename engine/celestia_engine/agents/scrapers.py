@@ -33,7 +33,7 @@ from ..storage import (
     record_attempt,
     record_route_outcome,
 )
-from .base import Agent
+from .base import Agent, subagent_deadline_expired
 
 
 async def _strategy_firecrawl_interact(agent, route, depart):
@@ -143,18 +143,23 @@ class AirlineScraperAgent(Agent):
             try:
                 offers = await STRATEGY_FUNCS[strategy](self, route, depart)
             except asyncio.CancelledError:
-                # teto do subagente (wait_for) cancelou esta estratégia no meio:
-                # registra como falha por timeout antes de propagar o cancelamento
-                record_attempt(
-                    self.ctx.settings, site=self.site, strategy=strategy,
-                    success=False, offers_found=0, duration_s=time.monotonic() - started,
-                )
-                record_route_outcome(
-                    self.ctx.settings, site=self.site, strategy=strategy,
-                    route=route.key(), depart=depart.isoformat(),
-                    success=False, error="timeout",
-                )
-                self.log(f"{strategy} cancelado (timeout do subagente)")
+                # só o teto PRÓPRIO do subagente conta como falha por timeout da
+                # estratégia; um cancelamento de fora (busca pai cancelada) não
+                # diz nada sobre ela. Propaga o cancelamento em ambos os casos.
+                if subagent_deadline_expired():
+                    record_attempt(
+                        self.ctx.settings, site=self.site, strategy=strategy,
+                        success=False, offers_found=0,
+                        duration_s=time.monotonic() - started,
+                    )
+                    record_route_outcome(
+                        self.ctx.settings, site=self.site, strategy=strategy,
+                        route=route.key(), depart=depart.isoformat(),
+                        success=False, error="timeout",
+                    )
+                    self.log(f"{strategy} cancelado (timeout do subagente)")
+                else:
+                    self.log(f"{strategy} cancelado")
                 raise
             except ProviderNotConfigured as error:
                 # "não configurado/desligado" é skip, NÃO falha de desempenho —

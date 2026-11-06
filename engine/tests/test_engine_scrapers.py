@@ -86,3 +86,39 @@ def test_subagent_timeout_mid_ladder_is_recorded_as_failure(settings, monkeypatc
     assert [(r["site"], r["outcome"]) for r in perf] == [("copa", "fail")]
     failures = _rows(Path(cfg.strategy_csv).parent / "search_failures.csv")
     assert [(r["strategy"], r["error"]) for r in failures] == [(perf[0]["strategy"], "timeout")]
+
+
+def test_parent_cancel_mid_ladder_is_not_recorded_as_timeout(settings, monkeypatch):
+    running: list[asyncio.Event] = []
+
+    async def hang(agent, route, depart):
+        running[0].set()
+        await asyncio.Event().wait()
+
+    for name in ("firecrawl_scrape", "playwright_local"):
+        monkeypatch.setitem(scrapers.STRATEGY_FUNCS, name, hang)
+    cfg = replace(
+        settings,
+        firecrawl_api_key="test-key",
+        scrape_strategies="firecrawl_scrape,playwright_local",
+        subagent_timeout_s=30,  # o teto do subagente NÃO estoura
+    )
+    ctx = AgentContext(settings=cfg)
+    agent = scrapers.CopaScraperAgent(ctx)
+    route = Route("GRU", "PTY", "CM")
+
+    async def main():
+        running.append(asyncio.Event())
+        search = asyncio.create_task(
+            ctx.spawn("test", "copa", lambda: agent.fetch_offers(route, DEPART))
+        )
+        await running[0].wait()
+        search.cancel()  # a busca pai é cancelada (ex.: cliente desconectou)
+        with pytest.raises(asyncio.CancelledError):
+            await search
+
+    asyncio.run(asyncio.wait_for(main(), timeout=5))
+
+    # o cancelamento propagou, mas a estratégia não foi punida por "timeout"
+    assert not Path(cfg.strategy_csv).exists()
+    assert not (Path(cfg.strategy_csv).parent / "search_failures.csv").exists()

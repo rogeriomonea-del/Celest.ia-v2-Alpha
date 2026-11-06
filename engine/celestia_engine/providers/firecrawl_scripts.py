@@ -23,6 +23,7 @@ Os primitivos de sessão (open/interact/close) e os parsers vivem em
 
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass
 from typing import Callable
 
@@ -33,10 +34,15 @@ from .firecrawl_interact import (
     _CABIN_GF,
     close_session,
     interact,
+    interact_timeouts,
     open_session,
     parse_calendar_output,
     parse_interact_output,
+    step_timeout,
 )
+
+#: relógio do prazo dos passos (substituível nos testes sem mexer no asyncio).
+_clock = time.monotonic
 
 # ---------------------------------------------------------------- extração rica
 #: Formato pedido ao LLM na extração de ofertas. Vai muito além do preço:
@@ -216,12 +222,25 @@ def _require_firecrawl(settings: Settings) -> None:
 
 async def _run_steps(settings: Settings, url: str, steps: list[str]) -> str:
     """Abre uma sessão, encadeia os passos (reusa o scrapeId) e sempre encerra.
-    Retorna a saída do ÚLTIMO passo (a extração)."""
+    Retorna a saída do ÚLTIMO passo (a extração).
+
+    Com teto de subagente, os passos dividem UM prazo por execução: cada passo
+    recebe o que resta dele (até MAX_STEP_S), e a execução falha antes de
+    começar um passo sem orçamento — em vez de ser cortada pelo teto."""
     scrape_id = await open_session(settings, url)
+    bounded = float(settings.subagent_timeout_s or 0) > 0
+    steps_budget = interact_timeouts(settings)[1]
+    deadline = _clock() + steps_budget if bounded else None
     last = ""
     try:
-        for step in steps:
-            last = await interact(settings, scrape_id, step)
+        for index, step in enumerate(steps, 1):
+            remaining = steps_budget if deadline is None else deadline - _clock()
+            if remaining <= 0:
+                raise ProviderError(
+                    f"firecrawl interact: orçamento de {steps_budget:.0f}s dos passos "
+                    f"esgotado antes do passo {index}/{len(steps)}"
+                )
+            last = await interact(settings, scrape_id, step, timeout_s=step_timeout(remaining))
     finally:
         await close_session(settings, scrape_id)
     return last
