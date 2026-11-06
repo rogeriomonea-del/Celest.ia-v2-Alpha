@@ -8,9 +8,11 @@ import { findAirport } from './data/airports'
 import { LATAM, makeFlight, TAP } from './test/flights'
 import { addDays, startOfDay, toISODate } from './utils/dates'
 import type { SavedSearch } from './features/savedSearches/types'
+import type { SaveResult } from './features/savedSearches/useSavedSearches'
 import type { SearchParams } from './types'
 
 const mocks = vi.hoisted(() => ({
+  loaded: true,
   loginOpen: false,
   save: vi.fn(),
   saved: [] as { label: string; search: unknown }[],
@@ -29,7 +31,7 @@ vi.mock('./lib/api', async (importOriginal) => ({
 }))
 
 vi.mock('./features/savedSearches/useSavedSearches', () => ({
-  useSavedSearches: () => ({ save: mocks.save }),
+  useSavedSearches: () => ({ save: mocks.save, loaded: mocks.loaded }),
 }))
 
 // The real Header needs auth; this one just exposes the saved-search callback.
@@ -76,6 +78,7 @@ async function searchAndWait() {
 }
 
 beforeEach(() => {
+  mocks.loaded = true
   mocks.loginOpen = false
   mocks.saved = []
   mocks.user = null
@@ -220,7 +223,7 @@ describe('App result status', () => {
 
 describe('App saved searches', () => {
   it('"Salvar busca" saves the searched params', async () => {
-    mocks.save.mockResolvedValue({ id: 'saved-9' })
+    mocks.save.mockResolvedValue({ status: 'saved', saved: { id: 'saved-9' } })
     render(<App />)
     await searchAndWait()
 
@@ -232,7 +235,7 @@ describe('App saved searches', () => {
   })
 
   it('keeps "Salvar busca" available when saving did not happen (e.g. logged out)', async () => {
-    mocks.save.mockResolvedValue(null)
+    mocks.save.mockResolvedValue({ status: 'login' })
     render(<App />)
     await searchAndWait()
 
@@ -243,9 +246,9 @@ describe('App saved searches', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
-  it('shows an inline error when saving fails while logged in', async () => {
+  it('shows the message from save() when saving fails while logged in', async () => {
     mocks.user = { id: 'user-1' }
-    mocks.save.mockResolvedValue(null)
+    mocks.save.mockResolvedValue({ status: 'error', message: 'Não foi possível salvar a busca. Tente novamente.' })
     render(<App />)
     await searchAndWait()
 
@@ -255,16 +258,29 @@ describe('App saved searches', () => {
     expect(screen.getByRole('button', { name: 'Salvar busca' })).toBeEnabled()
   })
 
+  it('shows the saved-searches cap message next to "Salvar busca"', async () => {
+    mocks.user = { id: 'user-1' }
+    const message = 'Você atingiu o limite de 50 buscas salvas. Remova alguma para salvar outra.'
+    mocks.save.mockResolvedValue({ status: 'error', message })
+    render(<App />)
+    await searchAndWait()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar busca' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(message)
+    expect(screen.getByRole('button', { name: 'Salvar busca' })).toBeEnabled()
+  })
+
   it('does not mark a new search as saved when an earlier save resolves late', async () => {
     mocks.user = { id: 'user-1' }
-    const pending = deferred<{ id: string } | null>()
+    const pending = deferred<SaveResult>()
     mocks.save.mockReturnValue(pending.promise)
     render(<App />)
     await searchAndWait()
 
     fireEvent.click(screen.getByRole('button', { name: 'Salvar busca' }))
     fireEvent.click(searchButton())
-    await act(async () => pending.resolve({ id: 'saved-old' }))
+    await act(async () => pending.resolve({ status: 'saved', saved: savedSearch('saved-old', 10) }))
 
     expect(screen.getByRole('button', { name: 'Salvar busca' })).toBeEnabled()
     expect(screen.queryByRole('button', { name: 'Busca salva' })).not.toBeInTheDocument()
@@ -319,7 +335,7 @@ describe('App pending save across the login redirect', () => {
     mocks.save.mockImplementation(async () => {
       // save() opens the login; the params must already be stored by then.
       expect(window.sessionStorage.getItem(PENDING_SAVE_KEY)).not.toBeNull()
-      return null
+      return { status: 'login' }
     })
     render(<App />)
     await searchAndWait()
@@ -341,7 +357,7 @@ describe('App pending save across the login redirect', () => {
 
   it('logged in: does not store a pending save', async () => {
     mocks.user = { id: 'user-1' }
-    mocks.save.mockResolvedValue({ id: 'saved-1' })
+    mocks.save.mockResolvedValue({ status: 'saved', saved: { id: 'saved-1' } })
     render(<App />)
     await searchAndWait()
 
@@ -353,7 +369,7 @@ describe('App pending save across the login redirect', () => {
 
   it('once logged in, restores the pending search, runs it and saves it', async () => {
     window.sessionStorage.setItem(PENDING_SAVE_KEY, JSON.stringify(stored(10)))
-    mocks.save.mockResolvedValue({ id: 'saved-2' })
+    mocks.save.mockResolvedValue({ status: 'saved', saved: { id: 'saved-2' } })
     const { rerender } = render(<App />)
 
     // Still logged out (e.g. the session is loading): nothing is consumed.
@@ -379,6 +395,27 @@ describe('App pending save across the login redirect', () => {
     expect(searchFlights).toHaveBeenCalledWith(expected, expect.any(AbortSignal))
     expect(mocks.save).toHaveBeenCalledWith(expected)
     expect(screen.getByRole('combobox', { name: 'Destino' })).toHaveValue('Madri (MAD)')
+  })
+
+  it('waits for the saved list to load before resuming, so an identical earlier save is found', async () => {
+    window.sessionStorage.setItem(PENDING_SAVE_KEY, JSON.stringify(stored(10)))
+    mocks.user = { id: 'user-1' }
+    mocks.loaded = false
+    mocks.save.mockResolvedValue({ status: 'saved', saved: { id: 'saved-3' } })
+    const { rerender } = render(<App />)
+
+    // Signed in, but the user's saved list is still loading: nothing is consumed yet.
+    expect(mocks.save).not.toHaveBeenCalled()
+    expect(searchFlights).not.toHaveBeenCalled()
+    expect(window.sessionStorage.getItem(PENDING_SAVE_KEY)).not.toBeNull()
+
+    mocks.loaded = true
+    rerender(<App />)
+
+    expect(await screen.findByRole('button', { name: 'Busca salva' })).toBeDisabled()
+    expect(window.sessionStorage.getItem(PENDING_SAVE_KEY)).toBeNull()
+    expect(mocks.save).toHaveBeenCalledTimes(1)
+    expect(searchFlights).toHaveBeenCalledTimes(1)
   })
 
   it('closing the login dialog without signing in drops the pending save', () => {
@@ -435,7 +472,7 @@ describe('App pending save across the login redirect', () => {
     vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
       throw new DOMException('denied', 'SecurityError')
     })
-    mocks.save.mockResolvedValue(null)
+    mocks.save.mockResolvedValue({ status: 'login' })
     render(<App />)
     await searchAndWait()
 
