@@ -390,6 +390,21 @@ describe('POST /api/flights/search with miles', () => {
     expect(miles?.options.map((o) => o.strategy)).toEqual(['cash'])
   })
 
+  it('stops calling seats.aero after a 429 and reports the daily limit on later searches', async () => {
+    const seatsAeroCalls = () => fetchMock.mock.calls.filter(([url]) => String(url).startsWith('https://seats.aero/')).length
+    fetchMock.mockImplementation(async (url) =>
+      String(url).startsWith('https://seats.aero/') ? new Response('slow down', { status: 429 }) : duffelOk(),
+    )
+    const first = (await (await searchPOST(milesSearch({ program: 'smiles', milheiroBrl: null, balance: 0 }))).json()) as SearchResponse
+    expect(first.miles?.awardsNote).toBe(AWARD_NOTES.dailyLimit)
+    expect(seatsAeroCalls()).toBe(1)
+
+    const second = await searchPOST(searchRequest({ ...validSearch, destination: 'LIS', miles: { program: 'smiles', milheiroBrl: null, balance: 0 } }))
+    expect(second.status).toBe(200)
+    expect(((await second.json()) as SearchResponse).miles).toMatchObject({ awardsSearched: false, awardsNote: AWARD_NOTES.dailyLimit })
+    expect(seatsAeroCalls()).toBe(1)
+  })
+
   it('gives each offer the award for its own flights across all slices, else the cheapest one', async () => {
     const roundTrip = { ...fixture.roundTripWithConnection, id: 'off_rt_match', total_amount: '3000.00', total_currency: 'BRL' }
     fetchMock.mockResolvedValue(duffelJson({ data: { id: 'orq_1', offers: [roundTrip, ...pricedOffers()] } }, 201))

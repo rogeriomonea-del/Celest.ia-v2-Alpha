@@ -4,7 +4,7 @@ import { findMilesProgram } from '../../src/shared/miles.js'
 import type { MilesProgramInfo } from '../../src/shared/miles.js'
 import type { AwardFare, CabinClass, Flight } from '../../src/types.js'
 import type { MilesSettings } from '../miles/calculator.js'
-import { searchAwards } from './seatsAero.js'
+import { SeatsAeroError, searchAwards } from './seatsAero.js'
 
 export const AWARDS_TIMEOUT_MS = 8_000
 
@@ -12,6 +12,7 @@ export const AWARD_NOTES = {
   unsupported: 'Este programa não tem consulta de award disponível.',
   notConfigured: 'Consulta de award não configurada.',
   failed: 'Não foi possível consultar awards agora.',
+  dailyLimit: 'Limite diário de consultas de award atingido.',
 } as const
 
 export interface AwardLookup {
@@ -79,7 +80,8 @@ export async function lookupAwards(
     const name = err instanceof Error ? err.name : typeof err
     const message = err instanceof Error ? err.message.split(apiKey).join('[redacted]') : ''
     console.error('[awards] seats.aero lookup failed', name, message)
-    return { awardsByCabin: {}, candidates: [], awardSource: 'seats_aero', awardsSearched: false, awardsNote: AWARD_NOTES.failed }
+    const note = err instanceof SeatsAeroError && err.status === 429 ? AWARD_NOTES.dailyLimit : AWARD_NOTES.failed
+    return { awardsByCabin: {}, candidates: [], awardSource: 'seats_aero', awardsSearched: false, awardsNote: note }
   }
 }
 

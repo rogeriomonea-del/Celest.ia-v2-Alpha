@@ -3,9 +3,12 @@ import type { SearchRequest } from '../../src/shared/api.js'
 import type { AwardFare } from '../../src/types.js'
 import type { MilesSettings } from '../miles/calculator.js'
 import { AWARD_NOTES, lookupAwards } from './index.js'
-import { searchAwards } from './seatsAero.js'
+import { SeatsAeroError, searchAwards } from './seatsAero.js'
 
-vi.mock('./seatsAero.js', () => ({ searchAwards: vi.fn() }))
+vi.mock('./seatsAero.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./seatsAero.js')>()),
+  searchAwards: vi.fn(),
+}))
 const searchAwardsMock = vi.mocked(searchAwards)
 
 const KEY = 'seats_aero_dummy_key_for_unit_tests'
@@ -84,6 +87,14 @@ describe('lookupAwards', () => {
     const logged = vi.mocked(console.error).mock.calls.map((args) => args.map(String).join(' ')).join('\n')
     expect(logged).toContain('[awards]')
     expect(logged).not.toContain(KEY)
+  })
+
+  it('reports the daily limit for a 429 and the generic note for other provider errors', async () => {
+    searchAwardsMock.mockRejectedValueOnce(new SeatsAeroError('seats.aero /search -> 429: limite de consultas atingido', 429))
+    expect((await lookupAwards(req, smiles, new AbortController().signal)).awardsNote).toBe(AWARD_NOTES.dailyLimit)
+    expect(AWARD_NOTES.dailyLimit).toBe('Limite diário de consultas de award atingido.')
+    searchAwardsMock.mockRejectedValueOnce(new SeatsAeroError('seats.aero /search -> 401: chave inválida', 401))
+    expect((await lookupAwards(req, smiles, new AbortController().signal)).awardsNote).toBe(AWARD_NOTES.failed)
   })
 
   it('gives up on a provider that hangs once the timeout elapses, aborting its signal', async () => {
