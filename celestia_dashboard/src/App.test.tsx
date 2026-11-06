@@ -79,7 +79,7 @@ beforeEach(() => {
   mocks.saved = []
   mocks.user = null
   window.sessionStorage.clear()
-  vi.mocked(searchFlights).mockResolvedValue({ offers, totalOffers: offers.length, truncated: false, liveMode: true, searchedAt: '2026-11-04T12:00:00Z' })
+  vi.mocked(searchFlights).mockResolvedValue({ offers, totalOffers: offers.length, truncated: false, liveMode: true, searchedAt: '2026-11-04T12:00:00Z', miles: null })
 })
 
 afterEach(() => {
@@ -147,7 +147,7 @@ describe('App search flow', () => {
   })
 
   it('shows the zero-offers state', async () => {
-    vi.mocked(searchFlights).mockResolvedValue({ offers: [], totalOffers: 0, truncated: false, liveMode: true, searchedAt: '2026-11-04T12:00:00Z' })
+    vi.mocked(searchFlights).mockResolvedValue({ offers: [], totalOffers: 0, truncated: false, liveMode: true, searchedAt: '2026-11-04T12:00:00Z', miles: null })
     render(<App />)
     fireEvent.click(searchButton())
 
@@ -188,7 +188,7 @@ describe('App search flow', () => {
 
 describe('App result status', () => {
   it('says how many offers are shown when the server truncated the results', async () => {
-    vi.mocked(searchFlights).mockResolvedValue({ offers, totalOffers: 57, truncated: true, liveMode: true, searchedAt: '2026-11-04T12:00:00Z' })
+    vi.mocked(searchFlights).mockResolvedValue({ offers, totalOffers: 57, truncated: true, liveMode: true, searchedAt: '2026-11-04T12:00:00Z', miles: null })
     render(<App />)
     await searchAndWait()
     expect(screen.getByText(/Mostrando 2 de 57 ofertas/)).toBeInTheDocument()
@@ -201,7 +201,7 @@ describe('App result status', () => {
   })
 
   it('shows the test-mode banner when the provider is not live', async () => {
-    vi.mocked(searchFlights).mockResolvedValue({ offers, totalOffers: 2, truncated: false, liveMode: false, searchedAt: '2026-11-04T12:00:00Z' })
+    vi.mocked(searchFlights).mockResolvedValue({ offers, totalOffers: 2, truncated: false, liveMode: false, searchedAt: '2026-11-04T12:00:00Z', miles: null })
     render(<App />)
     await searchAndWait()
     expect(screen.getByRole('note')).toHaveTextContent('Modo de teste: preços fictícios, apenas para demonstração.')
