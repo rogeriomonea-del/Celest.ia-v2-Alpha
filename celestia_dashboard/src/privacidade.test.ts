@@ -8,9 +8,11 @@ const read = (file: string) => readFileSync(new URL(file, PROJECT_ROOT), 'utf8')
 describe('privacidade.html', () => {
   const html = read('privacidade.html')
 
-  it('is served at the URL the footer links to', () => {
-    const vercel = JSON.parse(read('vercel.json')) as { rewrites?: { source: string; destination: string }[] }
-    expect(vercel.rewrites).toContainEqual({ source: PRIVACY_URL, destination: '/privacidade.html' })
+  it('is served at the URL the footer links to by both Vercel projects (dashboard root and repo root)', () => {
+    for (const file of ['vercel.json', '../vercel.json']) {
+      const vercel = JSON.parse(read(file)) as { rewrites?: { source: string; destination: string }[] }
+      expect(vercel.rewrites, file).toContainEqual({ source: PRIVACY_URL, destination: '/privacidade.html' })
+    }
   })
 
   it('is a pt-BR page with a last-updated date and a clearly marked contact placeholder', () => {
