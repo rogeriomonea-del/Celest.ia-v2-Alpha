@@ -1,7 +1,7 @@
 import { searchRequestSchema } from '../../src/shared/api.js'
 import type { MilesSummary, SearchResponse } from '../../src/shared/api.js'
 import { findMilesProgram } from '../../src/shared/miles.js'
-import { lookupAwards } from '../../server/awards/index.js'
+import { awardForOffer, lookupAwards } from '../../server/awards/index.js'
 import type { AwardLookupResult } from '../../server/awards/index.js'
 import { createOfferRequest } from '../../server/duffel.js'
 import { errorResponse, handleError, json, methodNotAllowed, NO_STORE, parseJsonBody, validationErrorResponse } from '../../server/http.js'
@@ -40,9 +40,13 @@ export async function POST(request: Request): Promise<Response> {
     let miles: MilesSummary | null = null
     if (settings && awards) {
       const milesSettings = settings
-      // Duffel offers are all in the searched cabin, so that cabin's award is the one to compare.
-      const award = awards.awardsByCabin[req.cabin] ?? null
-      offers = offers.map((offer) => ({ ...offer, miles: valueOffer(offer, milesSettings, award, req.cabin) }))
+      // Duffel offers are all in the searched cabin, so that cabin's awards are the ones to compare:
+      // the one for the offer's own flights when found, else the cheapest.
+      const cheapest = awards.awardsByCabin[req.cabin] ?? null
+      offers = offers.map((offer) => ({
+        ...offer,
+        miles: valueOffer(offer, milesSettings, awardForOffer(offer, awards.candidates, cheapest, req.cabin), req.cabin),
+      }))
       miles = {
         program: settings.program,
         programName: settings.programName,
