@@ -21,6 +21,7 @@ export async function POST(request: Request): Promise<Response> {
       truncated: all.length > offers.length,
       liveMode: result.liveMode,
       searchedAt: new Date().toISOString(),
+      miles: null,
     }
     return json(body, 200, NO_STORE)
   } catch (err) {

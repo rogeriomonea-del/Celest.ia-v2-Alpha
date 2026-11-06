@@ -185,6 +185,7 @@ export function mapSingleOffer(offer: DuffelOffer): Flight {
     emissionsKg: emissionsKgOf(offer),
     expiresAt: offer.expires_at,
     conditions: { refundable, changeable, refundPenalty, changePenalty },
+    miles: null,
   }
 }
 

@@ -28,6 +28,30 @@ const passengerCount = (invalid: string, min: number, minMessage: string, max: n
 
 export const MAX_SEATED_PASSENGERS = 9
 
+/** Optional miles module: which loyalty program to value miles in (and look awards up for). */
+export const milesRequestSchema = z.object(
+  {
+    program: z
+      .string({ required_error: 'Informe o programa de milhas', invalid_type_error: 'Programa de milhas inválido' })
+      .regex(/^[a-z0-9_]{2,32}$/, 'Programa de milhas inválido'),
+    /** BRL per 1,000 miles; null = use the program default (or none). */
+    milheiroBrl: z
+      .number({ invalid_type_error: 'Milheiro inválido' })
+      .positive('Milheiro inválido')
+      .max(1000, 'Milheiro inválido')
+      .nullable(),
+    /** The user's balance in that program, for "saldo insuficiente" notes. */
+    balance: z
+      .number({ invalid_type_error: 'Saldo de milhas inválido' })
+      .int('Saldo de milhas inválido')
+      .min(0, 'Saldo de milhas inválido')
+      .max(100_000_000, 'Saldo de milhas inválido'),
+  },
+  { invalid_type_error: 'Dados de milhas inválidos' },
+)
+
+export type MilesRequest = z.infer<typeof milesRequestSchema>
+
 export const searchRequestSchema = z
   .object(
     {
@@ -45,6 +69,7 @@ export const searchRequestSchema = z
         { required_error: 'Informe os passageiros', invalid_type_error: 'Passageiros inválidos' },
       ),
       cabin: z.enum(['economy', 'premium', 'business'], { errorMap: () => ({ message: 'Classe de cabine inválida' }) }),
+      miles: milesRequestSchema.optional(),
     },
     { required_error: 'Dados da busca inválidos.', invalid_type_error: 'Dados da busca inválidos.' },
   )
@@ -77,6 +102,20 @@ export interface SearchResponse {
   liveMode: boolean
   /** ISO timestamp of when the provider answered. */
   searchedAt: string
+  /** Echo of the miles module settings used; null when the request had no `miles`. */
+  miles: MilesSummary | null
+}
+
+export interface MilesSummary {
+  program: string
+  programName: string
+  /** Milheiro used for valuations; null when neither the request nor the registry had one. */
+  milheiroBrl: number | null
+  /** Award provider consulted for this program; null when none applies or none is configured. */
+  awardSource: 'seats_aero' | null
+  awardsSearched: boolean
+  /** User-facing pt-BR note when awards could not be searched (not configured, provider error, program unsupported). */
+  awardsNote: string | null
 }
 
 /** GET /api/places?q=<text> — airport/city suggestions (q: 2–64 chars). */

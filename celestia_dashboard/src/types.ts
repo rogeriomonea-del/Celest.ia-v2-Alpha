@@ -85,6 +85,59 @@ export interface Flight {
     refundPenalty: Money | null
     changePenalty: Money | null
   }
+  /** Miles module for this offer; null when the search did not ask for a program. */
+  miles: FlightMiles | null
+}
+
+/** An award (miles) fare found by an availability provider for the same route, date and cabin. */
+export interface AwardFare {
+  /** Program code from src/shared/miles.ts (e.g. "smiles"). */
+  program: string
+  programName: string
+  cabin: CabinClass
+  /** Miles per passenger. */
+  miles: number
+  /** Taxes/fees per passenger, when the provider reports them. */
+  taxes: Money | null
+  seatsLeft: number | null
+  direct: boolean
+  /** Flight numbers of the award itinerary when known ("LA 8084"). */
+  flightNumbers: string[] | null
+  /** true when the award is for these exact flights; false = same route/date/cabin, flights may differ. */
+  matchesItinerary: boolean
+  source: 'seats_aero'
+  fetchedAt: string
+  bookingUrl: string | null
+}
+
+export type PurchaseStrategy = 'cash' | 'award'
+
+/** One way of paying for the offer, ranked by effective cost in BRL. */
+export interface PurchaseOption {
+  strategy: PurchaseStrategy
+  /** pt-BR label, e.g. "Passagem em dinheiro", "Emissão em milhas (Smiles)". */
+  label: string
+  cabin: CabinClass
+  /** Cash paid per passenger (fare, or award taxes). */
+  cash: Money
+  /** Miles spent per passenger (0 for cash). */
+  miles: number
+  program: string | null
+  /** BRL per 1,000 miles used to value the miles; null when unknown. */
+  milheiroBrl: number | null
+  /** cash + miles/1000 × milheiro, in BRL; null when cash is not BRL or milheiro is unknown. */
+  effectiveTotalBrl: number | null
+  /** Milheiro (BRL/1,000) at which this award option costs the same as the best cash option in the same cabin. */
+  breakevenMilheiroBrl: number | null
+  notes: string[]
+}
+
+export interface FlightMiles {
+  /** Cash fare expressed in miles at the chosen program's milheiro (price / milheiro × 1000). */
+  equivalentMiles: number | null
+  /** Best award found for this route/date/cabin, in the chosen program. */
+  award: AwardFare | null
+  options: PurchaseOption[]
 }
 
 export interface Money {
