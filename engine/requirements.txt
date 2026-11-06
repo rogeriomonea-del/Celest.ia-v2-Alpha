@@ -1,0 +1,5 @@
+# Dependências do motor (celestia_engine). Scrapers locais: requirements-scrapers.txt
+fastapi==0.162.0
+pydantic==2.14.3
+httpx==0.28.1
+uvicorn==0.54.0

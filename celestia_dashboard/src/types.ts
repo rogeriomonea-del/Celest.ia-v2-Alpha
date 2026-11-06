@@ -6,10 +6,13 @@ export interface Airport {
 }
 
 export interface Airline {
+  /** IATA carrier code, e.g. "LA". */
   code: string
   name: string
-  /** Tailwind gradient classes used by the placeholder logo. */
+  /** Tailwind gradient classes used when no logo image is available. */
   logoGradient: string
+  /** Carrier logo (square symbol) from the flight provider, if any. */
+  logoUrl: string | null
 }
 
 export interface FlightStop {
@@ -20,21 +23,127 @@ export interface FlightStop {
 
 export type FlightTag = 'eco' | 'wifi' | 'best-rated' | 'flexible'
 
+export interface FlightSegment {
+  carrier: Airline
+  /** e.g. "LA 8084" */
+  flightNumber: string
+  originCode: string
+  destinationCode: string
+  /** Local date-time at the airport, ISO without offset: "2026-12-01T22:05:00". */
+  departingAt: string
+  arrivingAt: string
+  durationMin: number
+  aircraft: string | null
+}
+
+/** One direction of travel (outbound or return). */
+export interface FlightSlice {
+  departure: { time: string; airportCode: string; date: string }
+  arrival: { time: string; airportCode: string; dayOffset: number }
+  durationMin: number
+  stops: FlightStop[]
+  segments: FlightSegment[]
+}
+
+/**
+ * A bookable offer. The top-level departure/arrival/durationMin/stops mirror
+ * the OUTBOUND slice (slices[0]) so cards, filters and sorting can read them
+ * directly; `slices` carries every direction.
+ */
 export interface Flight {
+  /** Provider offer id (e.g. Duffel "off_..."). */
   id: string
+  /** Owner airline of the offer. */
   airline: Airline
   flightNumber: string
   departure: { time: string; airportCode: string }
   arrival: { time: string; airportCode: string; dayOffset: number }
+  /** Outbound slice duration. */
   durationMin: number
+  /** Sum of all slice durations (used for "fastest"/"best" sorting). */
+  totalDurationMin: number
   stops: FlightStop[]
-  /** Total price per passenger, in BRL. */
+  slices: FlightSlice[]
+  /** Price per passenger (totalPrice / passenger count), in `currency`. */
   price: number
-  currency: 'BRL'
+  /** Total price for all passengers, in `currency`. */
+  totalPrice: number
+  /** ISO 4217 code, e.g. "BRL", "USD". */
+  currency: string
   seatsLeft: number | null
   tags: FlightTag[]
   baggage: { carryOn: boolean; checkedBags: number }
+  /** Relative to the other offers in the same result set. */
   emissions: 'low' | 'average' | 'high'
+  emissionsKg: number | null
+  /** ISO timestamp after which the offer can no longer be booked. */
+  expiresAt: string
+  conditions: {
+    refundable: boolean | null
+    changeable: boolean | null
+    /** Fee charged to refund/change when allowed; null = allowed but fee unknown, or not allowed. */
+    refundPenalty: Money | null
+    changePenalty: Money | null
+  }
+  /** Miles module for this offer; null when the search did not ask for a program. */
+  miles: FlightMiles | null
+}
+
+/** An award (miles) fare found by an availability provider for the same route, date and cabin. */
+export interface AwardFare {
+  /** Program code from src/shared/miles.ts (e.g. "smiles"). */
+  program: string
+  programName: string
+  cabin: CabinClass
+  /** Miles per passenger. */
+  miles: number
+  /** Taxes/fees per passenger, when the provider reports them. */
+  taxes: Money | null
+  seatsLeft: number | null
+  direct: boolean
+  /** Flight numbers of the award itinerary when known ("LA 8084"). */
+  flightNumbers: string[] | null
+  /** true when the award is for these exact flights; false = same route/date/cabin, flights may differ. */
+  matchesItinerary: boolean
+  source: 'seats_aero'
+  fetchedAt: string
+  bookingUrl: string | null
+}
+
+export type PurchaseStrategy = 'cash' | 'award'
+
+/** One way of paying for the offer, ranked by effective cost in BRL. */
+export interface PurchaseOption {
+  strategy: PurchaseStrategy
+  /** pt-BR label, e.g. "Passagem em dinheiro", "Emissão em milhas (Smiles)". */
+  label: string
+  cabin: CabinClass
+  /** Cash paid per passenger (fare, or award taxes). */
+  cash: Money
+  /** Miles spent per passenger (0 for cash). */
+  miles: number
+  program: string | null
+  /** BRL per 1,000 miles used to value the miles; null when unknown. */
+  milheiroBrl: number | null
+  /** cash + miles/1000 × milheiro, in BRL; null when cash is not BRL or milheiro is unknown. */
+  effectiveTotalBrl: number | null
+  /** Milheiro (BRL/1,000) at which this award option costs the same as the best cash option in the same cabin. */
+  breakevenMilheiroBrl: number | null
+  notes: string[]
+}
+
+export interface FlightMiles {
+  /** Cash fare expressed in miles at the chosen program's milheiro (price / milheiro × 1000). */
+  equivalentMiles: number | null
+  /** Best award found for this route/date/cabin, in the chosen program. */
+  award: AwardFare | null
+  options: PurchaseOption[]
+}
+
+export interface Money {
+  amount: number
+  /** ISO 4217 */
+  currency: string
 }
 
 export interface PassengerCounts {

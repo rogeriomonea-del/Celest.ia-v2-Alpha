@@ -1,7 +1,8 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Plane, type LucideIcon } from 'lucide-react'
 import { AIRPORTS } from '../data/airports'
 import { useClickOutside } from '../hooks/useClickOutside'
+import { fetchPlaces } from '../lib/api'
 import { normalizeText } from '../utils/format'
 import type { Airport } from '../types'
 
@@ -15,6 +16,7 @@ interface AirportInputProps {
 }
 
 const MAX_SUGGESTIONS = 8
+export const PLACES_DEBOUNCE_MS = 250
 
 export function AirportInput({ label, icon: Icon, value, onChange, excludeCode }: AirportInputProps) {
   const [open, setOpen] = useState(false)
@@ -25,7 +27,39 @@ export function AirportInput({ label, icon: Icon, value, onChange, excludeCode }
 
   useClickOutside(containerRef, () => setOpen(false), open)
 
-  const suggestions = useMemo(() => {
+  // Remote suggestions for the trimmed query; stale requests are aborted.
+  const [remote, setRemote] = useState<{ query: string; places: Airport[] } | null>(null)
+  const [remoteLoading, setRemoteLoading] = useState(false)
+  const trimmed = query.trim()
+  useEffect(() => {
+    if (!open || trimmed.length < 2) {
+      setRemoteLoading(false)
+      return
+    }
+    const controller = new AbortController()
+    setRemoteLoading(true)
+    const timer = setTimeout(() => {
+      fetchPlaces(trimmed, controller.signal).then(
+        (places) => {
+          // A late answer for a superseded query must not touch the state.
+          if (controller.signal.aborted) return
+          setRemote({ query: trimmed, places })
+          setRemoteLoading(false)
+        },
+        () => {
+          // Errors fall back silently to the local list.
+          if (!controller.signal.aborted) setRemoteLoading(false)
+        },
+      )
+    }, PLACES_DEBOUNCE_MS)
+    return () => {
+      clearTimeout(timer)
+      controller.abort()
+    }
+  }, [open, trimmed])
+  const remotePlaces = remote && remote.query === trimmed ? remote.places : []
+
+  const localSuggestions = useMemo(() => {
     const normalized = normalizeText(query.trim())
     if (!normalized) return AIRPORTS.slice(0, MAX_SUGGESTIONS)
 
@@ -44,6 +78,13 @@ export function AirportInput({ label, icon: Icon, value, onChange, excludeCode }
       .sort((a, b) => rank(a) - rank(b))
       .slice(0, MAX_SUGGESTIONS)
   }, [query])
+
+  const suggestions = useMemo(() => {
+    const seen = new Set<string>()
+    return [...localSuggestions, ...remotePlaces]
+      .filter((airport) => !seen.has(airport.code) && seen.add(airport.code))
+      .slice(0, MAX_SUGGESTIONS)
+  }, [localSuggestions, remotePlaces])
 
   const isSelectable = (index: number) =>
     index >= 0 && index < suggestions.length && suggestions[index].code !== excludeCode
@@ -83,6 +124,8 @@ export function AirportInput({ label, icon: Icon, value, onChange, excludeCode }
     } else if (event.key === 'Escape') {
       setOpen(false)
       inputRef.current?.blur()
+    } else if (event.key === 'Tab') {
+      setOpen(false)
     }
   }
 
@@ -124,6 +167,7 @@ export function AirportInput({ label, icon: Icon, value, onChange, excludeCode }
               setHighlighted(0)
             }}
             onKeyDown={handleKeyDown}
+            onBlur={() => setOpen(false)}
           />
         </div>
       </div>
@@ -135,7 +179,12 @@ export function AirportInput({ label, icon: Icon, value, onChange, excludeCode }
           aria-label={`Sugestões de ${label.toLowerCase()}`}
           className="thin-scrollbar absolute left-0 top-full z-30 mt-2 max-h-80 w-full min-w-[18rem] animate-pop overflow-y-auto rounded-2xl border border-slate-200 bg-white py-2 shadow-xl shadow-slate-900/10"
         >
-          {suggestions.length === 0 && (
+          {remoteLoading && (
+            <li role="presentation" className="px-4 py-1 text-xs text-slate-400">
+              Buscando aeroportos…
+            </li>
+          )}
+          {suggestions.length === 0 && !remoteLoading && (
             <li className="px-4 py-3 text-sm text-slate-500">Nenhum aeroporto encontrado.</li>
           )}
           {suggestions.map((airport, index) => {

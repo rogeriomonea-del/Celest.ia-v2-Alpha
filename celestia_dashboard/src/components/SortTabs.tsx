@@ -1,4 +1,4 @@
-import { formatBRL, formatDuration } from '../utils/format'
+import { formatDuration, formatMoney } from '../utils/format'
 import type { Flight, SortKey } from '../types'
 
 interface SortTabsProps {
@@ -47,7 +47,7 @@ export function SortTabs({ topByKey, active, onChange }: SortTabsProps) {
               {TAB_LABELS[key]}
             </span>
             <span className="mt-0.5 block truncate text-xs text-slate-500">
-              {top ? `${formatBRL(top.price)} · ${formatDuration(top.durationMin)}` : '—'}
+              {top ? `${formatMoney(top.price, top.currency)} · ${formatDuration(top.totalDurationMin)}` : '—'}
             </span>
           </button>
         )

@@ -24,20 +24,21 @@ export function applyFilters(flights: Flight[], filters: Filters): Flight[] {
 function bestScore(flight: Flight, minPrice: number, minDuration: number): number {
   return (
     0.6 * (flight.price / minPrice) +
-    0.4 * (flight.durationMin / minDuration) +
+    0.4 * (flight.totalDurationMin / minDuration) +
     0.08 * flight.stops.length
   )
 }
 
 export function sortFlights(flights: Flight[], sortKey: SortKey): Flight[] {
   const sorted = [...flights]
+  if (sorted.length < 2) return sorted
   if (sortKey === 'cheapest') {
-    sorted.sort((a, b) => a.price - b.price || a.durationMin - b.durationMin)
+    sorted.sort((a, b) => a.price - b.price || a.totalDurationMin - b.totalDurationMin)
   } else if (sortKey === 'fastest') {
-    sorted.sort((a, b) => a.durationMin - b.durationMin || a.price - b.price)
+    sorted.sort((a, b) => a.totalDurationMin - b.totalDurationMin || a.price - b.price)
   } else {
     const minPrice = Math.min(...flights.map((flight) => flight.price))
-    const minDuration = Math.min(...flights.map((flight) => flight.durationMin))
+    const minDuration = Math.min(...flights.map((flight) => flight.totalDurationMin))
     sorted.sort(
       (a, b) => bestScore(a, minPrice, minDuration) - bestScore(b, minPrice, minDuration),
     )

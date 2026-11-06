@@ -1,11 +1,37 @@
-const brlFormatter = new Intl.NumberFormat('pt-BR', {
+const moneyFormatters = new Map<string, Intl.NumberFormat>()
+
+/** pt-BR currency format; BRL without cents, other currencies with their default digits. */
+export function formatMoney(amount: number, currency: string): string {
+  const code = currency.toUpperCase()
+  let formatter = moneyFormatters.get(code)
+  if (!formatter) {
+    formatter = new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: code,
+      ...(code === 'BRL' ? { minimumFractionDigits: 0, maximumFractionDigits: 0 } : {}),
+    })
+    moneyFormatters.set(code, formatter)
+  }
+  return formatter.format(amount)
+}
+
+const milesFormatter = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 })
+
+/** Miles count in pt-BR: 60000 -> "60.000". */
+export function formatMiles(miles: number): string {
+  return milesFormatter.format(miles)
+}
+
+const milheiroFormatter = new Intl.NumberFormat('pt-BR', {
   style: 'currency',
   currency: 'BRL',
-  maximumFractionDigits: 0,
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
 })
 
-export function formatBRL(value: number): string {
-  return brlFormatter.format(value)
+/** Milheiro (BRL per 1,000 miles): "R$ 29", or "R$ 17,50" when it has cents. */
+export function formatMilheiro(brl: number): string {
+  return Number.isInteger(brl) ? formatMoney(brl, 'BRL') : milheiroFormatter.format(brl)
 }
 
 export function formatDuration(totalMin: number): string {

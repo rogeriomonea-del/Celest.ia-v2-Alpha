@@ -1,6 +1,6 @@
 import { Moon, Sun, Sunrise, Sunset, type LucideIcon } from 'lucide-react'
 import { AirlineLogo } from './AirlineLogo'
-import { formatBRL } from '../utils/format'
+import { formatMoney } from '../utils/format'
 import type { Airline, DepartureWindow, Filters, Flight } from '../types'
 
 interface FilterSidebarProps {
@@ -48,6 +48,8 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 }
 
 export function FilterSidebar({ flights, filters, priceBounds, onChange }: FilterSidebarProps) {
+  const currency = flights[0]?.currency ?? 'BRL'
+  const money = (value: number) => formatMoney(value, currency)
   const airlines = [...new Map(flights.map((flight) => [flight.airline.code, flight.airline])).values()].sort(
     (a: Airline, b: Airline) => a.name.localeCompare(b.name),
   )
@@ -120,7 +122,7 @@ export function FilterSidebar({ flights, filters, priceBounds, onChange }: Filte
                   <span className="ml-1 text-xs font-normal text-slate-400">({count})</span>
                 </span>
                 {minPrice !== null && (
-                  <span className="text-xs font-semibold text-slate-500">{formatBRL(minPrice)}</span>
+                  <span className="text-xs font-semibold text-slate-500">{money(minPrice)}</span>
                 )}
               </label>
             )
@@ -141,8 +143,8 @@ export function FilterSidebar({ flights, filters, priceBounds, onChange }: Filte
           className="w-full accent-indigo-600"
         />
         <div className="mt-1 flex items-center justify-between text-xs text-slate-500">
-          <span>{formatBRL(priceBounds.min)}</span>
-          <span className="font-bold text-indigo-600">até {formatBRL(filters.maxPrice)}</span>
+          <span>{money(priceBounds.min)}</span>
+          <span className="font-bold text-indigo-600">até {money(filters.maxPrice)}</span>
         </div>
       </section>
 
@@ -196,7 +198,7 @@ export function FilterSidebar({ flights, filters, priceBounds, onChange }: Filte
                 <span className="flex-1 truncate font-medium text-slate-700">{airline.name}</span>
                 {minPrice !== null && (
                   <span className="shrink-0 text-xs font-semibold text-slate-500">
-                    {formatBRL(minPrice)}
+                    {money(minPrice)}
                   </span>
                 )}
               </label>

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import {
   AlertCircle,
+  BadgePercent,
   Briefcase,
   ChevronDown,
   Leaf,
@@ -13,13 +14,18 @@ import {
 } from 'lucide-react'
 import { AirlineLogo } from './AirlineLogo'
 import { Badge } from './Badge'
-import { formatBRL, formatDuration } from '../utils/format'
-import type { Flight } from '../types'
+import { awardBeatsCash, MilesPriceLines, PurchaseOptionsList } from './MilesInfo'
+import { formatDuration, formatMoney } from '../utils/format'
+import type { Flight, FlightSlice, Money } from '../types'
 
 interface FlightCardProps {
   flight: Flight
+  passengerCount: number
   isCheapest: boolean
   isFastest: boolean
+  /** Milheiro the search valued the miles at (response miles summary); null when none was set. */
+  milheiro: number | null
+  onViewOffer: (flight: Flight) => void
 }
 
 function StopsLine({ flight }: { flight: Flight }) {
@@ -64,70 +70,110 @@ function StopsLine({ flight }: { flight: Flight }) {
   )
 }
 
-function ExpandedDetails({ flight }: { flight: Flight }) {
+function stopsLabel(slice: FlightSlice): string {
+  const count = slice.stops.length
+  return count === 0 ? 'Direto' : count === 1 ? '1 escala' : `${count} escalas`
+}
+
+const SLICE_TITLES = ['Ida', 'Volta']
+
+/**
+ * Label for a refund/change condition: free only when the fee is known to be 0;
+ * a positive fee is spelled out; an unknown fee is flagged. null = omit.
+ */
+function conditionLabel(
+  allowed: boolean | null,
+  penalty: Money | null,
+  labels: { free: string; withFee: string; denied: string },
+): string | null {
+  if (allowed === null) return null
+  if (!allowed) return labels.denied
+  if (penalty === null) return `${labels.free} (taxa a confirmar)`
+  if (penalty.amount === 0) return labels.free
+  return `${labels.withFee} ${formatMoney(penalty.amount, penalty.currency)}`
+}
+
+/** Segments and layovers of every slice, plus baggage, emissions and conditions. */
+export function OfferDetails({ flight }: { flight: Flight }) {
+  const { checkedBags, carryOn } = flight.baggage
+  const { refundable, changeable, refundPenalty, changePenalty } = flight.conditions
+  const refundLabel = conditionLabel(refundable, refundPenalty, {
+    free: 'Reembolsável',
+    withFee: 'Reembolsável com multa de',
+    denied: 'Não reembolsável',
+  })
+  const changeLabel = conditionLabel(changeable, changePenalty, {
+    free: 'Remarcável',
+    withFee: 'Remarcação com taxa de',
+    denied: 'Não remarcável',
+  })
   return (
-    <div className="mt-4 space-y-4 rounded-xl bg-slate-50 p-4 text-sm">
-      <div>
-        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-          Itinerário
-        </p>
-        <ol className="space-y-2">
-          <li className="flex items-center gap-3">
-            <span className="h-2 w-2 shrink-0 rounded-full bg-indigo-600" aria-hidden="true" />
-            <span className="text-slate-700">
-              <strong className="font-semibold">{flight.departure.time}</strong> · Decola de{' '}
-              {flight.departure.airportCode}
-            </span>
-          </li>
-          {flight.stops.map((stop) => (
-            <li key={stop.airportCode} className="flex items-center gap-3">
-              <span className="h-2 w-2 shrink-0 rounded-full bg-amber-500" aria-hidden="true" />
-              <span className="text-slate-700">
-                Escala em <strong className="font-semibold">{stop.city}</strong> (
-                {stop.airportCode}) · espera de {formatDuration(stop.layoverMin)}
-              </span>
-            </li>
-          ))}
-          <li className="flex items-center gap-3">
-            <span className="h-2 w-2 shrink-0 rounded-full bg-green-600" aria-hidden="true" />
-            <span className="text-slate-700">
-              <strong className="font-semibold">{flight.arrival.time}</strong>
-              {flight.arrival.dayOffset > 0 && (
-                <sup className="font-semibold text-slate-500"> +{flight.arrival.dayOffset}</sup>
-              )}{' '}
-              · Aterrissa em {flight.arrival.airportCode}
-            </span>
-          </li>
-        </ol>
-      </div>
+    <div className="space-y-4 text-sm">
+      {flight.slices.map((slice, sliceIndex) => (
+        <div key={sliceIndex}>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+            {SLICE_TITLES[sliceIndex] ?? `Trecho ${sliceIndex + 1}`} · {formatDuration(slice.durationMin)} ·{' '}
+            {stopsLabel(slice)}
+          </p>
+          <ol className="space-y-2">
+            {slice.segments.map((segment, index) => (
+              <li key={`${segment.flightNumber}-${index}`} className="text-slate-700">
+                <span className="flex items-center gap-3">
+                  <span className="h-2 w-2 shrink-0 rounded-full bg-indigo-600" aria-hidden="true" />
+                  <span>
+                    <strong className="font-semibold">
+                      {segment.departingAt.slice(11, 16)} – {segment.arrivingAt.slice(11, 16)}
+                    </strong>{' '}
+                    · {segment.originCode} → {segment.destinationCode} · {segment.flightNumber} (
+                    {segment.carrier.name}){segment.aircraft ? ` · ${segment.aircraft}` : ''}
+                  </span>
+                </span>
+                {slice.stops[index] && (
+                  <span className="ml-5 mt-2 flex items-center gap-3 text-slate-600">
+                    <span className="h-2 w-2 shrink-0 rounded-full bg-amber-500" aria-hidden="true" />
+                    Escala em {slice.stops[index].city} ({slice.stops[index].airportCode}) · espera de{' '}
+                    {formatDuration(slice.stops[index].layoverMin)}
+                  </span>
+                )}
+              </li>
+            ))}
+          </ol>
+        </div>
+      ))}
       <div className="flex flex-wrap gap-x-6 gap-y-2 border-t border-slate-200 pt-3 text-slate-600">
         <span className="inline-flex items-center gap-1.5">
           <Briefcase className="h-4 w-4 text-slate-400" aria-hidden="true" />
-          Item pessoal incluído
+          {carryOn ? 'Bagagem de mão incluída' : 'Bagagem de mão não incluída'}
         </span>
         <span className="inline-flex items-center gap-1.5">
           <Luggage className="h-4 w-4 text-slate-400" aria-hidden="true" />
-          {flight.baggage.checkedBags === 0
+          {checkedBags === 0
             ? 'Bagagem despachada não incluída'
-            : `${flight.baggage.checkedBags} ${
-                flight.baggage.checkedBags > 1 ? 'bagagens' : 'bagagem'
-              } de 23 kg`}
+            : checkedBags === 1
+              ? '1 bagagem despachada incluída'
+              : `${checkedBags} bagagens despachadas incluídas`}
         </span>
-        <span className="inline-flex items-center gap-1.5">
-          <Leaf className="h-4 w-4 text-slate-400" aria-hidden="true" />
-          Emissões {flight.emissions === 'low' ? 'abaixo da' : flight.emissions === 'high' ? 'acima da' : 'na'}{' '}
-          média
-        </span>
+        {flight.emissionsKg !== null && (
+          <span className="inline-flex items-center gap-1.5">
+            <Leaf className="h-4 w-4 text-slate-400" aria-hidden="true" />
+            Emissões {flight.emissions === 'low' ? 'abaixo da' : flight.emissions === 'high' ? 'acima da' : 'na'}{' '}
+            média · {flight.emissionsKg} kg CO₂
+          </span>
+        )}
+        {refundLabel && <span>{refundLabel}</span>}
+        {changeLabel && <span>{changeLabel}</span>}
       </div>
     </div>
   )
 }
 
-export function FlightCard({ flight, isCheapest, isFastest }: FlightCardProps) {
+export function FlightCard({ flight, passengerCount, isCheapest, isFastest, milheiro, onViewOffer }: FlightCardProps) {
+  const returnSlice = flight.slices[1]
   const [expanded, setExpanded] = useState(false)
 
+  const milesWin = flight.miles !== null && awardBeatsCash(flight.miles)
   const hasBadges =
-    isCheapest || isFastest || flight.stops.length === 0 || flight.seatsLeft !== null
+    isCheapest || isFastest || flight.stops.length === 0 || flight.seatsLeft !== null || milesWin
 
   return (
     <article className="animate-fade-up rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition-shadow hover:shadow-md sm:p-5">
@@ -147,6 +193,11 @@ export function FlightCard({ flight, isCheapest, isFastest }: FlightCardProps) {
           {flight.seatsLeft !== null && (
             <Badge tone="red" icon={AlertCircle}>
               Poucos lugares · restam {flight.seatsLeft}
+            </Badge>
+          )}
+          {milesWin && (
+            <Badge tone="emerald" icon={BadgePercent}>
+              Vale com milhas
             </Badge>
           )}
         </div>
@@ -182,18 +233,47 @@ export function FlightCard({ flight, isCheapest, isFastest }: FlightCardProps) {
         <div className="flex items-center justify-between gap-4 border-t border-slate-100 pt-3 md:flex-col md:items-end md:border-0 md:pt-0">
           <div className="text-left md:text-right">
             <p className="text-2xl font-extrabold tracking-tight text-slate-900">
-              {formatBRL(flight.price)}
+              {formatMoney(flight.price, flight.currency)}
             </p>
             <p className="text-xs text-slate-500">por pessoa</p>
+            {passengerCount > 1 && (
+              <p className="text-xs text-slate-500">
+                Total {formatMoney(flight.totalPrice, flight.currency)} · {passengerCount} passageiros
+              </p>
+            )}
+            {flight.miles && <MilesPriceLines miles={flight.miles} milheiro={milheiro} />}
           </div>
           <button
             type="button"
+            onClick={() => onViewOffer(flight)}
             className="rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition-colors hover:bg-indigo-700"
           >
             Ver oferta
           </button>
         </div>
       </div>
+
+      {returnSlice && (
+        <div
+          data-testid="return-slice"
+          className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-slate-100 pt-3 text-sm text-slate-600"
+        >
+          <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Volta</span>
+          <span className="font-semibold text-slate-900">
+            {returnSlice.departure.time} – {returnSlice.arrival.time}
+            {returnSlice.arrival.dayOffset > 0 && (
+              <sup className="ml-0.5 text-xs font-semibold text-slate-500">+{returnSlice.arrival.dayOffset}</sup>
+            )}
+          </span>
+          <span>
+            {returnSlice.departure.airportCode} → {returnSlice.arrival.airportCode}
+          </span>
+          <span>{formatDuration(returnSlice.durationMin)}</span>
+          <span className={returnSlice.stops.length === 0 ? 'text-green-600' : 'text-amber-600'}>
+            {stopsLabel(returnSlice)}
+          </span>
+        </div>
+      )}
 
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3">
         <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
@@ -230,7 +310,16 @@ export function FlightCard({ flight, isCheapest, isFastest }: FlightCardProps) {
         </button>
       </div>
 
-      {expanded && <ExpandedDetails flight={flight} />}
+      {expanded && (
+        <div className="mt-4 rounded-xl bg-slate-50 p-4">
+          <OfferDetails flight={flight} />
+          {flight.miles && (
+            <div className="mt-4 border-t border-slate-200 pt-3">
+              <PurchaseOptionsList miles={flight.miles} />
+            </div>
+          )}
+        </div>
+      )}
     </article>
   )
 }

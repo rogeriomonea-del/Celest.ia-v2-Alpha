@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "celestia-engine"
+version = "1.0.0"
+description = "Motor de pesquisa multi-agente do celest.ia (não usado pelo site; desligado por padrão)"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi==0.162.0",
+    "pydantic==2.14.3",
+    "httpx==0.28.1",
+    "uvicorn==0.54.0",
+]
+
+[project.optional-dependencies]
+scrapers = ["playwright==1.64.1"]
+
+[tool.setuptools.packages.find]
+include = ["celestia_engine*"]

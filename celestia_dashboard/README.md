@@ -16,13 +16,18 @@ Google Flights), construída com **React + TypeScript**, **Tailwind CSS** e
 - **Sidebar de filtros funcional**: escalas, preço máximo, horário de partida
   e companhias — com contagens e menor preço por opção.
 - **Estados realistas**: skeleton loaders pulsantes durante a busca, estado
-  vazio com reset de filtros e dados mock em BRL.
+  vazio com reset de filtros e preços em BRL.
+
+> Na v1 os voos vêm de ofertas reais da Duffel via funções `/api` (veja o
+> README da raiz). `src/data/flights.ts` é apenas inventário de exemplo/legado
+> e não é o produto.
 
 ## Como rodar
 
 ```bash
-npm install
-npm run dev        # servidor de desenvolvimento (Vite)
+npm ci
+cp .env.example .env.local
+npm run dev        # front-end (Vite); /api só roda com `vercel dev`
 npm run build      # typecheck + build de produção
 npm run preview    # serve o build de produção
 ```
@@ -46,7 +51,7 @@ src/
 │   ├── Header.tsx / Footer.tsx
 ├── data/
 │   ├── airports.ts            # base de aeroportos (IATA)
-│   └── flights.ts             # inventário mock realista (preços em BRL)
+│   └── flights.ts             # inventário de exemplo (legado; a v1 usa Duffel)
 ├── hooks/useClickOutside.ts
 └── utils/                     # formatação BRL/datas, filtros e ordenação
 ```
