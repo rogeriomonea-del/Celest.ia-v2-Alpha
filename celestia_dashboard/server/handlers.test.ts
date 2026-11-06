@@ -1,12 +1,24 @@
 import { readFileSync } from 'node:fs'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ApiErrorBody, OfferResponse, PlacesResponse, SearchResponse } from '../src/shared/api.js'
+import type { AwardFare } from '../src/types.js'
 import { POST as searchPOST, GET as searchGET } from '../api/flights/search.js'
 import { GET as placesGET } from '../api/places.js'
 import { GET as offerGET } from '../api/offers/[id].js'
 import type { DuffelOffer } from './duffel.js'
 import { SEARCH_TIMEOUT_MS, SUPPLIER_TIMEOUT_MS } from './duffel.js'
 import { MESSAGES } from './http.js'
+import { AWARD_NOTES } from './awards/index.js'
+import { searchAwards } from './awards/seatsAero.js'
+
+// Spy on the award provider; by default it runs the real implementation.
+vi.mock('./awards/seatsAero.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./awards/seatsAero.js')>()
+  return { searchAwards: vi.fn(actual.searchAwards) }
+})
+const searchAwardsMock = vi.mocked(searchAwards)
+const { searchAwards: realSearchAwards } = await vi.importActual<typeof import('./awards/seatsAero.js')>('./awards/seatsAero.js')
+const SEATS_AERO_KEY = 'seats_aero_dummy_key_for_unit_tests'
 
 const TOKEN = 'duffel_test_dummy_token_for_unit_tests'
 const fixture = JSON.parse(readFileSync(new URL('./__fixtures__/duffel-offers.json', import.meta.url), 'utf8')) as {
@@ -58,6 +70,8 @@ function expectCredentialRejectedLogged(status: number) {
 beforeEach(() => {
   vi.stubGlobal('fetch', fetchMock)
   vi.stubEnv('DUFFEL_ACCESS_TOKEN', TOKEN)
+  vi.stubEnv('SEATS_AERO_API_KEY', SEATS_AERO_KEY)
+  searchAwardsMock.mockReset().mockImplementation(realSearchAwards)
   vi.spyOn(console, 'error').mockImplementation(() => {})
 })
 
@@ -253,6 +267,140 @@ describe('POST /api/flights/search', () => {
     const sentBody = JSON.parse(String(fetchMock.mock.calls[0][1]?.body))
     expect(sentBody.data.slices).toHaveLength(1)
     expect(sentBody.data.cabin_class).toBe('business')
+  })
+})
+
+describe('POST /api/flights/search with miles', () => {
+  // The fixture offer has one seated passenger, so price = total.
+  const pricedOffers = () => [
+    { ...fixture.oneWayDirect, id: 'off_miles_cheap', total_amount: '1100.00', total_currency: 'BRL' },
+    { ...fixture.oneWayDirect, id: 'off_miles_pricey', total_amount: '2200.00', total_currency: 'BRL' },
+  ]
+  const duffelOk = () => duffelJson({ data: { id: 'orq_1', offers: pricedOffers() } }, 201)
+  const milesSearch = (miles: unknown) => searchRequest({ ...validSearch, miles })
+
+  const award = (cabin: AwardFare['cabin'], miles: number): AwardFare => ({
+    program: 'smiles',
+    programName: 'Smiles (GOL)',
+    cabin,
+    miles,
+    taxes: { amount: 200, currency: 'BRL' },
+    seatsLeft: 2,
+    direct: true,
+    flightNumbers: null,
+    matchesItinerary: false,
+    source: 'seats_aero',
+    fetchedAt: '2026-11-06T12:00:00.000Z',
+    bookingUrl: null,
+  })
+
+  const byId = (body: SearchResponse, id: string) => body.offers.find((o) => o.id === id)
+
+  it('leaves miles null on the response and every offer, without calling the award provider, when the request has no miles', async () => {
+    fetchMock.mockResolvedValue(duffelOk())
+    const res = await searchPOST(searchRequest(validSearch))
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as SearchResponse
+    expect(body.miles).toBeNull()
+    expect(body.offers).toHaveLength(2)
+    expect(body.offers.every((o) => o.miles === null)).toBe(true)
+    expect(searchAwardsMock).not.toHaveBeenCalled()
+  })
+
+  it('values every offer, attaches the searched-cabin award and echoes the settings', async () => {
+    searchAwardsMock.mockResolvedValue([award('premium', 60_000), award('economy', 10_000)])
+    // Duffel only answers once the award lookup has started: the two run in parallel.
+    fetchMock.mockImplementation(async () => {
+      await vi.waitFor(() => expect(searchAwardsMock).toHaveBeenCalled())
+      return duffelOk()
+    })
+
+    const res = await searchPOST(milesSearch({ program: 'smiles', milheiroBrl: null, balance: 50_000 }))
+    expect(res.status).toBe(200)
+    const text = await res.text()
+    expect(text).not.toContain(SEATS_AERO_KEY)
+    const body = JSON.parse(text) as SearchResponse
+    expect(body.miles).toEqual({
+      program: 'smiles',
+      programName: 'Smiles (GOL)',
+      milheiroBrl: 22,
+      awardSource: 'seats_aero',
+      awardsSearched: true,
+      awardsNote: null,
+    })
+    expect(searchAwardsMock.mock.calls[0][0]).toMatchObject({ cabin: 'premium', origin: 'GRU', destination: 'MAD', date: '2026-12-01' })
+
+    const cheap = byId(body, 'off_miles_cheap')?.miles
+    const pricey = byId(body, 'off_miles_pricey')?.miles
+    // 1100 / 22 x 1000 and 2200 / 22 x 1000
+    expect(cheap?.equivalentMiles).toBe(50_000)
+    expect(pricey?.equivalentMiles).toBe(100_000)
+    expect(cheap?.award?.cabin).toBe('premium')
+    expect(cheap?.award?.miles).toBe(60_000)
+    const awardOption = (miles: typeof cheap) => miles?.options.find((o) => o.strategy === 'award')
+    // Breakeven against each offer's own price: (1100 - 200) / 60 and (2200 - 200) / 60.
+    expect(awardOption(cheap)?.breakevenMilheiroBrl).toBe(15)
+    expect(awardOption(pricey)?.breakevenMilheiroBrl).toBe(33.33)
+    expect(awardOption(pricey)?.notes).toEqual([
+      'Vale a pena com milheiro <= R$ 33,33',
+      'Saldo insuficiente: faltam 10.000 milhas',
+      'Voos podem diferir da oferta',
+      'Equivalente em dinheiro: R$ 1.520,00 (milheiro R$ 22,00)',
+    ])
+    expect(pricey?.options.map((o) => o.strategy)).toEqual(['award', 'cash'])
+    expect(cheap?.options.map((o) => o.strategy)).toEqual(['cash', 'award'])
+  })
+
+  it('uses the milheiro from the request over the program default, and none when neither has one', async () => {
+    fetchMock.mockResolvedValue(duffelOk())
+    searchAwardsMock.mockResolvedValue([])
+    const own = (await (await searchPOST(milesSearch({ program: 'smiles', milheiroBrl: 25, balance: 0 }))).json()) as SearchResponse
+    expect(own.miles?.milheiroBrl).toBe(25)
+    expect(byId(own, 'off_miles_cheap')?.miles?.equivalentMiles).toBe(44_000)
+
+    fetchMock.mockResolvedValue(duffelOk())
+    const none = (await (await searchPOST(milesSearch({ program: 'lifemiles', milheiroBrl: null, balance: 0 }))).json()) as SearchResponse
+    expect(none.miles).toMatchObject({ program: 'lifemiles', milheiroBrl: null, awardsSearched: true })
+    expect(byId(none, 'off_miles_cheap')?.miles).toMatchObject({ equivalentMiles: null, award: null })
+  })
+
+  it('returns a pt-BR 400 for an unknown program without calling Duffel or the award provider', async () => {
+    const res = await searchPOST(milesSearch({ program: 'nao_existe', milheiroBrl: null, balance: 0 }))
+    expect(res.status).toBe(400)
+    expect(await errorOf(res)).toEqual({ code: 'invalid_request', message: 'Programa de milhas desconhecido.' })
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(searchAwardsMock).not.toHaveBeenCalled()
+  })
+
+  it('still returns valued offers when the award provider fails', async () => {
+    // Default implementation: the real provider, which currently throws.
+    fetchMock.mockResolvedValue(duffelOk())
+    const res = await searchPOST(milesSearch({ program: 'smiles', milheiroBrl: null, balance: 0 }))
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as SearchResponse
+    expect(searchAwardsMock).toHaveBeenCalledTimes(1)
+    expect(body.miles).toMatchObject({ awardSource: 'seats_aero', awardsSearched: false, awardsNote: AWARD_NOTES.failed })
+    expect(body.offers).toHaveLength(2)
+    const miles = byId(body, 'off_miles_cheap')?.miles
+    expect(miles?.equivalentMiles).toBe(50_000)
+    expect(miles?.award).toBeNull()
+    expect(miles?.options.map((o) => o.strategy)).toEqual(['cash'])
+  })
+
+  it('reports award lookups as not configured without SEATS_AERO_API_KEY', async () => {
+    vi.stubEnv('SEATS_AERO_API_KEY', '')
+    fetchMock.mockResolvedValue(duffelOk())
+    const body = (await (await searchPOST(milesSearch({ program: 'smiles', milheiroBrl: null, balance: 0 }))).json()) as SearchResponse
+    expect(body.miles).toMatchObject({ awardSource: null, awardsSearched: false, awardsNote: AWARD_NOTES.notConfigured })
+    expect(searchAwardsMock).not.toHaveBeenCalled()
+  })
+
+  it('still fails the search when Duffel fails, even with miles', async () => {
+    searchAwardsMock.mockResolvedValue([award('premium', 60_000)])
+    fetchMock.mockResolvedValue(duffelJson(duffelErrorBody('internal_server_error', 'api_error'), 500))
+    const res = await searchPOST(milesSearch({ program: 'smiles', milheiroBrl: null, balance: 0 }))
+    expect(res.status).toBe(502)
+    expect((await errorOf(res)).code).toBe('provider_error')
   })
 })
 
