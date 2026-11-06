@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { ArrowLeftRight, PlaneLanding, PlaneTakeoff, Search } from 'lucide-react'
 import { AirportInput } from './AirportInput'
 import { DateRangePicker } from './DateRangePicker'
@@ -9,6 +9,8 @@ interface SearchBarProps {
   initialParams: SearchParams
   loading: boolean
   onSearch: (params: SearchParams) => void
+  /** Extra control shown at the end of the trip-type row (the miles popover). */
+  extraControl?: ReactNode
 }
 
 const TRIP_TYPE_LABELS: Record<TripType, string> = {
@@ -16,7 +18,7 @@ const TRIP_TYPE_LABELS: Record<TripType, string> = {
   oneway: 'Somente ida',
 }
 
-export function SearchBar({ initialParams, loading, onSearch }: SearchBarProps) {
+export function SearchBar({ initialParams, loading, onSearch, extraControl }: SearchBarProps) {
   const [draft, setDraft] = useState<SearchParams>(initialParams)
   const [swapCount, setSwapCount] = useState(0)
 
@@ -60,6 +62,7 @@ export function SearchBar({ initialParams, loading, onSearch }: SearchBarProps) 
             {TRIP_TYPE_LABELS[tripType]}
           </button>
         ))}
+        {extraControl && <div className="sm:ml-auto">{extraControl}</div>}
       </div>
 
       <div className="grid grid-cols-1 gap-3 xl:grid-cols-[1.05fr_auto_1.05fr_1.5fr_1.05fr]">

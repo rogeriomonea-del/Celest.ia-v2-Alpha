@@ -15,6 +15,25 @@ export function formatMoney(amount: number, currency: string): string {
   return formatter.format(amount)
 }
 
+const milesFormatter = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 })
+
+/** Miles count in pt-BR: 60000 -> "60.000". */
+export function formatMiles(miles: number): string {
+  return milesFormatter.format(miles)
+}
+
+const milheiroFormatter = new Intl.NumberFormat('pt-BR', {
+  style: 'currency',
+  currency: 'BRL',
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+})
+
+/** Milheiro (BRL per 1,000 miles): "R$ 29", or "R$ 17,50" when it has cents. */
+export function formatMilheiro(brl: number): string {
+  return Number.isInteger(brl) ? formatMoney(brl, 'BRL') : milheiroFormatter.format(brl)
+}
+
 export function formatDuration(totalMin: number): string {
   const hours = Math.floor(totalMin / 60)
   const minutes = totalMin % 60

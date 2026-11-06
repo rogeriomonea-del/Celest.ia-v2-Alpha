@@ -2,8 +2,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { FlightCard } from './FlightCard'
-import { LATAM, makeFlight, makeSlice } from '../test/flights'
-import type { Flight } from '../types'
+import { LATAM, makeFlight, makeMiles, makeSlice } from '../test/flights'
+import type { Flight, FlightMiles, PurchaseOption } from '../types'
 
 const plain = (text: string | null) => (text ?? '').replace(/\s/g, ' ')
 
@@ -146,5 +146,98 @@ describe('FlightCard', () => {
       openDetails(makeFlight({ emissions: 'low', emissionsKg: 412 }))
       expect(plain(screen.getByText(/Emissões/).textContent)).toBe('Emissões abaixo da média · 412 kg CO₂')
     })
+  })
+})
+
+describe('FlightCard miles', () => {
+  /** Replaces the effective totals of the award and cash options. */
+  function withTotals(award: number | null, cash: number | null): FlightMiles {
+    const base = makeMiles()
+    const totals: Record<PurchaseOption['strategy'], number | null> = { award, cash }
+    return { ...base, options: base.options.map((option) => ({ ...option, effectiveTotalBrl: totals[option.strategy] })) }
+  }
+
+  it('shows nothing about miles when the search did not ask for a program', () => {
+    renderCard(makeFlight({ miles: null }))
+    expect(screen.queryByText(/milhas/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/^Award/)).not.toBeInTheDocument()
+    expect(screen.queryByText('Vale com milhas')).not.toBeInTheDocument()
+  })
+
+  it('shows the fare in miles with the milheiro used in its title', () => {
+    renderCard(makeFlight({ miles: makeMiles({ equivalentMiles: 52900 }) }))
+    const line = screen.getByText('≈ 52.900 milhas')
+    expect(plain(line.getAttribute('title'))).toBe('ao milheiro de R$ 29')
+  })
+
+  it('asks for the milheiro when the fare could not be valued for lack of one', () => {
+    const base = makeMiles()
+    renderCard(
+      makeFlight({
+        miles: {
+          ...base,
+          equivalentMiles: null,
+          options: base.options.map((option) => ({ ...option, milheiroBrl: null, effectiveTotalBrl: null })),
+        },
+      }),
+    )
+    expect(screen.getByText(/informe o milheiro/)).toBeInTheDocument()
+    expect(screen.queryByText(/≈/)).not.toBeInTheDocument()
+  })
+
+  it('shows the award line with miles, taxes and seats', () => {
+    renderCard(makeFlight({ miles: makeMiles() }))
+    expect(plain(screen.getByText(/^Award/).textContent)).toBe('Award Smiles: 60.000 mi + R$ 180 · 4 assentos')
+    expect(screen.queryByText(/voos podem diferir/)).not.toBeInTheDocument()
+  })
+
+  it('warns that the award flights may differ when it is not for this itinerary', () => {
+    const base = makeMiles()
+    renderCard(makeFlight({ miles: { ...base, award: { ...base.award!, matchesItinerary: false, seatsLeft: 1 } } }))
+    expect(plain(screen.getByText(/^Award/).textContent)).toBe(
+      'Award Smiles: 60.000 mi + R$ 180 · 1 assento· voos podem diferir',
+    )
+  })
+
+  it('has no award line when no award was found', () => {
+    renderCard(makeFlight({ miles: makeMiles({ award: null }) }))
+    expect(screen.queryByText(/^Award/)).not.toBeInTheDocument()
+    expect(screen.getByText('≈ 120.690 milhas')).toBeInTheDocument()
+  })
+
+  it('badges "Vale com milhas" only when the award costs less than paying cash', () => {
+    renderCard(makeFlight({ miles: withTotals(1920, 3500) }))
+    expect(screen.getByText('Vale com milhas')).toBeInTheDocument()
+    cleanup()
+
+    renderCard(makeFlight({ miles: withTotals(3600, 3500) }))
+    expect(screen.queryByText('Vale com milhas')).not.toBeInTheDocument()
+    cleanup()
+
+    renderCard(makeFlight({ miles: withTotals(3500, 3500) }))
+    expect(screen.queryByText('Vale com milhas')).not.toBeInTheDocument()
+    cleanup()
+
+    // Unknown effective cost (no milheiro): no claim either way.
+    renderCard(makeFlight({ miles: withTotals(null, 3500) }))
+    expect(screen.queryByText('Vale com milhas')).not.toBeInTheDocument()
+  })
+
+  it('lists every way to pay in the details, with effective cost and notes', () => {
+    const base = makeMiles()
+    const miles = { ...base, options: [base.options[0], { ...base.options[1], effectiveTotalBrl: null }] }
+    renderCard(makeFlight({ miles }))
+    expect(screen.queryByRole('list', { name: 'Como pagar' })).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Detalhes do voo' }))
+
+    const list = screen.getByRole('list', { name: 'Como pagar' })
+    const items = within(list).getAllByRole('listitem').filter((item) => item.parentElement === list)
+    expect(items).toHaveLength(2)
+    expect(plain(items[0].textContent)).toBe(
+      'Emissão em milhas (Smiles): 60.000 mi + R$ 180 · custo efetivo R$ 1.920' +
+        'Saldo insuficiente: faltam 10.000 milhas',
+    )
+    expect(plain(items[1].textContent)).toBe('Passagem em dinheiro: R$ 3.500 · custo efetivo —')
   })
 })

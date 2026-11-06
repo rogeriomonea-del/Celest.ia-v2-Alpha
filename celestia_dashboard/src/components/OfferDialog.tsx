@@ -3,6 +3,7 @@ import { Loader2, X } from 'lucide-react'
 import { ApiError, fetchOffer, UNREACHABLE_MESSAGE } from '../lib/api'
 import { formatMoney } from '../utils/format'
 import { OfferDetails } from './FlightCard'
+import { MilesBlock } from './MilesInfo'
 import type { Flight } from '../types'
 
 interface OfferDialogProps {
@@ -160,6 +161,8 @@ export function OfferDialog({ flight, passengerCount, onClose, onResearch }: Off
               </div>
               {/* The emissions bucket is relative to the search results, so keep the card's. */}
               <OfferDetails flight={{ ...state.offer, emissions: flight.emissions }} />
+              {/* The re-fetched offer carries no miles: keep the card's valuation. */}
+              {flight.miles && <MilesBlock miles={flight.miles} />}
               <p className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-600">Reserva online em breve.</p>
             </div>
           )}

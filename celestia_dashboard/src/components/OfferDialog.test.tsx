@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { OfferDialog } from './OfferDialog'
 import { ApiError, fetchOffer, UNREACHABLE_MESSAGE } from '../lib/api'
-import { makeFlight } from '../test/flights'
+import { makeFlight, makeMiles } from '../test/flights'
 
 vi.mock('../lib/api', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../lib/api')>()),
@@ -130,5 +130,25 @@ describe('OfferDialog', () => {
     expect(signal.aborted).toBe(false)
     cleanup()
     expect(signal.aborted).toBe(true)
+  })
+})
+
+describe('OfferDialog miles', () => {
+  it("shows the card's miles valuation, since the re-fetched offer has none", async () => {
+    const card = makeFlight({ id: 'off_9', miles: makeMiles({ equivalentMiles: 52900 }) })
+    vi.mocked(fetchOffer).mockResolvedValue({ ...card, miles: null })
+    render(<OfferDialog flight={card} passengerCount={1} onClose={vi.fn()} onResearch={vi.fn()} />)
+
+    expect(await screen.findByText('≈ 52.900 milhas')).toBeInTheDocument()
+    expect(plain(screen.getByText(/^Award/).textContent)).toBe('Award Smiles: 60.000 mi + R$ 180 · 4 assentos')
+    expect(screen.getByRole('list', { name: 'Como pagar' })).toBeInTheDocument()
+  })
+
+  it('has no miles block when the card has no miles', async () => {
+    vi.mocked(fetchOffer).mockResolvedValue(searched)
+    renderDialog()
+    await screen.findByText(/por pessoa/)
+    expect(screen.queryByRole('list', { name: 'Como pagar' })).not.toBeInTheDocument()
+    expect(screen.queryByText(/milhas/)).not.toBeInTheDocument()
   })
 })

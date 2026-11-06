@@ -18,6 +18,7 @@ import { SortTabs } from './components/SortTabs'
 import { FlightCard } from './components/FlightCard'
 import { FilterSidebar } from './components/FilterSidebar'
 import { OfferDialog } from './components/OfferDialog'
+import { MilesControl } from './components/MilesControl'
 import {
   FilterSidebarSkeleton,
   FlightCardSkeleton,
@@ -28,9 +29,11 @@ import { ApiError, searchFlights, UNREACHABLE_MESSAGE } from './lib/api'
 import { useAuth } from './auth/context'
 import { useSavedSearches } from './features/savedSearches/useSavedSearches'
 import type { SavedSearch } from './features/savedSearches/types'
+import { useMilesPrefs, type MilesPrefs } from './features/miles/useMilesPrefs'
 import { applyFilters, sortFlights } from './utils/flightLogic'
 import { addDays, fromISODate, startOfDay, toISODate } from './utils/dates'
 import { formatShortDate } from './utils/format'
+import type { MilesSummary } from './shared/api'
 import type { Filters, Flight, SearchParams, SortKey } from './types'
 
 const SKELETON_COUNT = 5
@@ -139,6 +142,11 @@ export default function App() {
   const [truncated, setTruncated] = useState(false)
   const [liveMode, setLiveMode] = useState(true)
   const [offer, setOffer] = useState<Flight | null>(null)
+  const [milesSummary, setMilesSummary] = useState<MilesSummary | null>(null)
+  const { prefs: milesPrefs, setPrefs: setMilesPrefs } = useMilesPrefs()
+  // Read by runSearch, so a search started right after Apply uses the new prefs.
+  const milesPrefsRef = useRef(milesPrefs)
+  milesPrefsRef.current = milesPrefs
   const controllerRef = useRef<AbortController | null>(null)
   // Bumped on every search, so a save that resolves late can tell it is stale.
   const searchSeqRef = useRef(0)
@@ -161,7 +169,12 @@ export default function App() {
     setSaveError(null)
     setHint(null)
     setStatus('loading')
-    searchFlights(nextParams, controller.signal).then(
+    const miles = milesPrefsRef.current
+    // Prefs travel only when the miles module is on.
+    const request = miles.enabled
+      ? searchFlights(nextParams, controller.signal, miles)
+      : searchFlights(nextParams, controller.signal)
+    request.then(
       (response) => {
         if (controller.signal.aborted) return
         const { offers } = response
@@ -169,6 +182,7 @@ export default function App() {
         setTotalOffers(response.totalOffers)
         setTruncated(response.truncated)
         setLiveMode(response.liveMode)
+        setMilesSummary(response.miles)
         setFilters(buildDefaultFilters(offers))
         setStatus('results')
       },
@@ -210,6 +224,12 @@ export default function App() {
     },
     [save],
   )
+
+  const handleMilesApply = (next: MilesPrefs) => {
+    setMilesPrefs(next)
+    milesPrefsRef.current = next
+    if (status !== 'idle' && searchedParams) runSearch(searchedParams)
+  }
 
   const handleSave = async () => {
     if (!searchedParams) return
@@ -309,7 +329,13 @@ export default function App() {
                 Compare tarifas de companhias aéreas e encontre o melhor voo.
               </p>
             </div>
-            <SearchBar key={formKey} initialParams={params} loading={loading} onSearch={runSearch} />
+            <SearchBar
+              key={formKey}
+              initialParams={params}
+              loading={loading}
+              onSearch={runSearch}
+              extraControl={<MilesControl prefs={milesPrefs} onApply={handleMilesApply} />}
+            />
             {hint && (
               <p role="status" className="mt-10 text-center text-sm font-medium text-white">
                 {hint}
@@ -364,6 +390,12 @@ export default function App() {
               )}
             </div>
           </div>
+
+          {status === 'results' && milesPrefs.enabled && milesSummary?.awardsNote && (
+            <p role="note" className="mb-5 text-sm text-slate-500">
+              Awards: {milesSummary.awardsNote}
+            </p>
+          )}
 
           {status === 'results' && !liveMode && (
             <p

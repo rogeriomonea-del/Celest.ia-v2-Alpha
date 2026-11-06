@@ -1,4 +1,4 @@
-import type { Airline, Flight, FlightSlice } from '../types'
+import type { Airline, Flight, FlightMiles, FlightSlice } from '../types'
 
 export const LATAM: Airline = {
   code: 'LA',
@@ -59,6 +59,54 @@ export function makeFlight(overrides: Partial<Flight> = {}): Flight {
     expiresAt: '2026-12-01T15:30:00Z',
     conditions: { refundable: null, changeable: null, refundPenalty: null, changePenalty: null },
     miles: null,
+    ...overrides,
+  }
+}
+
+/** Miles module for a R$ 3.500 fare at milheiro R$ 29 (LATAM Pass), with a cheaper Smiles award. */
+export function makeMiles(overrides: Partial<FlightMiles> = {}): FlightMiles {
+  return {
+    equivalentMiles: 120690,
+    award: {
+      program: 'smiles',
+      programName: 'Smiles',
+      cabin: 'economy',
+      miles: 60000,
+      taxes: { amount: 180, currency: 'BRL' },
+      seatsLeft: 4,
+      direct: true,
+      flightNumbers: ['LA 8084'],
+      matchesItinerary: true,
+      source: 'seats_aero',
+      fetchedAt: '2026-11-04T12:00:00Z',
+      bookingUrl: null,
+    },
+    options: [
+      {
+        strategy: 'award',
+        label: 'Emissão em milhas (Smiles)',
+        cabin: 'economy',
+        cash: { amount: 180, currency: 'BRL' },
+        miles: 60000,
+        program: 'smiles',
+        milheiroBrl: 29,
+        effectiveTotalBrl: 1920,
+        breakevenMilheiroBrl: 55.33,
+        notes: ['Saldo insuficiente: faltam 10.000 milhas'],
+      },
+      {
+        strategy: 'cash',
+        label: 'Passagem em dinheiro',
+        cabin: 'economy',
+        cash: { amount: 3500, currency: 'BRL' },
+        miles: 0,
+        program: null,
+        milheiroBrl: 29,
+        effectiveTotalBrl: 3500,
+        breakevenMilheiroBrl: null,
+        notes: [],
+      },
+    ],
     ...overrides,
   }
 }
