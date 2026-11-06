@@ -1,7 +1,7 @@
 /** @type {import('tailwindcss').Config} */
 export default {
   // server/ holds the airline logo gradient palette (server/mapOffer.ts).
-  content: ['./index.html', './src/**/*.{ts,tsx}', './server/**/*.ts'],
+  content: ['./index.html', './privacidade.html', './src/**/*.{ts,tsx}', './server/**/*.ts'],
   theme: {
     extend: {
       fontFamily: {

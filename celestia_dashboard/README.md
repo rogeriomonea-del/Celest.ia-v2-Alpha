@@ -55,3 +55,13 @@ src/
 ├── hooks/useClickOutside.ts
 └── utils/                     # formatação BRL/datas, filtros e ordenação
 ```
+
+## Política de privacidade
+
+`privacidade.html` é uma página estática (sem JavaScript) construída como segunda
+entrada do Vite e servida em `/privacidade` (rewrite em `vercel.json`; em `vite` e
+`vite preview`, pelo plugin `cleanUrls` de `vite.config.ts`). O rodapé do app aponta
+para ela e `src/privacidade.test.ts` garante que o link e a página continuam
+alinhados. O texto descreve o que o código coleta hoje; o contato do responsável
+está marcado `[PREENCHER]` e precisa ser preenchido antes de publicar a URL nas
+telas de consentimento do Google e da Apple.

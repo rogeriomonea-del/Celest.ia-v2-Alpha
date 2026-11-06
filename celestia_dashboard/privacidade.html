@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<!--
+  Política de Privacidade do celest.ia (página estática, sem JavaScript).
+  Servida em /privacidade (rewrite em vercel.json; em `vite`/`vite preview`, pelo
+  plugin cleanUrls em vite.config.ts) e linkada no rodapé do app.
+
+  ANTES DE PUBLICAR, o responsável pelo site precisa:
+    1. Substituir todo texto marcado [PREENCHER: ...] (seção "Contato").
+    2. Atualizar a data em "Última atualização" (texto e atributo datetime).
+    3. Reler as seções "Com quem compartilhamos" e "Base legal" com quem cuida
+       do jurídico. O texto descreve o que o código faz hoje; não é parecer jurídico.
+  Nenhuma pessoa jurídica, CNPJ ou endereço foi inventado neste texto.
+-->
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Política de Privacidade do celest.ia: quais dados a busca de voos usa, onde ficam e com quem são compartilhados."
+    />
+    <title>Política de Privacidade · celest.ia</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/src/index.css" />
+  </head>
+  <body>
+    <header class="border-b border-slate-200 bg-white/90 backdrop-blur">
+      <div class="mx-auto flex h-16 max-w-3xl items-center justify-between px-4 sm:px-6">
+        <a href="/" class="flex items-center gap-2" aria-label="celest.ia — voltar para a busca de voos">
+          <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 shadow-sm">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              width="20"
+              height="20"
+              fill="none"
+              stroke="#ffffff"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z" />
+              <path d="M20 3v4" />
+              <path d="M22 5h-4" />
+              <path d="M4 17v2" />
+              <path d="M5 18H3" />
+            </svg>
+          </span>
+          <span class="text-lg font-extrabold tracking-tight text-slate-900">celest<span class="text-indigo-600">.ia</span></span>
+        </a>
+        <a
+          href="/"
+          class="rounded-full px-4 py-2 text-sm font-semibold text-indigo-700 transition-colors hover:bg-indigo-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+        >
+          Voltar para a busca
+        </a>
+      </div>
+    </header>
+
+    <main class="mx-auto max-w-3xl px-4 py-10 sm:px-6 sm:py-14">
+      <article class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-10">
+        <header>
+          <p class="text-sm font-semibold uppercase tracking-wide text-indigo-600">celest.ia</p>
+          <h1 class="mt-2 text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">Política de Privacidade</h1>
+          <p class="mt-3 text-sm text-slate-500">
+            Última atualização: <time datetime="2026-11-06">6 de novembro de 2026</time>
+          </p>
+          <p class="mt-6 text-base leading-7 text-slate-700">
+            O celest.ia é um buscador de voos: você informa origem, destino, datas, passageiros e cabine, e
+            nós mostramos ofertas reais de companhias aéreas, opcionalmente comparadas com o custo em milhas.
+            Esta página descreve, de forma direta, quais dados o app usa, onde eles ficam e com quem são
+            compartilhados. Ela foi escrita a partir do que o código faz hoje; quando o app mudar, esta
+            página muda junto.
+          </p>
+        </header>
+
+        <section aria-labelledby="resumo" class="mt-8 rounded-xl bg-slate-50 p-5">
+          <h2 id="resumo" class="text-lg font-bold text-slate-900">Em 30 segundos</h2>
+          <ul class="mt-3 list-disc space-y-2 pl-5 text-slate-700">
+            <li>Você pode buscar voos <strong>sem criar conta</strong>. O login (Google ou Apple) serve só para salvar buscas.</li>
+            <li>Ao entrar, recebemos do provedor <strong>nome, e-mail e foto de perfil</strong>. Nada mais.</li>
+            <li>Buscas de voos vão para a <strong>Duffel</strong> e consultas de milhas para a <strong>seats.aero</strong>, sempre <strong>sem dados pessoais</strong>: só rota, datas, quantidade de passageiros, cabine e programa.</li>
+            <li>Suas preferências de milhas (programa, milheiro, saldo) ficam <strong>no seu navegador</strong> e só saem dele junto com uma busca, se o módulo estiver ativado.</li>
+            <li><strong>Não fazemos reservas nem pagamentos</strong>: não pedimos cartão, CPF, passaporte ou dados de viajantes.</li>
+            <li>Sem anúncios, sem analytics de terceiros, sem cookies de rastreamento, sem venda de dados.</li>
+          </ul>
+        </section>
+
+        <nav aria-label="Nesta página" class="mt-8">
+          <h2 class="text-sm font-semibold uppercase tracking-wide text-slate-500">Nesta página</h2>
+          <ol class="mt-2 grid gap-1 text-sm text-indigo-700 sm:grid-cols-2">
+            <li><a class="hover:underline" href="#responsavel">1. Quem é o responsável</a></li>
+            <li><a class="hover:underline" href="#dados">2. Quais dados usamos e para quê</a></li>
+            <li><a class="hover:underline" href="#nao-fazemos">3. O que não fazemos</a></li>
+            <li><a class="hover:underline" href="#compartilhamento">4. Com quem compartilhamos</a></li>
+            <li><a class="hover:underline" href="#navegador">5. Dados guardados no seu navegador</a></li>
+            <li><a class="hover:underline" href="#base-legal">6. Base legal (LGPD)</a></li>
+            <li><a class="hover:underline" href="#retencao">7. Por quanto tempo guardamos</a></li>
+            <li><a class="hover:underline" href="#direitos">8. Seus direitos</a></li>
+            <li><a class="hover:underline" href="#seguranca">9. Segurança</a></li>
+            <li><a class="hover:underline" href="#menores">10. Menores de idade</a></li>
+            <li><a class="hover:underline" href="#alteracoes">11. Alterações desta política</a></li>
+            <li><a class="hover:underline" href="#contato">12. Contato</a></li>
+          </ol>
+        </nav>
+
+        <div class="prose-celestia mt-10 space-y-10 text-slate-700">
+          <section aria-labelledby="responsavel">
+            <h2 id="responsavel" class="text-xl font-bold text-slate-900">1. Quem é o responsável</h2>
+            <p class="mt-3 leading-7">
+              O celest.ia é operado pelo seu responsável, que atua como <strong>controlador</strong> dos dados pessoais
+              nos termos da Lei Geral de Proteção de Dados (LGPD, Lei nº 13.709/2018). Para qualquer assunto
+              relacionado a esta política, use o canal indicado na seção <a class="text-indigo-700 hover:underline" href="#contato">Contato</a>.
+            </p>
+          </section>
+
+          <section aria-labelledby="dados">
+            <h2 id="dados" class="text-xl font-bold text-slate-900">2. Quais dados usamos e para quê</h2>
+
+            <h3 class="mt-5 text-base font-semibold text-slate-900">2.1 Conta e login (Google ou Apple)</h3>
+            <p class="mt-2 leading-7">
+              O login é opcional e feito pelo <strong>Supabase Auth</strong> com os provedores <strong>Google</strong> e
+              <strong>Apple</strong>. Ao entrar, o provedor nos envia o seu perfil básico:
+            </p>
+            <ul class="mt-2 list-disc space-y-1 pl-5">
+              <li><strong>nome</strong> e <strong>e-mail</strong> (se você usar “Ocultar meu e-mail” da Apple, recebemos o endereço de retransmissão gerado pela Apple, não o seu e-mail real);</li>
+              <li><strong>foto de perfil (avatar)</strong>, quando o provedor a fornece — ela é carregada no seu navegador diretamente do servidor do provedor;</li>
+              <li>um <strong>identificador técnico</strong> da sua conta no provedor, usado para reconhecer você nos próximos logins.</li>
+            </ul>
+            <p class="mt-2 leading-7">
+              Usamos esses dados apenas para mostrar seu nome e foto no menu da conta e para associar as buscas salvas
+              a você. Não enviamos e-mails de marketing. Os <strong>tokens de sessão</strong> do login ficam guardados
+              no armazenamento local do seu navegador (<code class="rounded bg-slate-100 px-1 text-sm">localStorage</code>, chaves iniciadas por
+              <code class="rounded bg-slate-100 px-1 text-sm">sb-</code>) pela biblioteca do Supabase, até você sair ou limpar os dados do site.
+            </p>
+
+            <h3 class="mt-5 text-base font-semibold text-slate-900">2.2 Buscas salvas (somente com login)</h3>
+            <p class="mt-2 leading-7">
+              Quando você clica em “Salvar busca”, gravamos no banco de dados do Supabase, associados ao seu identificador de usuário:
+              <strong>origem e destino</strong> (código IATA, cidade, nome do aeroporto e país), <strong>datas</strong> de ida e volta,
+              <strong>tipo de viagem</strong> (ida e volta ou só ida), <strong>quantidade de passageiros</strong> (adultos, crianças e bebês)
+              e <strong>cabine</strong>, além da data em que a busca foi salva. Há um limite de 50 buscas salvas por conta.
+              Você pode excluir cada busca salva a qualquer momento pelo menu da conta. Regras no próprio banco garantem que
+              cada pessoa só vê, cria e exclui as suas próprias buscas.
+            </p>
+
+            <h3 class="mt-5 text-base font-semibold text-slate-900">2.3 Buscas de voos e detalhes de ofertas</h3>
+            <p class="mt-2 leading-7">
+              A cada busca, os parâmetros informados (origem, destino, datas, quantidade de passageiros por tipo e cabine)
+              são enviados aos nossos servidores e repassados à <strong>Duffel</strong>, a plataforma que consulta as companhias
+              aéreas e devolve as ofertas. <strong>Nenhum dado pessoal vai para a Duffel</strong>: não enviamos nome, e-mail,
+              documentos nem identificadores da sua conta. Para crianças e bebês enviamos apenas idades representativas,
+              não as idades reais. Ao abrir os detalhes de uma oferta, consultamos a Duffel pelo identificador da própria
+              oferta. Nós <strong>não gravamos</strong> suas buscas de voos em banco de dados; elas existem apenas durante o
+              processamento da sua solicitação.
+            </p>
+            <p class="mt-2 leading-7">
+              No campo de aeroporto, o texto que você digita (de 2 a 64 caracteres) é enviado à Duffel para sugerir
+              aeroportos e cidades. Essas respostas não contêm dados pessoais e podem ficar em cache na rede de
+              distribuição do nosso provedor de hospedagem por até 24 horas.
+            </p>
+
+            <h3 class="mt-5 text-base font-semibold text-slate-900">2.4 Módulo de milhas (opcional)</h3>
+            <p class="mt-2 leading-7">
+              Se você ativar o módulo de milhas, informa um <strong>programa de fidelidade</strong>, opcionalmente o
+              <strong>valor do milheiro</strong> (reais por mil milhas) e o seu <strong>saldo</strong>. Essas preferências ficam
+              guardadas <strong>apenas no seu navegador</strong> (<code class="rounded bg-slate-100 px-1 text-sm">localStorage</code>, chave
+              <code class="rounded bg-slate-100 px-1 text-sm">celestia:miles</code>) e são enviadas aos nossos servidores
+              <strong>somente junto com uma busca, e somente enquanto o módulo estiver ativado</strong>, para calcular o valor
+              em milhas de cada oferta e avisar quando o saldo não é suficiente. Não gravamos essas preferências no servidor
+              nem as associamos à sua conta.
+            </p>
+            <p class="mt-2 leading-7">
+              Para programas com suporte, consultamos a disponibilidade de passagens por milhas (<em>awards</em>) na
+              <strong>seats.aero</strong>. Para isso enviamos apenas <strong>rota, datas, cabine e programa</strong>.
+              <strong>Seu saldo e seu milheiro nunca são enviados à seats.aero</strong>, e nenhum dado da sua conta vai junto.
+            </p>
+
+            <h3 class="mt-5 text-base font-semibold text-slate-900">2.5 Salvamento pendente durante o login</h3>
+            <p class="mt-2 leading-7">
+              Se você clicar em “Salvar busca” sem estar logado, guardamos os parâmetros daquela busca no
+              <code class="rounded bg-slate-100 px-1 text-sm">sessionStorage</code> do navegador (chave
+              <code class="rounded bg-slate-100 px-1 text-sm">celestia:pendingSave</code>) para concluir o salvamento assim que o
+              login terminar. Esse registro é apagado ao concluir o salvamento, ao cancelar, ou quando você fecha a aba.
+            </p>
+
+            <h3 class="mt-5 text-base font-semibold text-slate-900">2.6 Dados técnicos de conexão</h3>
+            <p class="mt-2 leading-7">
+              Como em qualquer site, o nosso provedor de hospedagem (<strong>Vercel</strong>) registra automaticamente dados técnicos
+              de cada acesso, como endereço IP, tipo de navegador, páginas acessadas e data/hora, para operar e proteger o
+              serviço. Nos nossos registros de erro gravamos apenas o tipo da falha, nunca o conteúdo da sua busca.
+              A fonte tipográfica da interface é carregada do <strong>Google Fonts</strong>, o que faz o seu navegador
+              enviar ao Google uma requisição com o seu endereço IP.
+            </p>
+          </section>
+
+          <section aria-labelledby="nao-fazemos">
+            <h2 id="nao-fazemos" class="text-xl font-bold text-slate-900">3. O que não fazemos</h2>
+            <ul class="mt-3 list-disc space-y-2 pl-5">
+              <li><strong>Não realizamos reservas nem pagamentos.</strong> Não coletamos dados de cartão, CPF, passaporte ou nomes de viajantes. A compra é feita fora do celest.ia, com a companhia ou agência que você escolher.</li>
+              <li><strong>Não vendemos nem alugamos</strong> dados pessoais e não os usamos para publicidade.</li>
+              <li><strong>Não usamos</strong> ferramentas de analytics de terceiros, pixels de redes sociais ou cookies de rastreamento.</li>
+              <li><strong>Não enviamos</strong> seu nome, e-mail ou identificadores da conta para a Duffel, para a seats.aero ou para qualquer companhia aérea.</li>
+              <li><strong>Não gravamos</strong> suas buscas de voos nem suas preferências de milhas em nossos servidores.</li>
+            </ul>
+          </section>
+
+          <section aria-labelledby="compartilhamento">
+            <h2 id="compartilhamento" class="text-xl font-bold text-slate-900">4. Com quem compartilhamos</h2>
+            <p class="mt-3 leading-7">
+              Usamos os serviços abaixo como <strong>operadores</strong> para prestar o serviço. Cada um recebe apenas o
+              necessário para a sua função:
+            </p>
+            <ul class="mt-3 list-disc space-y-2 pl-5">
+              <li><strong>Supabase</strong> (autenticação e banco de dados): perfil de login e buscas salvas.</li>
+              <li><strong>Google</strong> e <strong>Apple</strong> (provedores de login): o login acontece nos sites deles, sob as políticas de privacidade deles; eles sabem que você entrou no celest.ia. O Google também recebe requisições de fonte (Google Fonts) e, quando aplicável, serve a sua foto de perfil.</li>
+              <li><strong>Duffel</strong> (ofertas de voos e sugestões de aeroportos): parâmetros de busca e texto digitado no campo de aeroporto, sem dados pessoais.</li>
+              <li><strong>seats.aero</strong> (disponibilidade de passagens por milhas): rota, datas, cabine e programa, sem dados pessoais.</li>
+              <li><strong>Vercel</strong> (hospedagem do site e das funções de servidor): dados técnicos de conexão.</li>
+            </ul>
+            <p class="mt-3 leading-7">
+              Esses provedores podem processar dados <strong>fora do Brasil</strong>. Quando isso ocorre, a transferência
+              internacional segue o previsto na LGPD. Também podemos compartilhar dados quando exigido por lei ou por ordem
+              de autoridade competente.
+            </p>
+          </section>
+
+          <section aria-labelledby="navegador">
+            <h2 id="navegador" class="text-xl font-bold text-slate-900">5. Dados guardados no seu navegador</h2>
+            <p class="mt-3 leading-7">
+              Não usamos cookies próprios de rastreamento. O celest.ia guarda no armazenamento do seu navegador apenas:
+            </p>
+            <ul class="mt-3 list-disc space-y-2 pl-5">
+              <li><code class="rounded bg-slate-100 px-1 text-sm">localStorage</code> · chaves iniciadas por <code class="rounded bg-slate-100 px-1 text-sm">sb-</code>: sessão de login (Supabase).</li>
+              <li><code class="rounded bg-slate-100 px-1 text-sm">localStorage</code> · <code class="rounded bg-slate-100 px-1 text-sm">celestia:miles</code>: preferências do módulo de milhas (ativado ou não, programa, milheiro, saldo).</li>
+              <li><code class="rounded bg-slate-100 px-1 text-sm">sessionStorage</code> · <code class="rounded bg-slate-100 px-1 text-sm">celestia:pendingSave</code>: busca aguardando login para ser salva.</li>
+            </ul>
+            <p class="mt-3 leading-7">
+              Você pode apagar tudo isso a qualquer momento limpando os dados do site nas configurações do navegador.
+              Sair da conta remove a sessão de login; desativar o módulo de milhas faz com que suas preferências de milhas
+              deixem de ser enviadas nas buscas.
+            </p>
+          </section>
+
+          <section aria-labelledby="base-legal">
+            <h2 id="base-legal" class="text-xl font-bold text-slate-900">6. Base legal (LGPD)</h2>
+            <ul class="mt-3 list-disc space-y-2 pl-5">
+              <li><strong>Execução do serviço que você solicita</strong> (art. 7º, V): login, buscas salvas, buscas de voos e consultas de milhas.</li>
+              <li><strong>Consentimento</strong> (art. 7º, I): o módulo de milhas é opcional e só funciona se você o ativar; você pode desativá-lo quando quiser.</li>
+              <li><strong>Legítimo interesse</strong> (art. 7º, IX): registros técnicos de conexão e de erros, para segurança e estabilidade do serviço.</li>
+            </ul>
+          </section>
+
+          <section aria-labelledby="retencao">
+            <h2 id="retencao" class="text-xl font-bold text-slate-900">7. Por quanto tempo guardamos</h2>
+            <ul class="mt-3 list-disc space-y-2 pl-5">
+              <li><strong>Perfil de login:</strong> enquanto a sua conta existir.</li>
+              <li><strong>Buscas salvas:</strong> até você excluí-las ou até a exclusão da conta.</li>
+              <li><strong>Buscas de voos e consultas de milhas:</strong> não são armazenadas por nós.</li>
+              <li><strong>Dados no navegador:</strong> até você sair da conta, fechar a aba (no caso do <code class="rounded bg-slate-100 px-1 text-sm">sessionStorage</code>) ou limpar os dados do site.</li>
+              <li><strong>Registros técnicos de hospedagem:</strong> pelo prazo definido pelo provedor de hospedagem.</li>
+            </ul>
+          </section>
+
+          <section aria-labelledby="direitos">
+            <h2 id="direitos" class="text-xl font-bold text-slate-900">8. Seus direitos</h2>
+            <p class="mt-3 leading-7">
+              Nos termos do art. 18 da LGPD, você pode, a qualquer momento, pedir: confirmação de que tratamos seus dados;
+              acesso aos dados; correção de dados incompletos ou desatualizados; anonimização, bloqueio ou eliminação de
+              dados desnecessários; portabilidade; informação sobre com quem compartilhamos; e revogação do consentimento.
+            </p>
+            <p class="mt-3 leading-7">Boa parte disso você mesmo faz no app:</p>
+            <ul class="mt-2 list-disc space-y-1 pl-5">
+              <li>excluir buscas salvas: menu da conta → “Buscas salvas” → ícone de lixeira;</li>
+              <li>encerrar a sessão: menu da conta → “Sair”;</li>
+              <li>parar de enviar preferências de milhas: desativar o módulo de milhas;</li>
+              <li>apagar dados locais: limpar os dados do site no navegador.</li>
+            </ul>
+            <p class="mt-3 leading-7">
+              Para <strong>excluir a sua conta</strong> (o que remove o perfil de login e todas as buscas salvas) ou para
+              qualquer outro pedido, fale conosco pelo canal da seção <a class="text-indigo-700 hover:underline" href="#contato">Contato</a>.
+              Você também pode revogar o acesso do celest.ia nas configurações de segurança da sua conta Google ou Apple.
+            </p>
+          </section>
+
+          <section aria-labelledby="seguranca">
+            <h2 id="seguranca" class="text-xl font-bold text-slate-900">9. Segurança</h2>
+            <p class="mt-3 leading-7">
+              Toda a comunicação usa HTTPS. As chaves de acesso à Duffel e à seats.aero ficam apenas nos nossos servidores e
+              nunca chegam ao navegador. No banco de dados, políticas de segurança em nível de linha garantem que cada conta
+              acessa somente os seus próprios registros. Nenhum sistema é infalível; se identificarmos um incidente que afete
+              seus dados, comunicaremos você e a autoridade competente conforme a LGPD.
+            </p>
+          </section>
+
+          <section aria-labelledby="menores">
+            <h2 id="menores" class="text-xl font-bold text-slate-900">10. Menores de idade</h2>
+            <p class="mt-3 leading-7">
+              O celest.ia não é direcionado a menores de 18 anos e não coleta intencionalmente dados deles. A quantidade de
+              crianças e bebês informada em uma busca é apenas um número de passageiros, sem qualquer identificação.
+            </p>
+          </section>
+
+          <section aria-labelledby="alteracoes">
+            <h2 id="alteracoes" class="text-xl font-bold text-slate-900">11. Alterações desta política</h2>
+            <p class="mt-3 leading-7">
+              Quando o app mudar o que coleta ou com quem compartilha, esta página será atualizada e a data no topo,
+              revisada. Mudanças relevantes serão destacadas no próprio app.
+            </p>
+          </section>
+
+          <section aria-labelledby="contato">
+            <h2 id="contato" class="text-xl font-bold text-slate-900">12. Contato</h2>
+            <p class="mt-3 leading-7">
+              Para exercer seus direitos, tirar dúvidas ou pedir a exclusão da conta, escreva para o responsável pelo celest.ia:
+            </p>
+            <div
+              role="note"
+              class="mt-4 rounded-xl border-2 border-dashed border-amber-400 bg-amber-50 p-4 text-amber-900"
+            >
+              <p class="font-semibold">⚠️ Pendência do responsável pelo site — substituir antes de publicar</p>
+              <ul class="mt-2 list-disc space-y-1 pl-5">
+                <li>E-mail para assuntos de privacidade: <strong>[PREENCHER: e-mail de contato]</strong></li>
+                <li>Encarregado(a) pelo tratamento de dados (DPO), se houver: <strong>[PREENCHER: nome ou “o próprio responsável”]</strong></li>
+              </ul>
+            </div>
+            <p class="mt-4 leading-7">
+              Respondemos no prazo previsto na LGPD. Se preferir, você também pode registrar uma reclamação junto à
+              Autoridade Nacional de Proteção de Dados (ANPD).
+            </p>
+          </section>
+        </div>
+      </article>
+    </main>
+
+    <footer class="mt-8 border-t border-slate-200 bg-white">
+      <div class="mx-auto flex max-w-3xl flex-col items-center justify-between gap-3 px-4 py-8 text-sm text-slate-500 sm:flex-row sm:px-6">
+        <p>© 2026 celest.ia · Compare voos com inteligência.</p>
+        <nav aria-label="Rodapé">
+          <a href="/" class="transition-colors hover:text-slate-900">Busca de voos</a>
+        </nav>
+      </div>
+    </footer>
+  </body>
+</html>
