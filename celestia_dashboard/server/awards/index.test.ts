@@ -50,14 +50,14 @@ afterEach(() => {
 describe('lookupAwards', () => {
   it('skips programs without an award source', async () => {
     const result = await lookupAwards(req, latam, new AbortController().signal)
-    expect(result).toEqual({ awardsByCabin: {}, awardSource: null, awardsSearched: false, awardsNote: AWARD_NOTES.unsupported })
+    expect(result).toEqual({ awardsByCabin: {}, candidates: [], awardSource: null, awardsSearched: false, awardsNote: AWARD_NOTES.unsupported })
     expect(searchAwardsMock).not.toHaveBeenCalled()
   })
 
   it('skips the lookup when SEATS_AERO_API_KEY is not set', async () => {
     vi.stubEnv('SEATS_AERO_API_KEY', '  ')
     const result = await lookupAwards(req, smiles, new AbortController().signal)
-    expect(result).toEqual({ awardsByCabin: {}, awardSource: null, awardsSearched: false, awardsNote: AWARD_NOTES.notConfigured })
+    expect(result).toEqual({ awardsByCabin: {}, candidates: [], awardSource: null, awardsSearched: false, awardsNote: AWARD_NOTES.notConfigured })
     expect(searchAwardsMock).not.toHaveBeenCalled()
   })
 
@@ -69,9 +69,10 @@ describe('lookupAwards', () => {
     expect(result.awardsNote).toBeNull()
     expect(result.awardsByCabin.business?.miles).toBe(70_000)
     expect(result.awardsByCabin.economy?.miles).toBe(30_000)
+    expect(result.candidates).toHaveLength(3)
 
     const [lookup, options] = searchAwardsMock.mock.calls[0]
-    expect(lookup).toMatchObject({ cabin: 'business', origin: 'GRU', destination: 'MAD', date: '2026-12-01' })
+    expect(lookup).toMatchObject({ cabin: 'business', origin: 'GRU', destination: 'MAD', date: '2026-12-01', returnDate: null })
     expect(lookup.program.code).toBe('smiles')
     expect(options.apiKey).toBe(KEY)
   })
@@ -79,7 +80,7 @@ describe('lookupAwards', () => {
   it('turns a provider error into a note, never a failure, and does not log the key', async () => {
     searchAwardsMock.mockRejectedValue(new Error(`HTTP 500 for key ${KEY}`))
     const result = await lookupAwards(req, smiles, new AbortController().signal)
-    expect(result).toEqual({ awardsByCabin: {}, awardSource: 'seats_aero', awardsSearched: false, awardsNote: AWARD_NOTES.failed })
+    expect(result).toEqual({ awardsByCabin: {}, candidates: [], awardSource: 'seats_aero', awardsSearched: false, awardsNote: AWARD_NOTES.failed })
     const logged = vi.mocked(console.error).mock.calls.map((args) => args.map(String).join(' ')).join('\n')
     expect(logged).toContain('[awards]')
     expect(logged).not.toContain(KEY)
@@ -95,7 +96,7 @@ describe('lookupAwards', () => {
     const started = Date.now()
     const result = await lookupAwards(req, smiles, new AbortController().signal, 50)
     expect(Date.now() - started).toBeLessThan(2_000)
-    expect(result).toEqual({ awardsByCabin: {}, awardSource: 'seats_aero', awardsSearched: false, awardsNote: AWARD_NOTES.failed })
+    expect(result).toEqual({ awardsByCabin: {}, candidates: [], awardSource: 'seats_aero', awardsSearched: false, awardsNote: AWARD_NOTES.failed })
     expect(providerSignal?.aborted).toBe(true)
   })
 

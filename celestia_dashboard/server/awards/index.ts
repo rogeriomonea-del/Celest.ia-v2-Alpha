@@ -2,7 +2,7 @@
 import type { SearchRequest } from '../../src/shared/api.js'
 import { findMilesProgram } from '../../src/shared/miles.js'
 import type { MilesProgramInfo } from '../../src/shared/miles.js'
-import type { AwardFare, CabinClass } from '../../src/types.js'
+import type { AwardFare, CabinClass, Flight } from '../../src/types.js'
 import type { MilesSettings } from '../miles/calculator.js'
 import { searchAwards } from './seatsAero.js'
 
@@ -20,12 +20,16 @@ export interface AwardLookup {
   destination: string
   /** Outbound date, AAAA-MM-DD. */
   date: string
+  /** Return date for a round trip (awards then cover both directions); null = one way. */
+  returnDate: string | null
   program: MilesProgramInfo
 }
 
 export interface AwardLookupResult {
   /** Fewest-miles award per cabin. */
   awardsByCabin: Partial<Record<CabinClass, AwardFare>>
+  /** Every award found, for matching each offer's own flights. */
+  candidates: AwardFare[]
   awardSource: 'seats_aero' | null
   awardsSearched: boolean
   awardsNote: string | null
@@ -47,11 +51,11 @@ export async function lookupAwards(
 ): Promise<AwardLookupResult> {
   const program = findMilesProgram(settings.program)
   if (!program?.awardSource) {
-    return { awardsByCabin: {}, awardSource: null, awardsSearched: false, awardsNote: AWARD_NOTES.unsupported }
+    return { awardsByCabin: {}, candidates: [], awardSource: null, awardsSearched: false, awardsNote: AWARD_NOTES.unsupported }
   }
   const apiKey = process.env.SEATS_AERO_API_KEY?.trim()
   if (!apiKey) {
-    return { awardsByCabin: {}, awardSource: null, awardsSearched: false, awardsNote: AWARD_NOTES.notConfigured }
+    return { awardsByCabin: {}, candidates: [], awardSource: null, awardsSearched: false, awardsNote: AWARD_NOTES.notConfigured }
   }
 
   const lookup: AwardLookup = {
@@ -59,6 +63,7 @@ export async function lookupAwards(
     origin: req.origin,
     destination: req.destination,
     date: req.departDate,
+    returnDate: req.returnDate,
     program,
   }
   const combined = AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)])
@@ -69,11 +74,31 @@ export async function lookupAwards(
       const best = awardsByCabin[award.cabin]
       if (!best || award.miles < best.miles) awardsByCabin[award.cabin] = award
     }
-    return { awardsByCabin, awardSource: 'seats_aero', awardsSearched: true, awardsNote: null }
+    return { awardsByCabin, candidates: awards, awardSource: 'seats_aero', awardsSearched: true, awardsNote: null }
   } catch (err) {
     const name = err instanceof Error ? err.name : typeof err
     const message = err instanceof Error ? err.message.split(apiKey).join('[redacted]') : ''
     console.error('[awards] seats.aero lookup failed', name, message)
-    return { awardsByCabin: {}, awardSource: 'seats_aero', awardsSearched: false, awardsNote: AWARD_NOTES.failed }
+    return { awardsByCabin: {}, candidates: [], awardSource: 'seats_aero', awardsSearched: false, awardsNote: AWARD_NOTES.failed }
   }
+}
+
+const normalizeFlightNumbers = (numbers: string[]) => numbers.map((n) => n.replace(/\s+/g, '').toUpperCase()).join(',')
+
+/**
+ * The award for this offer's exact flights (every slice, in order) when one was found,
+ * flagged matchesItinerary; otherwise the cabin's cheapest award, flagged as not matching.
+ */
+export function awardForOffer(
+  offer: Flight,
+  candidates: AwardFare[],
+  cheapest: AwardFare | null,
+  cabin: CabinClass,
+): AwardFare | null {
+  const wanted = normalizeFlightNumbers(offer.slices.flatMap((slice) => slice.segments.map((segment) => segment.flightNumber)))
+  const match = candidates
+    .filter((award) => award.cabin === cabin && award.flightNumbers && normalizeFlightNumbers(award.flightNumbers) === wanted)
+    .sort((a, b) => a.miles - b.miles)[0]
+  if (match) return { ...match, matchesItinerary: true }
+  return cheapest ? { ...cheapest, matchesItinerary: false } : null
 }

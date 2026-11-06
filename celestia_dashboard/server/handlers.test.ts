@@ -9,12 +9,12 @@ import type { DuffelOffer } from './duffel.js'
 import { SEARCH_TIMEOUT_MS, SUPPLIER_TIMEOUT_MS } from './duffel.js'
 import { MESSAGES } from './http.js'
 import { AWARD_NOTES } from './awards/index.js'
-import { searchAwards } from './awards/seatsAero.js'
+import { clearAwardCache, searchAwards } from './awards/seatsAero.js'
 
 // Spy on the award provider; by default it runs the real implementation.
 vi.mock('./awards/seatsAero.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./awards/seatsAero.js')>()
-  return { searchAwards: vi.fn(actual.searchAwards) }
+  return { ...actual, searchAwards: vi.fn(actual.searchAwards) }
 })
 const searchAwardsMock = vi.mocked(searchAwards)
 const { searchAwards: realSearchAwards } = await vi.importActual<typeof import('./awards/seatsAero.js')>('./awards/seatsAero.js')
@@ -72,6 +72,7 @@ beforeEach(() => {
   vi.stubEnv('DUFFEL_ACCESS_TOKEN', TOKEN)
   vi.stubEnv('SEATS_AERO_API_KEY', SEATS_AERO_KEY)
   searchAwardsMock.mockReset().mockImplementation(realSearchAwards)
+  clearAwardCache()
   vi.spyOn(console, 'error').mockImplementation(() => {})
 })
 
@@ -373,8 +374,10 @@ describe('POST /api/flights/search with miles', () => {
   })
 
   it('still returns valued offers when the award provider fails', async () => {
-    // Default implementation: the real provider, which currently throws.
-    fetchMock.mockResolvedValue(duffelOk())
+    // Default implementation: the real provider, here answered with a 500 by seats.aero.
+    fetchMock.mockImplementation(async (url) =>
+      String(url).startsWith('https://seats.aero/') ? new Response('boom', { status: 500 }) : duffelOk(),
+    )
     const res = await searchPOST(milesSearch({ program: 'smiles', milheiroBrl: null, balance: 0 }))
     expect(res.status).toBe(200)
     const body = (await res.json()) as SearchResponse
@@ -385,6 +388,22 @@ describe('POST /api/flights/search with miles', () => {
     expect(miles?.equivalentMiles).toBe(50_000)
     expect(miles?.award).toBeNull()
     expect(miles?.options.map((o) => o.strategy)).toEqual(['cash'])
+  })
+
+  it('gives each offer the award for its own flights across all slices, else the cheapest one', async () => {
+    const roundTrip = { ...fixture.roundTripWithConnection, id: 'off_rt_match', total_amount: '3000.00', total_currency: 'BRL' }
+    fetchMock.mockResolvedValue(duffelJson({ data: { id: 'orq_1', offers: [roundTrip, ...pricedOffers()] } }, 201))
+    searchAwardsMock.mockResolvedValue([
+      { ...award('premium', 50_000), flightNumbers: ['LA 9999'] },
+      { ...award('premium', 80_000), flightNumbers: ['tp82', 'TP 1026', 'TP 1027', 'TP  81'] },
+      { ...award('economy', 10_000), flightNumbers: ['TP 82', 'TP 1026', 'TP 1027', 'TP 81'] },
+    ])
+    const body = (await (await searchPOST(milesSearch({ program: 'smiles', milheiroBrl: null, balance: 0 }))).json()) as SearchResponse
+    expect(searchAwardsMock.mock.calls[0][0]).toMatchObject({ date: '2026-12-01', returnDate: '2026-12-15' })
+    expect(byId(body, 'off_rt_match')?.miles?.award).toMatchObject({ miles: 80_000, cabin: 'premium', matchesItinerary: true })
+    expect(byId(body, 'off_miles_cheap')?.miles?.award).toMatchObject({ miles: 50_000, matchesItinerary: false })
+    const matched = byId(body, 'off_rt_match')?.miles?.options.find((o) => o.strategy === 'award')
+    expect(matched?.notes).not.toContain('Voos podem diferir da oferta')
   })
 
   it('reports award lookups as not configured without SEATS_AERO_API_KEY', async () => {
