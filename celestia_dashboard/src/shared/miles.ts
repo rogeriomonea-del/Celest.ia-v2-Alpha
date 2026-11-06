@@ -17,7 +17,7 @@ export const MILES_PROGRAMS: readonly MilesProgramInfo[] = [
   { code: 'latampass', name: 'LATAM Pass', defaultMilheiroBrl: 29, awardSource: null },
   { code: 'smiles', name: 'Smiles (GOL)', defaultMilheiroBrl: 22, awardSource: 'smiles' },
   { code: 'azul', name: 'Azul Fidelidade', defaultMilheiroBrl: 24, awardSource: 'azul' },
-  { code: 'connectmiles', name: 'ConnectMiles (Copa)', defaultMilheiroBrl: 34, awardSource: null },
+  { code: 'connectmiles', name: 'ConnectMiles (Copa)', defaultMilheiroBrl: 34, awardSource: 'connectmiles' },
   { code: 'lifemiles', name: 'LifeMiles (Avianca)', defaultMilheiroBrl: null, awardSource: 'lifemiles' },
   { code: 'aeroplan', name: 'Aeroplan (Air Canada)', defaultMilheiroBrl: null, awardSource: 'aeroplan' },
   { code: 'aadvantage', name: 'AAdvantage (American)', defaultMilheiroBrl: null, awardSource: 'american' },
