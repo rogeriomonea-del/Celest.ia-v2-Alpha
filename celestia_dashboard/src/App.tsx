@@ -43,7 +43,6 @@ const PRICE_STEP = 50
 type Status = 'idle' | 'loading' | 'error' | 'results'
 
 const PAST_DATES_HINT = 'As datas desta busca já passaram. Escolha novas datas e busque novamente.'
-const SAVE_FAILED = 'Não foi possível salvar a busca. Tente novamente.'
 
 /** Search the user asked to save while logged out; survives the OAuth redirect. */
 export const PENDING_SAVE_KEY = 'celestia:pendingSave'
@@ -153,7 +152,7 @@ export default function App() {
   const { user, loginOpen } = useAuth()
   const userId = user?.id ?? null
   const wasLoginOpenRef = useRef(false)
-  const { save } = useSavedSearches()
+  const { save, loaded: savedListLoaded } = useSavedSearches()
   const loading = status === 'loading'
 
   const runSearch = useCallback((nextParams: SearchParams) => {
@@ -214,13 +213,13 @@ export default function App() {
 
   /** Saves `target`; the result is applied only if no search ran meanwhile. */
   const saveSearch = useCallback(
-    async (target: SearchParams, loggedIn: boolean) => {
+    async (target: SearchParams) => {
       const seq = searchSeqRef.current
       setSaveError(null)
-      const saved = await save(target)
+      const result = await save(target)
       if (searchSeqRef.current !== seq) return
-      if (saved) setSavedId(saved.id)
-      else if (loggedIn) setSaveError(SAVE_FAILED)
+      if (result.status === 'saved') setSavedId(result.saved.id)
+      else if (result.status === 'error') setSaveError(result.message)
     },
     [save],
   )
@@ -235,7 +234,7 @@ export default function App() {
     if (!searchedParams) return
     // save() opens the OAuth login, which leaves the page: keep the search to resume it.
     if (!userId) storePendingSave(searchedParams)
-    await saveSearch(searchedParams, userId !== null)
+    await saveSearch(searchedParams)
   }
 
   // Login dialog dismissed without signing in: the pending save is abandoned.
@@ -245,8 +244,10 @@ export default function App() {
   }, [loginOpen, userId])
 
   // Back from login with a pending save: restore that search, run it and save it.
+  // save() finds an identical search only in the loaded list, so resuming before
+  // the user's list is in would insert a duplicate of a search saved earlier.
   useEffect(() => {
-    if (!userId) return
+    if (!userId || !savedListLoaded) return
     const pending = takePendingSave()
     if (!pending) return
     const today = startOfDay(new Date())
@@ -258,8 +259,8 @@ export default function App() {
     }
     setFormKey((key) => key + 1)
     runSearch(pending)
-    void saveSearch(pending, true)
-  }, [userId, runSearch, saveSearch])
+    void saveSearch(pending)
+  }, [userId, savedListLoaded, runSearch, saveSearch])
 
   const priceBounds = useMemo(() => {
     if (results.length === 0) return { min: 0, max: 0 }

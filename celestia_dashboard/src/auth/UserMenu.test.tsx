@@ -19,7 +19,8 @@ vi.mock('../lib/supabase', () => ({
   isAuthConfigured: true,
 }))
 
-vi.mock('../features/savedSearches/repository', () => ({
+vi.mock('../features/savedSearches/repository', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../features/savedSearches/repository')>()),
   listSavedSearches: vi.fn(),
   createSavedSearch: vi.fn(),
   deleteSavedSearch: vi.fn(),
