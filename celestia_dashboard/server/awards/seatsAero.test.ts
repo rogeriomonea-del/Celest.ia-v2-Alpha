@@ -290,18 +290,29 @@ describe('searchAwards (seats.aero)', () => {
     expect(fetchMock).toHaveBeenCalledTimes(3)
   })
 
-  it('passes the abort signal to fetch', async () => {
+  it('settles on the caller abort without aborting the shared fetch', async () => {
     const controller = new AbortController()
-    fetchMock.mockImplementation(
-      (_url, init) =>
-        new Promise((_resolve, reject) => {
-          init?.signal?.addEventListener('abort', () => reject(init.signal?.reason), { once: true })
-        }),
-    )
+    fetchMock.mockImplementation(() => new Promise(() => {}))
     const pending = searchAwards(lookup(), { apiKey: KEY, signal: controller.signal })
     controller.abort()
     await expect(pending).rejects.toBeDefined()
-    expect(fetchMock.mock.calls[0][1]?.signal).toBe(controller.signal)
+    const fetchSignal = fetchMock.mock.calls[0][1]?.signal
+    expect(fetchSignal).not.toBe(controller.signal)
+    expect(fetchSignal?.aborted).toBe(false)
+  })
+
+  it('still serves a second caller after the first one aborts the shared lookup', async () => {
+    let resolveFetch: (value: Response) => void = () => {}
+    fetchMock.mockImplementation(() => new Promise<Response>((resolve) => { resolveFetch = resolve }))
+    const first = new AbortController()
+    const second = new AbortController()
+    const firstCall = searchAwards(lookup(), { apiKey: KEY, signal: first.signal })
+    const secondCall = searchAwards(lookup({ passengers: 2 }), { apiKey: KEY, signal: second.signal })
+    first.abort()
+    await expect(firstCall).rejects.toBeDefined()
+    resolveFetch(ok([row()]))
+    expect((await secondCall).map((f) => f.miles)).toEqual([70000])
+    expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
   describe('round trips', () => {

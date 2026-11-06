@@ -154,6 +154,9 @@ interface SearchParams {
   endDate: string
 }
 
+/** Upper bound for one shared seats.aero call; callers race their own signal in searchAwards. */
+const FETCH_TIMEOUT_MS = 8_000
+
 async function cachedSearch(lookup: AwardLookup, params: SearchParams, options: SeatsAeroOptions): Promise<SeatsAeroAvailability[]> {
   throwIfBlocked()
   const url = new URL('search', SEATS_AERO_BASE_URL)
@@ -171,10 +174,12 @@ async function cachedSearch(lookup: AwardLookup, params: SearchParams, options: 
   }
   for (const [key, value] of Object.entries(query)) url.searchParams.set(key, value)
 
+  // The fetch is shared by every caller waiting on this direction (see track), so it
+  // must not die with the first caller's abort: it gets its own timeout instead.
   const response = await fetch(url, {
     method: 'GET',
     headers: { 'Partner-Authorization': options.apiKey, Accept: 'application/json' },
-    signal: options.signal,
+    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
   })
   const text = await response.text()
   if (!response.ok) {
@@ -350,11 +355,21 @@ export async function searchAwards(lookup: AwardLookup, options: SeatsAeroOption
   // Each leg is checked before pairing: a pair's seat count is unknown when either leg's is.
   const seated = (fares: AwardFare[]) => fares.filter((fare) => hasSeatsFor(fare, lookup.passengers))
   const outbound: Direction = { origin: lookup.origin, destination: lookup.destination, date: lookup.date }
-  if (!lookup.returnDate) {
-    const [outs] = await directionAwards(lookup, [outbound], options)
-    return seated(outs)
-  }
-  const inbound: Direction = { origin: lookup.destination, destination: lookup.origin, date: lookup.returnDate }
-  const [outs, rets] = await directionAwards(lookup, [outbound, inbound], options)
-  return pairAwards(seated(outs), seated(rets))
+  const inbound: Direction | null = lookup.returnDate
+    ? { origin: lookup.destination, destination: lookup.origin, date: lookup.returnDate }
+    : null
+  const directions = inbound ? [outbound, inbound] : [outbound]
+  // The caller's abort settles this promise; the shared fetch keeps going for the other callers.
+  const [outs, rets] = await Promise.race([directionAwards(lookup, directions, options), abortedBy(options.signal)])
+  return inbound ? pairAwards(seated(outs), seated(rets)) : seated(outs)
+}
+
+function abortedBy(signal: AbortSignal): Promise<never> {
+  return new Promise((_resolve, reject) => {
+    if (signal.aborted) {
+      reject(signal.reason ?? new DOMException('aborted', 'AbortError'))
+      return
+    }
+    signal.addEventListener('abort', () => reject(signal.reason ?? new DOMException('aborted', 'AbortError')), { once: true })
+  })
 }
