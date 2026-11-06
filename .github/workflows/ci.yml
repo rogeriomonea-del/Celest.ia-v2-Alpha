@@ -30,5 +30,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install -r requirements-dev.txt
+      - run: pip install -r requirements-dev.txt -r engine/requirements.txt
+      - run: python -m compileall -q engine/celestia_engine
+      # pytest.ini roda tests/ e engine/tests/
       - run: pytest -q

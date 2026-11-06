@@ -8,3 +8,6 @@ __pycache__/
 .vercel
 node_modules/
 .DS_Store
+
+# motor Python (engine/): dados locais gerados em runtime
+engine/data/
