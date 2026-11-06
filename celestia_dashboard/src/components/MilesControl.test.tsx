@@ -114,11 +114,42 @@ describe('MilesControl', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Milheiro inválido')
 
     fireEvent.change(milheiroInput(), { target: { value: '25' } })
-    fireEvent.change(balanceInput(), { target: { value: '10.5' } })
+    // Dots are pt-BR thousands separators now; a decimal comma is still not a balance.
+    fireEvent.change(balanceInput(), { target: { value: '10,5' } })
     fireEvent.click(screen.getByRole('button', { name: 'Aplicar' }))
     expect(screen.getByRole('alert')).toHaveTextContent('Saldo de milhas inválido')
     expect(onApply).not.toHaveBeenCalled()
     expect(screen.getByRole('dialog')).toBeInTheDocument()
+  })
+
+  it('accepts a pt-BR formatted balance and shows the parsed value beside the field', () => {
+    const onApply = renderControl()
+    fireEvent.click(trigger())
+    expect(balanceInput()).toHaveAttribute('type', 'text')
+    expect(balanceInput()).toHaveAttribute('inputmode', 'numeric')
+
+    fireEvent.change(balanceInput(), { target: { value: '60.000' } })
+    expect(balanceInput()).toHaveAccessibleDescription('60.000 milhas')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Aplicar' }))
+    expect(onApply).toHaveBeenCalledWith({ enabled: false, program: 'latampass', milheiroBrl: null, balance: 60000 })
+  })
+
+  it('rejects a balance with letters', () => {
+    const onApply = renderControl()
+    fireEvent.click(trigger())
+    fireEvent.change(balanceInput(), { target: { value: 'abc' } })
+    expect(balanceInput()).toHaveAccessibleDescription('')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Aplicar' }))
+    expect(screen.getByRole('alert')).toHaveTextContent('Saldo de milhas inválido')
+    expect(onApply).not.toHaveBeenCalled()
+  })
+
+  it('anchors the popover to the right from sm up, where the trigger sits at the end of the row', () => {
+    renderControl()
+    fireEvent.click(trigger())
+    expect(screen.getByRole('dialog')).toHaveClass('sm:right-0', 'sm:left-auto')
   })
 
   it('Escape closes without applying and returns focus to the trigger', () => {
