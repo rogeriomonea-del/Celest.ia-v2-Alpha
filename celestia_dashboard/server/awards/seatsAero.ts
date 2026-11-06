@@ -9,7 +9,7 @@ export const AWARD_CACHE_TTL_MS = 10 * 60_000
 export const AWARD_CACHE_MAX_ENTRIES = 200
 /** Round trips up to this many days apart are fetched in a single call covering both directions. */
 export const SINGLE_CALL_MAX_DAYS = 30
-/** Cheapest awards kept per direction, in the cache and when pairing outbound and return awards. */
+/** Cheapest awards returned per direction once awards with too few seats are dropped; also the pairing bound for round trips. */
 export const MAX_AWARDS_PER_DIRECTION = 50
 /** Round-trip pairs returned per lookup, cheapest first. */
 export const MAX_ROUND_TRIP_PAIRS = 400
@@ -79,7 +79,11 @@ interface Direction {
 
 interface CacheEntry {
   expiresAt: number
-  /** At most MAX_AWARDS_PER_DIRECTION, cheapest first. */
+  /**
+   * Every award of the direction in the lookup's cabin, cheapest first. Not capped: the entry is
+   * shared by lookups with different passenger counts, so the seat filter and the cap are applied
+   * on read. Bounded by the trips seats.aero returns for one route-day (take=100 rows, one direction).
+   */
   awards: AwardFare[]
 }
 
@@ -290,7 +294,7 @@ export function combineAwards(out: AwardFare, ret: AwardFare): AwardFare {
 /** True unless the award is known to have fewer seats left than `passengers`. */
 export const hasSeatsFor = (award: AwardFare, passengers: number) => award.seatsLeft === null || award.seatsLeft >= passengers
 
-const cheapestFirst = (fares: AwardFare[]) => [...fares].sort((a, b) => a.miles - b.miles).slice(0, MAX_AWARDS_PER_DIRECTION)
+const cheapestFirst = (fares: AwardFare[]) => [...fares].sort((a, b) => a.miles - b.miles)
 
 function daysBetween(from: string, to: string): number {
   return (Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000
@@ -311,7 +315,8 @@ function track(key: string, fetching: Promise<AwardFare[]>): Promise<AwardFare[]
 }
 
 /**
- * Awards per direction, cheapest first, from the cache, a fetch already in flight, or seats.aero.
+ * Every award per direction, cheapest first, from the cache, a fetch already in flight, or seats.aero.
+ * Not capped here: the seat filter and MAX_AWARDS_PER_DIRECTION are applied on read (searchAwards).
  * Two uncached directions up to SINGLE_CALL_MAX_DAYS apart share one call; otherwise each
  * direction is fetched and cached on its own, so one failed leg does not waste the other.
  */
@@ -352,8 +357,10 @@ function pairAwards(outs: AwardFare[], rets: AwardFare[]): AwardFare[] {
  * each fare pairs an outbound and a return award (the Duffel offer prices both slices).
  */
 export async function searchAwards(lookup: AwardLookup, options: SeatsAeroOptions): Promise<AwardFare[]> {
-  // Each leg is checked before pairing: a pair's seat count is unknown when either leg's is.
-  const seated = (fares: AwardFare[]) => fares.filter((fare) => hasSeatsFor(fare, lookup.passengers))
+  // Each leg is filtered, then capped, before pairing: the cap must not hide a seated award behind
+  // cheaper ones with too few seats, and a pair's seat count is unknown when either leg's is.
+  const seated = (fares: AwardFare[]) =>
+    fares.filter((fare) => hasSeatsFor(fare, lookup.passengers)).slice(0, MAX_AWARDS_PER_DIRECTION)
   const outbound: Direction = { origin: lookup.origin, destination: lookup.destination, date: lookup.date }
   const inbound: Direction | null = lookup.returnDate
     ? { origin: lookup.destination, destination: lookup.origin, date: lookup.returnDate }
